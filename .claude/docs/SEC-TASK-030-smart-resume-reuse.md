@@ -2,7 +2,7 @@
 
 **Date**: 2026-03-11
 **Auditor**: Claude (Security Engineer)
-**Scope**: TASK-030 M1+M2+M3 — Knowledge Base foundation (4 M1 modules, 3 DB tables, 2 config models) + Scoring Engine (2 M2 modules) + LaTeX Engine (compile_latex, escape_latex, TinyTeX bundling)
+**Scope**: TASK-030 M1+M2+M3+M4 — Knowledge Base foundation (4 M1 modules, 3 DB tables, 2 config models) + Scoring Engine (2 M2 modules) + LaTeX Engine (compile_latex, escape_latex, TinyTeX bundling) + Resume Assembly (resume_assembler, save_assembled_resume, _ingest_llm_output)
 
 ---
 
@@ -27,18 +27,22 @@
 | 15 | Medium | B1 | LaTeX injection via user content — `escape_latex()` escapes 9 special chars (`{`, `}`, `$`, `&`, `#`, `^`, `_`, `~`, `%`) before template rendering. Backslash is intentionally preserved (needed for LaTeX commands in templates). User content flows through escape_latex() before insertion, preventing unintended formatting from special chars. | MITIGATED |
 | 16 | Info | B7 | Subprocess timeout — 30s default timeout on pdflatex execution. Prevents hang if LaTeX enters infinite loop or waits for input. `subprocess.TimeoutExpired` caught and logged. | MITIGATED |
 | 17 | Info | I1 | TinyTeX bundling downloads from HTTPS — uses HTTPS URLs for all downloads, follows redirects safely. No HTTP fallback. | MITIGATED |
+| 18 | Info | B3 | `resume_assembler` uses no subprocess calls — assembly is pure Python (scoring + context building). PDF compilation delegates to existing `compile_resume()` which was already audited in M3. | PASS |
+| 19 | Info | B1 | `save_assembled_resume` sanitizes filenames via character allowlist. No path traversal possible. | PASS |
+| 20 | Info | B6 | `_ingest_llm_output` reads `.md` files from local profile directory only. No user-supplied paths. | PASS |
+| 21 | Info | B5 | `save_resume_version` uses parameterized SQL for `reuse_source` and `source_entry_ids`. JSON serialized via `json.dumps` (safe). | PASS |
 
 ## Checklist Summary
 
 | Section | Pass | Fail | N/A | Notes |
 |---------|:----:|:----:|:---:|-------|
-| A. Input Validation | 6 | 0 | 1 | A5 N/A (no API endpoints in M1/M2/M3). M2 input is pre-validated JD text from DB. M3 escape_latex() validates all user content. |
-| B. Injection Prevention | 11 | 0 | 0 | B3 now covered by M3 LaTeX escaping. M3 compile_latex() uses arg list (no shell=True), subprocess timeout. |
-| C. Authentication | 0 | 0 | 6 | No new endpoints in M1/M2/M3 |
-| D. Authorization | 0 | 0 | 5 | No new endpoints in M1/M2/M3 |
+| A. Input Validation | 6 | 0 | 1 | A5 N/A (no API endpoints in M1/M2/M3/M4). M2 input is pre-validated JD text from DB. M3 escape_latex() validates all user content. M4 reads from local profile dir only. |
+| B. Injection Prevention | 15 | 0 | 0 | B3 covered by M3 LaTeX escaping + M4 no subprocess. B1 M4 filename allowlist. B5 M4 parameterized SQL + json.dumps. B6 M4 local-only file reads. |
+| C. Authentication | 0 | 0 | 6 | No new endpoints in M1/M2/M3/M4 |
+| D. Authorization | 0 | 0 | 5 | No new endpoints in M1/M2/M3/M4 |
 | E. Secrets Management | 7 | 0 | 0 | No secrets in code, LLM keys not stored |
 | F. Data Protection | 1 | 0 | 3 | Raw text stored locally (acceptable for desktop app) |
-| G. Dependencies | 6 | 0 | 0 | All pinned, no known CVEs. M2 adds zero new deps. M3 uses Jinja2 (already added in M1). |
+| G. Dependencies | 6 | 0 | 0 | All pinned, no known CVEs. M2 adds zero new deps. M3 uses Jinja2 (already added in M1). M4 adds zero new deps. |
 | H. Error Handling | 7 | 0 | 0 | Errors logged, no stack trace leakage. M2 returns empty list on edge cases. M3 try/finally cleanup on temp files, TimeoutExpired caught. |
 | I. Transport Security | 1 | 0 | 4 | M3 TinyTeX download uses HTTPS only. No HTTP fallback. |
 | J. Logging & Monitoring | 3 | 0 | 0 | Structured logging, no sensitive data logged |
@@ -92,4 +96,4 @@
 
 ## Verdict
 
-**PASS** — No security vulnerabilities found in M1+M2+M3 code. M1 is backend-only with no user-facing endpoints. M2 is pure computation (TF-IDF cosine similarity, keyword extraction) with zero external dependencies, zero I/O, and zero network calls. M3 (LaTeX Engine) introduces subprocess execution (pdflatex) and temp file I/O, but all risks are mitigated: user content is escaped via `escape_latex()` before template rendering, subprocess uses explicit arg list (no shell=True) with 30s timeout, temp files are cleaned up in try/finally blocks, and TinyTeX downloads use HTTPS only. Attack surface remains minimal. Future milestones (especially M5 Upload API and M8 ONNX) must follow the recommendations above.
+**PASS** — No security vulnerabilities found in M1+M2+M3+M4 code. M1 is backend-only with no user-facing endpoints. M2 is pure computation (TF-IDF cosine similarity, keyword extraction) with zero external dependencies, zero I/O, and zero network calls. M3 (LaTeX Engine) introduces subprocess execution (pdflatex) and temp file I/O, but all risks are mitigated: user content is escaped via `escape_latex()` before template rendering, subprocess uses explicit arg list (no shell=True) with 30s timeout, temp files are cleaned up in try/finally blocks, and TinyTeX downloads use HTTPS only. M4 (Resume Assembly) is pure Python orchestration — no subprocess calls, no user-supplied file paths, filename sanitization via character allowlist, parameterized SQL for all DB writes, and JSON serialization via `json.dumps`. PDF compilation delegates to the already-audited M3 `compile_resume()`. Attack surface remains minimal. Future milestones (especially M5 Upload API and M8 ONNX) must follow the recommendations above.

@@ -12,7 +12,7 @@
 ## 1. Purpose and Scope
 
 ### 1.1 Purpose
-This SRS specifies the functional and non-functional requirements for Milestone 1 (Foundation) of the Smart Resume Reuse feature (TASK-030). The audience is the System Engineer, Backend Developer, Unit Tester, Integration Tester, Security Engineer, and Release Engineer.
+This SRS specifies the functional and non-functional requirements for Milestones 1–4 (Foundation, Scoring, LaTeX Compilation, Resume Assembly + Bot Integration) of the Smart Resume Reuse feature (TASK-030). The audience is the System Engineer, Backend Developer, Unit Tester, Integration Tester, Security Engineer, and Release Engineer.
 
 ### 1.2 Scope
 **In scope (M1)**:
@@ -41,8 +41,15 @@ This SRS specifies the functional and non-functional requirements for Milestone 
 - TinyTeX bundling script for cross-platform distribution (Windows, macOS, Linux)
 - `compile_resume()` convenience function combining template rendering and PDF compilation
 
-**Explicitly out of scope (M1/M2/M3)**:
-- Bot integration and resume assembly (M4)
+**In scope (M4)**:
+- Resume assembly from KB entries scored against a JD (0 API calls when KB has sufficient entries)
+- Entry selection with configurable per-category minimums (e.g., min 3 experience, 1 summary)
+- Bot `_generate_docs` KB-first flow: attempt KB assembly, fall back to LLM if insufficient entries
+- Post-LLM ingestion: auto-parse LLM-generated resume into KB entries for future reuse
+- `resume_versions.reuse_source` column tracking origin (`kb_assembly` or `llm_generated`)
+- `resume_versions.source_entry_ids` column storing JSON array of KB entry IDs used in assembly
+
+**Explicitly out of scope (M1/M2/M3/M4)**:
 - Frontend UI, upload endpoints, KB viewer (M5)
 - ATS scoring (M6), manual builder (M7), performance (M8), intelligence (M9), migration (M10)
 
@@ -613,6 +620,123 @@ This feature extends the existing AutoApply bot. Currently, every job applicatio
 
 ---
 
+### FR-030-27: Resume Assembly from KB Entries
+
+**Description**: The system shall assemble a complete resume by selecting and organizing KB entries scored against a job description, requiring 0 LLM API calls. The assembler retrieves all active KB entries, scores them via `score_kb_entries()`, selects top entries per category respecting configurable minimums, and produces a structured resume context dict suitable for LaTeX template rendering via `compile_resume()`.
+
+**Priority**: P0 (M4 ship-blocking)
+**Source**: US-102, US-106 from PRD
+**Dependencies**: FR-030-04 (KB CRUD), FR-030-13 (TF-IDF scoring), FR-030-26 (compile_resume)
+
+**Acceptance Criteria**:
+
+- **AC-030-27-1**: Given a JD text and KB with sufficient entries, When `assemble_resume(jd_text, db, config)` is called, Then a resume context dict is returned with sections: summary, experience, skills, education, certifications, projects.
+- **AC-030-27-2**: Given assembled context, When the context is passed to `compile_resume()`, Then a valid PDF is produced without errors.
+- **AC-030-27-3**: Given the assembly process, Then 0 LLM API calls are made.
+- **AC-030-27-4**: Given a KB with entries across all categories, When assembled, Then entries are sorted by score descending within each section.
+- **AC-030-27-5**: Given the assembly result, Then it includes a `selected_entry_ids` list containing the IDs of all KB entries used.
+
+**Negative Cases**:
+- **AC-030-27-N1**: Given an empty KB (0 active entries), When `assemble_resume()` is called, Then `None` is returned indicating insufficient entries.
+- **AC-030-27-N2**: Given a KB with entries but none scoring above `min_score`, When assembled, Then `None` is returned indicating insufficient entries.
+
+---
+
+### FR-030-28: Entry Selection with Category Minimums
+
+**Description**: The system shall select KB entries for assembly using configurable per-category minimum counts. If the KB cannot satisfy the minimum for any required category (summary, experience, skills), assembly fails and returns `None` to trigger LLM fallback.
+
+**Priority**: P0 (M4 ship-blocking)
+**Source**: US-102 from PRD
+**Dependencies**: FR-030-27 (assembly)
+
+**Acceptance Criteria**:
+
+- **AC-030-28-1**: Given default category minimums `{summary: 1, experience: 3, skills: 1, education: 0, certifications: 0, projects: 0}`, When selecting entries, Then at least 1 summary, 3 experience, and 1 skills entry must be available above `min_score`.
+- **AC-030-28-2**: Given custom category minimums in ResumeReuseConfig, When selecting entries, Then the custom minimums are used instead of defaults.
+- **AC-030-28-3**: Given a category with more entries than the minimum, When selecting, Then the top N entries by score are selected (up to a configurable max per category, default 10).
+- **AC-030-28-4**: Given a category with entries between minimum and max, When selecting, Then all qualifying entries above `min_score` are included.
+
+**Negative Cases**:
+- **AC-030-28-N1**: Given a KB with only 2 experience entries above `min_score` and minimum is 3, When assembly is attempted, Then `None` is returned.
+- **AC-030-28-N2**: Given a KB with 0 summary entries, When assembly is attempted, Then `None` is returned.
+
+---
+
+### FR-030-29: Bot KB-First Flow with LLM Fallback
+
+**Description**: The system shall modify `bot.bot._generate_docs()` to attempt KB-based resume assembly first. If assembly succeeds, the assembled resume is compiled to PDF and used directly. If assembly returns `None` (insufficient entries), the system falls back to the existing LLM-based `generate_documents()` flow.
+
+**Priority**: P0 (M4 ship-blocking)
+**Source**: US-102 from PRD
+**Dependencies**: FR-030-27 (assembly), FR-030-30 (post-LLM ingestion)
+
+**Acceptance Criteria**:
+
+- **AC-030-29-1**: Given `resume_reuse.enabled=True` in config and KB assembly succeeds, When `_generate_docs()` is called, Then the KB-assembled resume is used and `invoke_llm()` is NOT called for resume generation.
+- **AC-030-29-2**: Given `resume_reuse.enabled=True` but KB assembly returns `None`, When `_generate_docs()` is called, Then the existing `generate_documents()` LLM flow is invoked as fallback.
+- **AC-030-29-3**: Given `resume_reuse.enabled=False` in config, When `_generate_docs()` is called, Then KB assembly is skipped entirely and LLM flow is used directly.
+- **AC-030-29-4**: Given KB assembly succeeds, When the resume is saved, Then `reuse_source="kb_assembly"` is stored in resume_versions.
+- **AC-030-29-5**: Given LLM fallback is used, When the resume is saved, Then `reuse_source="llm_generated"` is stored in resume_versions.
+
+**Negative Cases**:
+- **AC-030-29-N1**: Given KB assembly raises an unexpected exception, When `_generate_docs()` is called, Then the error is logged at ERROR level and LLM fallback is used (never crash the bot loop).
+
+---
+
+### FR-030-30: Post-LLM Ingestion
+
+**Description**: The system shall automatically parse LLM-generated markdown resumes into KB entries after each LLM fallback, so that future applications for similar roles can reuse those entries without additional LLM calls.
+
+**Priority**: P1
+**Source**: US-105 from PRD
+**Dependencies**: FR-030-06 (markdown parser), FR-030-07 (ingestion pipeline), FR-030-29 (LLM fallback)
+
+**Acceptance Criteria**:
+
+- **AC-030-30-1**: Given LLM fallback produces a markdown resume, When the resume is saved, Then `ingest_generated_resume()` is called to parse and insert entries into KB.
+- **AC-030-30-2**: Given duplicate entries already exist in KB from a previous ingestion, When `ingest_generated_resume()` is called, Then duplicates are silently skipped via dedup (INSERT OR IGNORE).
+- **AC-030-30-3**: Given post-LLM ingestion, Then the ingested entry count is logged at INFO level.
+
+**Negative Cases**:
+- **AC-030-30-N1**: Given `ingest_generated_resume()` raises an exception, When post-LLM ingestion fails, Then the error is logged at WARNING level and the bot continues (ingestion failure is non-blocking).
+
+---
+
+### FR-030-31: resume_versions reuse_source Column
+
+**Description**: The `resume_versions` table shall include a `reuse_source` column (TEXT, nullable, default NULL) indicating the origin of each resume version: `"kb_assembly"` for KB-assembled resumes or `"llm_generated"` for LLM-produced resumes. Existing rows without this field retain NULL.
+
+**Priority**: P1
+**Source**: Derived from FR-030-29 (tracking)
+**Dependencies**: FR-030-11 (schema migration)
+
+**Acceptance Criteria**:
+
+- **AC-030-31-1**: Given a KB-assembled resume is saved, When the resume_versions row is inserted, Then `reuse_source="kb_assembly"` is stored.
+- **AC-030-31-2**: Given an LLM-generated resume is saved, When the resume_versions row is inserted, Then `reuse_source="llm_generated"` is stored.
+- **AC-030-31-3**: Given an existing resume_versions row created before M4, Then `reuse_source` is NULL (backward compatible).
+- **AC-030-31-4**: Given the resume_versions API returns version data, Then `reuse_source` is included in the response dict.
+
+---
+
+### FR-030-32: resume_versions source_entry_ids Column
+
+**Description**: The `resume_versions` table shall include a `source_entry_ids` column (TEXT, nullable, default NULL) storing a JSON-serialized array of KB entry IDs used during assembly. This enables tracing which KB entries contributed to each resume version.
+
+**Priority**: P1
+**Source**: Derived from FR-030-27 (assembly tracking)
+**Dependencies**: FR-030-11 (schema migration), FR-030-27 (assembly)
+
+**Acceptance Criteria**:
+
+- **AC-030-32-1**: Given a KB-assembled resume using entry IDs [5, 12, 23, 41], When saved, Then `source_entry_ids='[5, 12, 23, 41]'` is stored as a JSON string.
+- **AC-030-32-2**: Given an LLM-generated resume (no KB entries), When saved, Then `source_entry_ids` is NULL.
+- **AC-030-32-3**: Given a resume_versions row with `source_entry_ids`, When the API returns version data, Then `source_entry_ids` is parsed from JSON and returned as a list.
+- **AC-030-32-4**: Given an existing resume_versions row created before M4, Then `source_entry_ids` is NULL (backward compatible).
+
+---
+
 ## 4. Non-Functional Requirements
 
 ### NFR-030-01: KB Assembly Latency (M1 Foundation)
@@ -706,22 +830,37 @@ This feature extends the existing AutoApply bot. Currently, every job applicatio
 **Priority**: P0
 **Validation Method**: Unit test with None, "", 0, 3.14, True inputs
 
+### NFR-030-14: KB Assembly Latency (M4)
+
+**Description**: KB-based resume assembly (entry retrieval, scoring, selection, and context dict construction) shall complete within 2 seconds, excluding pdflatex PDF compilation time.
+**Metric**: p95 latency < 2s for assembly of 500-entry KB against a single JD
+**Priority**: P1
+**Validation Method**: Unit test with 500 pre-inserted KB entries, measure wall-clock time of `assemble_resume()` excluding `compile_resume()`
+
+### NFR-030-15: Backward Compatibility (M4)
+
+**Description**: Existing callers of `_generate_docs()`, `save_resume_version()`, and resume_versions API endpoints shall continue to work without modification. Callers that do not supply `reuse_source` or `source_entry_ids` fields shall receive NULL defaults. Existing resume_versions rows without the new columns shall be returned with `reuse_source=None` and `source_entry_ids=None`.
+**Metric**: Zero breaking changes to existing bot loop, resume_versions API, or database queries
+**Priority**: P0
+**Validation Method**: Run existing test suite (`test_resume_versions.py`, `test_bot_loop.py`) with zero modifications — all must pass
+
 ---
 
 ## 5. Interface Requirements
 
-### 5.1 Internal Interfaces (M1 — no external/UI interfaces, M2 — internal scoring APIs, M3 — LaTeX compilation APIs)
+### 5.1 Internal Interfaces (M1 — no external/UI interfaces, M2 — internal scoring APIs, M3 — LaTeX compilation APIs, M4 — assembly + bot integration APIs)
 
 | Module | Function | Direction | Consumers |
 |--------|----------|-----------|-----------|
 | core/document_parser | `extract_text(file_path)` | Called by KnowledgeBase | core/knowledge_base |
 | core/knowledge_base | `KnowledgeBase.process_upload()` | Called by routes (M5) | routes/knowledge_base (M5) |
-| core/knowledge_base | `KnowledgeBase.get_all_entries()` | Called by assembler (M4) | core/resume_assembler (M4) |
+| core/knowledge_base | `KnowledgeBase.get_all_entries()` | Called by assembler (M4) | core/resume_assembler |
+| core/knowledge_base | `KnowledgeBase.ingest_generated_resume()` | Called by bot (M4) | bot/bot.py |
 | core/resume_parser | `parse_resume_md(md_text)` | Called by KnowledgeBase | core/knowledge_base |
-| core/experience_calculator | `calculate_experience(db)` | Called by assembler (M4) | core/resume_assembler (M4) |
+| core/experience_calculator | `calculate_experience(db)` | Called by assembler (M4) | core/resume_assembler |
 | core/ai_engine | `invoke_llm(prompt, config)` | Called by KnowledgeBase | core/knowledge_base |
 | db/database | KB CRUD methods | Called by KnowledgeBase | core/knowledge_base |
-| core/resume_scorer | `score_kb_entries(jd_text, entries, config)` | Called by assembler (M4) | core/resume_assembler (M4) |
+| core/resume_scorer | `score_kb_entries(jd_text, entries, config)` | Called by assembler (M4) | core/resume_assembler |
 | core/resume_scorer | `compute_tfidf_score(jd_text, entry_text)` | Utility | Any module |
 | core/jd_analyzer | `analyze_jd(text)` | Called by ResumeScorer | core/resume_scorer |
 | core/jd_analyzer | `normalize_term(term)` | Called by ResumeScorer | core/resume_scorer |
@@ -729,7 +868,10 @@ This feature extends the existing AutoApply bot. Currently, every job applicatio
 | core/latex_compiler | `find_pdflatex()` | Called by compile_pdf | core/latex_compiler |
 | core/latex_compiler | `render_latex_template(template_name, context)` | Called by compile_resume | core/latex_compiler |
 | core/latex_compiler | `compile_pdf(latex_source, timeout)` | Called by compile_resume | core/latex_compiler |
-| core/latex_compiler | `compile_resume(template_name, context, output_path)` | Called by assembler (M4) | core/resume_assembler (M4) |
+| core/latex_compiler | `compile_resume(template_name, context, output_path)` | Called by assembler (M4) | core/resume_assembler |
+| core/resume_assembler | `assemble_resume(jd_text, db, config)` | Called by bot (M4) | bot/bot.py |
+| bot/bot | `_generate_docs()` (modified) | Called by bot loop | bot/bot.py |
+| db/database | `save_resume_version(..., reuse_source, source_entry_ids)` | Called by bot (M4) | bot/bot.py |
 
 ---
 
@@ -756,8 +898,8 @@ Existing databases auto-migrated via `_migrate()` — adds new tables and column
 ## 7. Out of Scope
 
 - **LaTeX compilation**: Deferred to M3 — requires pdflatex/TinyTeX bundling.
-- **Bot integration**: Deferred to M4 — requires scoring + compilation from M2/M3.
-- **Frontend UI and API endpoints**: Deferred to M5 — M1 is backend foundation only.
+- **Bot integration and resume assembly**: Covered in M4.
+- **Frontend UI and API endpoints**: Deferred to M5 — M1-M4 are backend only.
 - **ATS scoring**: Deferred to M6.
 - **Manual resume builder**: Deferred to M7.
 - **ONNX embeddings**: M2 optional — embedding BLOB column reserved but unused in M1.
@@ -825,16 +967,22 @@ Existing databases auto-migrated via `_migrate()` — adds new tables and column
 | FR-030-24 | US-106 | Design: LatexCompiler → Code: core/latex_compiler.py, templates/*.tex → Test: test_latex_compiler.py |
 | FR-030-25 | Derived | Design: Distribution → Code: electron/scripts/bundle-tinytex.js → Test: manual |
 | FR-030-26 | Derived | Design: LatexCompiler → Code: core/latex_compiler.py → Test: test_latex_compiler.py |
+| FR-030-27 | US-102, US-106 | Design: ResumeAssembler → Code: core/resume_assembler.py → Test: test_resume_assembler.py |
+| FR-030-28 | US-102 | Design: ResumeAssembler → Code: core/resume_assembler.py → Test: test_resume_assembler.py |
+| FR-030-29 | US-102 | Design: BotIntegration → Code: bot/bot.py → Test: test_bot_loop.py |
+| FR-030-30 | US-105 | Design: BotIntegration → Code: bot/bot.py, core/knowledge_base.py → Test: test_bot_loop.py |
+| FR-030-31 | Derived | Design: Database → Code: db/database.py → Test: test_resume_versions.py |
+| FR-030-32 | Derived | Design: Database → Code: db/database.py → Test: test_resume_versions.py |
 
 ---
 
 ## Software Requirements Specification -- GATE 3 OUTPUT
 
 **Document**: SRS-TASK-030-smart-resume-reuse
-**FRs**: 26 functional requirements (12 M1 + 7 M2 + 7 M3)
-**NFRs**: 13 non-functional requirements (6 M1 + 4 M2 + 3 M3)
-**ACs**: 99 total acceptance criteria (72 positive + 27 negative)
-**Quality Checklist**: 26/26 items passed (100%)
+**FRs**: 32 functional requirements (12 M1 + 7 M2 + 7 M3 + 6 M4)
+**NFRs**: 15 non-functional requirements (6 M1 + 4 M2 + 3 M3 + 2 M4)
+**ACs**: 123 total acceptance criteria (90 positive + 33 negative)
+**Quality Checklist**: 32/32 items passed (100%)
 
 ### Handoff Routing
 | Recipient | What They Receive |
