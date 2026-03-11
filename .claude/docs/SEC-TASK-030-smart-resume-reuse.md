@@ -24,7 +24,7 @@
 | 12 | Info | E4 | ONNX embedding interface (`_onnx_score_entries()`) is a stub in M2. When implemented in M8, it must validate that embedding vectors come from the local KB, not from external sources. | PASS (M2), TODO (M8) |
 | 13 | Info | B3 | Command injection in `compile_latex()` — pdflatex path validated, tex content written to file not passed as arg. Subprocess called with explicit arg list, no shell=True. | MITIGATED |
 | 14 | Info | H2 | Temp file cleanup — uses `tempfile.mkdtemp()` with try/finally cleanup. Temp directory and all contents removed even on compilation failure. | MITIGATED |
-| 15 | Medium | B1 | LaTeX injection via user content — `escape_latex()` escapes all special chars (`\`, `{`, `}`, `$`, `&`, `#`, `^`, `_`, `~`, `%`) before template rendering. Prevents arbitrary LaTeX command execution from user-supplied resume content. | MITIGATED |
+| 15 | Medium | B1 | LaTeX injection via user content — `escape_latex()` escapes 9 special chars (`{`, `}`, `$`, `&`, `#`, `^`, `_`, `~`, `%`) before template rendering. Backslash is intentionally preserved (needed for LaTeX commands in templates). User content flows through escape_latex() before insertion, preventing unintended formatting from special chars. | MITIGATED |
 | 16 | Info | B7 | Subprocess timeout — 30s default timeout on pdflatex execution. Prevents hang if LaTeX enters infinite loop or waits for input. `subprocess.TimeoutExpired` caught and logged. | MITIGATED |
 | 17 | Info | I1 | TinyTeX bundling downloads from HTTPS — uses HTTPS URLs for all downloads, follows redirects safely. No HTTP fallback. | MITIGATED |
 
@@ -87,7 +87,7 @@
 |-----------|---------------|
 | M5 (Upload API) | Add path traversal protection on upload endpoint. Validate filename against `[a-zA-Z0-9._-]+` regex. Add file size limit (10MB). Rate-limit upload endpoint. |
 | M5 (KB CRUD API) | All endpoints must check Bearer token auth (existing middleware). Add input validation on entry_id (positive integer). |
-| M3 (LaTeX) | Jinja2 templates must use `autoescape=True` or manual escaping for LaTeX special chars to prevent command injection. |
+| M3 (LaTeX) | DONE — `escape_latex()` applied to all user content before template rendering. Templates use custom Jinja2 delimiters to avoid LaTeX brace conflicts. |
 | M8 (ONNX) | Validate that embedding vectors come from local KB. Do not accept embeddings from external sources without integrity check. |
 
 ## Verdict

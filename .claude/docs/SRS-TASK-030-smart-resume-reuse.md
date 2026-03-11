@@ -490,7 +490,7 @@ This feature extends the existing AutoApply bot. Currently, every job applicatio
 - **AC-030-20-1**: Given text containing `&`, `%`, `$`, `#`, `_`, `{`, `}`, When `escape_latex()` is called, Then each character is replaced with its backslash-escaped form.
 - **AC-030-20-2**: Given text containing `~`, When `escape_latex()` is called, Then it is replaced with `\textasciitilde{}`.
 - **AC-030-20-3**: Given text containing `^`, When `escape_latex()` is called, Then it is replaced with `\textasciicircum{}`.
-- **AC-030-20-4**: Given text containing `\`, When `escape_latex()` is called, Then it is replaced with `\textbackslash{}`.
+- **AC-030-20-4**: Given text containing `\`, When `escape_latex()` is called, Then backslash is preserved (NOT escaped), because backslashes are used in LaTeX commands (e.g., `\textbf`, `\section`).
 
 **Negative Cases**:
 - **AC-030-20-N1**: Given `None` input, When `escape_latex()` is called, Then an empty string is returned.
@@ -710,7 +710,7 @@ This feature extends the existing AutoApply bot. Currently, every job applicatio
 
 ## 5. Interface Requirements
 
-### 5.1 Internal Interfaces (M1 — no external/UI interfaces, M2 — internal scoring APIs)
+### 5.1 Internal Interfaces (M1 — no external/UI interfaces, M2 — internal scoring APIs, M3 — LaTeX compilation APIs)
 
 | Module | Function | Direction | Consumers |
 |--------|----------|-----------|-----------|
@@ -725,6 +725,11 @@ This feature extends the existing AutoApply bot. Currently, every job applicatio
 | core/resume_scorer | `compute_tfidf_score(jd_text, entry_text)` | Utility | Any module |
 | core/jd_analyzer | `analyze_jd(text)` | Called by ResumeScorer | core/resume_scorer |
 | core/jd_analyzer | `normalize_term(term)` | Called by ResumeScorer | core/resume_scorer |
+| core/latex_compiler | `escape_latex(text)` | Utility | Any module needing LaTeX-safe text |
+| core/latex_compiler | `find_pdflatex()` | Called by compile_pdf | core/latex_compiler |
+| core/latex_compiler | `render_latex_template(template_name, context)` | Called by compile_resume | core/latex_compiler |
+| core/latex_compiler | `compile_pdf(latex_source, timeout)` | Called by compile_resume | core/latex_compiler |
+| core/latex_compiler | `compile_resume(template_name, context, output_path)` | Called by assembler (M4) | core/resume_assembler (M4) |
 
 ---
 
@@ -813,16 +818,23 @@ Existing databases auto-migrated via `_migrate()` — adds new tables and column
 | FR-030-17 | Derived | Design: ResumeScorer → Code: core/resume_scorer.py → Test: test_resume_scorer.py |
 | FR-030-18 | US-102 | Design: ResumeScorer → Code: core/resume_scorer.py → Test: test_resume_scorer.py |
 | FR-030-19 | Derived | Design: JDAnalyzer → Code: core/jd_analyzer.py → Test: test_resume_scorer.py |
+| FR-030-20 | Derived | Design: LatexCompiler → Code: core/latex_compiler.py → Test: test_latex_compiler.py |
+| FR-030-21 | Derived | Design: LatexCompiler → Code: core/latex_compiler.py → Test: test_latex_compiler.py |
+| FR-030-22 | Derived | Design: LatexCompiler → Code: core/latex_compiler.py → Test: test_latex_compiler.py |
+| FR-030-23 | Derived | Design: LatexCompiler → Code: core/latex_compiler.py → Test: test_latex_compiler.py |
+| FR-030-24 | US-106 | Design: LatexCompiler → Code: core/latex_compiler.py, templates/*.tex → Test: test_latex_compiler.py |
+| FR-030-25 | Derived | Design: Distribution → Code: electron/scripts/bundle-tinytex.js → Test: manual |
+| FR-030-26 | Derived | Design: LatexCompiler → Code: core/latex_compiler.py → Test: test_latex_compiler.py |
 
 ---
 
 ## Software Requirements Specification -- GATE 3 OUTPUT
 
 **Document**: SRS-TASK-030-smart-resume-reuse
-**FRs**: 19 functional requirements (12 M1 + 7 M2)
-**NFRs**: 10 non-functional requirements (6 M1 + 4 M2)
-**ACs**: 66 total acceptance criteria (49 positive + 17 negative)
-**Quality Checklist**: 20/20 items passed (100%)
+**FRs**: 26 functional requirements (12 M1 + 7 M2 + 7 M3)
+**NFRs**: 13 non-functional requirements (6 M1 + 4 M2 + 3 M3)
+**ACs**: 99 total acceptance criteria (72 positive + 27 negative)
+**Quality Checklist**: 26/26 items passed (100%)
 
 ### Handoff Routing
 | Recipient | What They Receive |

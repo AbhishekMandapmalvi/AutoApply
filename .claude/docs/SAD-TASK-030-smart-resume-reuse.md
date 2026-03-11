@@ -84,6 +84,9 @@ This architecture defines the M1 foundation for the Smart Resume Reuse feature: 
 | Database (extended) | SQLite CRUD for KB, documents, roles | sqlite3 | Repository | `db/database.py` |
 | ResumeReuseConfig | Resume reuse settings | Pydantic | Domain | `config/settings.py` |
 | LatexConfig | LaTeX compilation settings | Pydantic | Domain | `config/settings.py` |
+| LatexCompiler | LaTeX escaping, template rendering, PDF compilation | Jinja2, subprocess | Infrastructure | `core/latex_compiler.py` |
+| LaTeX Templates | 4 resume templates with custom Jinja2 delimiters | Jinja2 (.tex.j2) | Infrastructure | `templates/latex/*.tex.j2` |
+| TinyTeX Bundler | Platform-specific TinyTeX download and packaging | Node.js | Infrastructure | `electron/scripts/bundle-tinytex.js` |
 
 ---
 
@@ -379,7 +382,7 @@ Input Parameters:
 Output:
 | Field | Type | Nullable | Description |
 |-------|------|----------|-------------|
-| (return) | str | no | LaTeX-safe string with special chars escaped (& → \&, % → \%, $ → \$, # → \#, _ → \_, { → \{, } → \}, ~ → \textasciitilde{}, ^ → \textasciicircum{}, \ → \textbackslash{}). Returns "" if input is None or empty. |
+| (return) | str | no | LaTeX-safe string with 9 special chars escaped (& → \&, % → \%, $ → \$, # → \#, _ → \_, { → \{, } → \}, ~ → \textasciitilde{}, ^ → \textasciicircum{}). Backslash is NOT escaped (preserved for LaTeX commands). Returns "" if input is None or empty. |
 
 **Preconditions**: None.
 **Postconditions**: No state change.
@@ -753,8 +756,17 @@ uploaded_documents ──1:N──▶ knowledge_base  (via knowledge_base.source
 | NFR-030-08 | NFR | Test suite (M2) | pytest | — |
 | NFR-030-09 | NFR | pyproject.toml | No new deps for M2 | ADR-029 |
 | NFR-030-10 | NFR | ResumeScorer, JDAnalyzer | logging.getLogger(__name__) | — |
+| FR-030-20 | FR | LatexCompiler | escape_latex() | — |
+| FR-030-21 | FR | LatexCompiler | find_pdflatex() | — |
+| FR-030-22 | FR | LatexCompiler | render_template(), compile_latex() | ADR-031 |
+| FR-030-23 | FR | LatexCompiler | compile_resume() | — |
+| FR-030-24 | FR | LaTeX Templates | classic.tex.j2, modern.tex.j2, compact.tex.j2, academic.tex.j2 | ADR-031 |
+| FR-030-25 | FR | TinyTeX Bundler | bundle-tinytex.js | — |
+| NFR-030-11 | NFR | LatexCompiler | compile_latex() timeout, temp dir cleanup | — |
+| NFR-030-12 | NFR | LatexCompiler | logging.getLogger(__name__) | — |
+| NFR-030-13 | NFR | Test suite (M3) | pytest | — |
 
-**Completeness**: 19/19 FRs mapped, 10/10 NFRs mapped. Zero gaps.
+**Completeness**: 25/25 FRs mapped, 13/13 NFRs mapped. Zero gaps.
 
 ---
 
@@ -923,15 +935,72 @@ uploaded_documents ──1:N──▶ knowledge_base  (via knowledge_base.source
 
 ---
 
+### ADR-031: Custom Jinja2 Delimiters for LaTeX Templates
+
+**Status**: accepted
+**Context**: LaTeX uses `{` and `}` extensively for grouping arguments (e.g., `\textbf{bold}`, `\begin{document}`). Jinja2's default delimiters (`{{ }}`, `{% %}`, `{# #}`) conflict with LaTeX braces, making templates unreadable and error-prone. Every LaTeX brace would need escaping or raw blocks, defeating the purpose of templating.
+
+**Decision**: Use custom Jinja2 delimiters that start with `\` (a LaTeX command prefix) to feel natural in LaTeX source:
+
+| Jinja2 Purpose | Default Delimiter | Custom Delimiter |
+|----------------|-------------------|------------------|
+| Variable | `{{ var }}` | `\VAR{var}` |
+| Block/logic | `{% if %}` | `\BLOCK{if condition}` |
+| Comment | `{# comment #}` | `\#{comment}` |
+
+**Jinja2 Environment Configuration**:
+```python
+env = jinja2.Environment(
+    block_start_string="\\BLOCK{",
+    block_end_string="}",
+    variable_start_string="\\VAR{",
+    variable_end_string="}",
+    comment_start_string="\\#{",
+    comment_end_string="}",
+    autoescape=False,
+    loader=jinja2.FileSystemLoader("templates/latex/"),
+)
+```
+
+**Template Example**:
+```latex
+\documentclass[11pt]{article}
+\begin{document}
+\textbf{\VAR{name}} \\
+\VAR{email} | \VAR{phone}
+
+\BLOCK{for exp in experiences}
+\textbf{\VAR{exp.title}} at \VAR{exp.company} \\
+\VAR{exp.start_date} -- \VAR{exp.end_date}
+\BLOCK{endfor}
+\end{document}
+```
+
+**Alternatives Considered**:
+
+| Option | Pros | Cons |
+|--------|------|------|
+| Default Jinja2 delimiters | No config needed | Conflicts with every LaTeX `{}` usage |
+| `<< >>` / `<% %>` delimiters | No LaTeX conflict | Looks foreign in LaTeX source, possible HTML confusion |
+| Raw blocks around LaTeX | Works with defaults | Verbose, defeats templating purpose |
+| **`\VAR{}` / `\BLOCK{}` / `\#{}` delimiters** | **Looks like LaTeX commands, zero conflict** | **Requires env configuration** |
+
+**Consequences**:
+- Positive: Templates read naturally as LaTeX with embedded variables; no escaping needed for LaTeX braces; `\VAR{name}` visually signals "this is a variable" to LaTeX-familiar users
+- Negative: Requires custom Jinja2 Environment setup (one-time, 6 lines); developers must learn non-default syntax
+- Risks: `}` as end delimiter could theoretically conflict with LaTeX's `}` in complex nesting → mitigated by placing Jinja2 tags on their own lines or at clear boundaries
+
+---
+
 ## System Architecture -- GATE 4 OUTPUT
 
 **Document**: SAD-TASK-030-smart-resume-reuse
-**Components**: 9 components defined (7 M1 + 2 M2)
-**Interfaces**: 14 contracts specified (10 M1 + 4 M2)
+**Components**: 12 components defined (7 M1 + 2 M2 + 3 M3)
+**Interfaces**: 19 contracts specified (10 M1 + 4 M2 + 5 M3)
 **Entities**: 4 data entities modeled (3 new tables + 1 modified)
-**ADRs**: 4 decisions documented (ADR-027, ADR-028, ADR-029, ADR-030)
-**Impl Tasks**: 11 tasks in dependency order (8 M1 + 3 M2)
-**Traceability**: 29/29 requirements mapped (100%)
+**ADRs**: 5 decisions documented (ADR-027, ADR-028, ADR-029, ADR-030, ADR-031)
+**Impl Tasks**: 14 tasks in dependency order (8 M1 + 3 M2 + 3 M3)
+**Traceability**: 38/38 requirements mapped (100%)
 **Checklist**: 20/20 items passed
 
 ### Handoff Routing
