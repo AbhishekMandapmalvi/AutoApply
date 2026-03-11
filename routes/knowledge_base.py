@@ -108,6 +108,56 @@ def upload_document():
 
 
 # ---------------------------------------------------------------------------
+# ATS Scoring
+# ---------------------------------------------------------------------------
+
+
+@kb_bp.route("/api/kb/ats-score", methods=["POST"])
+def ats_score():
+    """Score KB entries against a JD for ATS compatibility.
+
+    Request body:
+        jd_text: str (required)
+        platform: str (optional — greenhouse/lever/workday/ashby/icims/taleo)
+        entry_ids: list[int] (optional — if omitted, uses all active entries)
+    """
+    db = _get_db()
+    data = request.get_json(silent=True)
+    if not data or not data.get("jd_text"):
+        abort(400, description=t("errors.invalid_request"))
+
+    jd_text = data["jd_text"]
+    platform = data.get("platform", "default")
+    entry_ids = data.get("entry_ids")
+
+    from core.ats_profiles import get_weights
+    from core.ats_scorer import score_ats
+
+    # Get entries
+    if entry_ids:
+        entries = db.get_kb_entries_by_ids(entry_ids)
+    else:
+        entries = db.get_kb_entries(active_only=True, limit=2000)
+
+    if not entries:
+        abort(400, description=t("kb.entries_empty"))
+
+    weights = get_weights(platform)
+    result = score_ats(jd_text, entries, weights)
+    result["platform"] = platform
+
+    return jsonify(result)
+
+
+@kb_bp.route("/api/kb/ats-profiles", methods=["GET"])
+def ats_profiles():
+    """List available ATS platform profiles."""
+    from core.ats_profiles import list_profiles
+
+    return jsonify({"profiles": list_profiles()})
+
+
+# ---------------------------------------------------------------------------
 # KB entries CRUD
 # ---------------------------------------------------------------------------
 

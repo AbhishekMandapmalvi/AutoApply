@@ -1373,16 +1373,77 @@ Response 400: { description: str }
 
 ---
 
+## 10. Design — M6: ATS Scoring + Platform Profiles + Gap Analysis
+
+### §3.31 Component: ATSScorer (`core/ats_scorer.py`)
+
+**Purpose**: Composite ATS compatibility scoring with 5 weighted components.
+
+**Internal Functions**:
+- `_tokenize(text)` → list[str] — Normalize text into searchable terms
+- `_score_keyword_match(jd_keywords, resume_terms)` → (float, list, list) — Keyword overlap score
+- `_score_section_completeness(categories_present)` → float — Required/optional section presence
+- `_score_skill_match(jd_tech, resume_terms)` → (float, list, list) — Technical skill alignment
+- `_score_content_length(entries)` → float — Word count against ideal range (300–800)
+- `_score_format_compliance(entries, categories_present)` → float — ATS-friendly formatting checks
+
+**Public API**:
+- `score_ats(jd_text, entries, weights=None)` → dict — Composite score 0–100 with gap analysis
+- `_empty_result()` → dict — Zeroed result for empty inputs
+
+**Dependencies**: `core.jd_analyzer.analyze_jd`, `core.jd_analyzer.normalize_term`
+
+### §3.32 Component: ATSProfiles (`core/ats_profiles.py`)
+
+**Purpose**: Vendor-specific ATS scoring weight profiles.
+
+**Data**: `ATS_PROFILES` dict with 7 profiles: default, greenhouse, lever, workday, ashby, icims, taleo.
+
+**Public API**:
+- `get_profile(platform)` → dict — Profile with name, description, weights (falls back to default)
+- `get_weights(platform)` → dict[str, float] — Weight dict summing to 1.0
+- `list_profiles()` → list[dict] — All profiles as [{id, name, description}]
+
+### §3.33 Component: ATS Frontend (`static/js/knowledge-base.js` additions)
+
+**Purpose**: ATS scoring UI card in KB screen.
+
+**Functions added**:
+- `analyzeATS()` — Fetches `/api/kb/ats-score`, renders results
+- `renderATSResult(data, el)` — Score badge (color-coded), component progress bars, gap badges
+
+### Interface Contracts — M6
+
+#### IC-028: `POST /api/kb/ats-score`
+
+**Request**: `{ jd_text: string, platform?: string, entry_ids?: int[] }`
+**Response 200**: `{ score: int, platform: string, components: {name: {score, weight, weighted}}, matched_keywords: [], missing_keywords: [], matched_skills: [], missing_skills: [], categories_present: [], categories_missing: [], entry_count: int, word_count: int }`
+**Response 400**: `{ error: string }` — Missing jd_text or empty KB
+
+#### IC-029: `GET /api/kb/ats-profiles`
+
+**Response 200**: `{ profiles: [{id, name, description}] }`
+
+### §3.34 Implementation Tasks — M6
+
+| Task | Name | Depends On | Files |
+|------|------|------------|-------|
+| IMPL-026 | ATS Scorer Module | M2 jd_analyzer | `core/ats_scorer.py` |
+| IMPL-027 | ATS Profiles Module | IMPL-026 | `core/ats_profiles.py` |
+| IMPL-028 | ATS Endpoints + Frontend | IMPL-026, IMPL-027, M5 KB routes | `routes/knowledge_base.py`, `static/js/knowledge-base.js`, `templates/index.html`, `static/locales/en.json`, `static/locales/es.json` |
+
+---
+
 ## System Architecture -- GATE 4 OUTPUT
 
 **Document**: SAD-TASK-030-smart-resume-reuse
-**Components**: 19 components defined (7 M1 + 2 M2 + 3 M3 + 3 M4 + 4 M5)
-**Interfaces**: 27 contracts specified (10 M1 + 4 M2 + 5 M3 + 5 M4 + 3 M5)
+**Components**: 21 components defined (7 M1 + 2 M2 + 3 M3 + 3 M4 + 4 M5 + 2 M6)
+**Interfaces**: 29 contracts specified (10 M1 + 4 M2 + 5 M3 + 5 M4 + 3 M5 + 2 M6)
 **Entities**: 4 data entities modeled (3 new tables + 1 modified with 2 new columns)
 **ADRs**: 7 decisions documented (ADR-027 to ADR-033)
-**Impl Tasks**: 25 tasks in dependency order (8 M1 + 3 M2 + 3 M3 + 3 M4 + 8 M5)
-**Traceability**: 60/60 requirements mapped (100%)
-**Checklist**: 25/25 items passed
+**Impl Tasks**: 28 tasks in dependency order (8 M1 + 3 M2 + 3 M3 + 3 M4 + 8 M5 + 3 M6)
+**Traceability**: 68/68 requirements mapped (100%)
+**Checklist**: 28/28 items passed
 
 ### Handoff Routing
 | Recipient | What They Receive |

@@ -1112,13 +1112,101 @@ File uploads SHALL validate extension (allowlist), filename (sanitize), and size
 
 ---
 
+## 10. Functional Requirements — M6: ATS Scoring + Platform Profiles
+
+### 10.1 User Stories
+
+| ID | As a… | I want to… | So that… | Priority |
+|----|-------|-----------|----------|----------|
+| US-113 | Job seeker | See an ATS compatibility score for my KB entries against a JD | I know how well my resume matches before applying | Must |
+| US-114 | Job seeker | See which keywords and skills are missing from my resume | I can fill gaps before submitting | Must |
+| US-115 | Job seeker | Select an ATS platform profile (Workday, Greenhouse, etc.) | Scoring weights match the ATS I'm applying through | Should |
+| US-116 | Job seeker | View all available ATS profiles | I can pick the right one for each application | Should |
+
+### 10.2 Functional Requirements
+
+#### FR-030-43: ATS Composite Scoring Engine
+
+The system SHALL compute a composite ATS compatibility score (0–100) from 5 weighted components: keyword match (35%), section completeness (20%), skill match (20%), content length (15%), and format compliance (10%).
+
+**Acceptance Criteria**:
+- AC-030-43-1: Given a JD and KB entries, When `score_ats()` called, Then returns score 0–100 with 5 component breakdowns
+- AC-030-43-2: Given empty JD or entries, When scored, Then returns 0 with empty gap lists
+- AC-030-43-3: Given well-matched entries, When scored, Then composite score >= 50
+
+#### FR-030-44: Keyword and Skill Gap Analysis
+
+The system SHALL identify matched and missing keywords/skills between JD and resume content, returning them as sorted lists.
+
+**Acceptance Criteria**:
+- AC-030-44-1: Given JD keywords present in resume, When scored, Then matched_keywords contains them
+- AC-030-44-2: Given JD keywords absent from resume, When scored, Then missing_keywords contains them
+- AC-030-44-3: Given JD tech terms, When scored, Then matched_skills and missing_skills populated
+
+#### FR-030-45: ATS Platform Profiles
+
+The system SHALL define platform-specific scoring weight profiles for at least 6 ATS vendors (Greenhouse, Lever, Workday, Ashby, iCIMS, Taleo) plus a default profile.
+
+**Acceptance Criteria**:
+- AC-030-45-1: Given any profile, When weights retrieved, Then they sum to 1.0
+- AC-030-45-2: Given unknown platform name, When profile requested, Then default profile returned
+- AC-030-45-3: Given "workday", When weights compared to default, Then keyword_match weight is higher
+
+#### FR-030-46: ATS Score API Endpoint
+
+The system SHALL expose `POST /api/kb/ats-score` accepting `jd_text`, optional `platform`, and optional `entry_ids`, returning composite score + gap analysis.
+
+**Acceptance Criteria**:
+- AC-030-46-1: Given valid JD text and KB entries, When POST, Then 200 with score and gap data
+- AC-030-46-2: Given missing jd_text, When POST, Then 400 error
+- AC-030-46-3: Given empty KB, When POST, Then 400 error
+- AC-030-46-4: Given platform="workday", When POST, Then response includes platform="workday"
+
+#### FR-030-47: ATS Profiles List Endpoint
+
+The system SHALL expose `GET /api/kb/ats-profiles` returning all available ATS platform profiles.
+
+**Acceptance Criteria**:
+- AC-030-47-1: Given GET request, When called, Then 200 with profiles array containing >= 7 entries
+- AC-030-47-2: Given each profile, When listed, Then includes id, name, description fields
+
+#### FR-030-48: ATS Scoring UI
+
+The system SHALL provide a frontend ATS scoring card with platform selector, JD textarea, analyze button, and results display (score badge, component bars, gap badges).
+
+**Acceptance Criteria**:
+- AC-030-48-1: Given ATS card rendered, When user selects platform and enters JD, Then analyze button enabled
+- AC-030-48-2: Given analyze clicked, When score returned, Then score badge color-coded (green >= 70, yellow >= 40, red < 40)
+- AC-030-48-3: Given missing keywords/skills, When displayed, Then shown as badge elements
+
+### 10.3 Non-Functional Requirements
+
+#### NFR-030-19: ATS i18n Coverage
+All ATS UI strings SHALL use `data-i18n` attributes. All keys SHALL exist in en.json and es.json `ats` section.
+
+#### NFR-030-20: ATS Accessibility
+The ATS scoring card SHALL have ARIA labels, aria-live region for results, semantic HTML, and keyboard-accessible controls.
+
+### 10.4 Traceability Seeds
+
+| FR | → Design | → Source | → Test |
+|----|----------|----------|--------|
+| FR-030-43 | SAD §3.31 | `core/ats_scorer.py` | `test_ats_scorer.py::TestScoreATS` |
+| FR-030-44 | SAD §3.31 | `core/ats_scorer.py` | `test_ats_scorer.py::TestKeywordMatch, TestSkillMatch` |
+| FR-030-45 | SAD §3.32 | `core/ats_profiles.py` | `test_ats_scorer.py::TestATSProfiles` |
+| FR-030-46 | SAD §3.31, IC-028 | `routes/knowledge_base.py` | `test_ats_scorer.py::TestATSEndpoint` |
+| FR-030-47 | SAD §3.32, IC-029 | `routes/knowledge_base.py` | `test_ats_scorer.py::TestATSProfilesEndpoint` |
+| FR-030-48 | SAD §3.33 | `static/js/knowledge-base.js` | — |
+
+---
+
 ## Software Requirements Specification -- GATE 3 OUTPUT
 
 **Document**: SRS-TASK-030-smart-resume-reuse
-**FRs**: 42 functional requirements (12 M1 + 7 M2 + 7 M3 + 6 M4 + 10 M5)
-**NFRs**: 18 non-functional requirements (6 M1 + 4 M2 + 3 M3 + 2 M4 + 3 M5)
-**ACs**: 152 total acceptance criteria (119 positive + 33 negative)
-**Quality Checklist**: 42/42 items passed (100%)
+**FRs**: 48 functional requirements (12 M1 + 7 M2 + 7 M3 + 6 M4 + 10 M5 + 6 M6)
+**NFRs**: 20 non-functional requirements (6 M1 + 4 M2 + 3 M3 + 2 M4 + 3 M5 + 2 M6)
+**ACs**: 167 total acceptance criteria (134 positive + 33 negative)
+**Quality Checklist**: 48/48 items passed (100%)
 
 ### Handoff Routing
 | Recipient | What They Receive |

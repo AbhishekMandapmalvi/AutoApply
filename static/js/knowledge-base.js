@@ -312,6 +312,109 @@ export async function loadKBDocuments() {
 }
 
 // ---------------------------------------------------------------------------
+// ATS Scoring
+// ---------------------------------------------------------------------------
+
+export async function analyzeATS() {
+  const jdEl = document.getElementById('kb-ats-jd');
+  const platformEl = document.getElementById('kb-ats-platform');
+  const resultEl = document.getElementById('kb-ats-result');
+  const statusEl = document.getElementById('kb-ats-status');
+
+  const jdText = jdEl?.value?.trim();
+  if (!jdText) {
+    if (statusEl) { statusEl.textContent = t('errors.invalid_request'); statusEl.className = 'text-danger'; }
+    return;
+  }
+
+  if (statusEl) { statusEl.textContent = t('ats.analyzing'); statusEl.className = 'text-info'; }
+
+  try {
+    const res = await fetch('/api/kb/ats-score', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jd_text: jdText,
+        platform: platformEl?.value || 'default',
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      if (statusEl) { statusEl.textContent = err.description || 'Scoring failed'; statusEl.className = 'text-danger'; }
+      return;
+    }
+
+    const data = await res.json();
+    if (statusEl) { statusEl.textContent = ''; statusEl.className = ''; }
+    renderATSResult(data, resultEl);
+  } catch (e) {
+    if (statusEl) { statusEl.textContent = e.message; statusEl.className = 'text-danger'; }
+  }
+}
+
+function renderATSResult(data, el) {
+  if (!el) return;
+
+  const scoreColor = data.score >= 80 ? 'var(--success)' : data.score >= 60 ? 'var(--warning)' : 'var(--danger)';
+
+  let html = `<div class="ats-result">
+    <div class="ats-score-badge" style="border-color:${scoreColor}; color:${scoreColor};">
+      <span class="ats-score-value">${data.score}</span>
+      <span class="ats-score-label">${escHtml(t('ats.score_label'))}</span>
+    </div>
+    <div class="ats-components">`;
+
+  // Component bars
+  const compKeys = ['keyword_match', 'section_completeness', 'skill_match', 'content_length', 'format_compliance'];
+  const compLabels = {
+    keyword_match: t('ats.component_keyword'),
+    section_completeness: t('ats.component_section'),
+    skill_match: t('ats.component_skill'),
+    content_length: t('ats.component_length'),
+    format_compliance: t('ats.component_format'),
+  };
+
+  for (const key of compKeys) {
+    const comp = data.components[key] || {};
+    const pct = Math.round((comp.score || 0) * 100);
+    const barColor = pct >= 80 ? 'var(--success)' : pct >= 60 ? 'var(--warning)' : 'var(--danger)';
+    html += `<div class="ats-component-row">
+      <span class="ats-component-label">${escHtml(compLabels[key] || key)}</span>
+      <div class="ats-bar-bg"><div class="ats-bar-fill" style="width:${pct}%;background:${barColor};"></div></div>
+      <span class="ats-component-pct">${pct}%</span>
+    </div>`;
+  }
+  html += '</div>';
+
+  // Gap analysis
+  if (data.missing_keywords?.length || data.missing_skills?.length || data.categories_missing?.length) {
+    html += '<div class="ats-gaps">';
+    if (data.missing_keywords?.length) {
+      html += `<div><strong>${escHtml(t('ats.missing_keywords'))}:</strong> ${data.missing_keywords.map(k => `<span class="badge badge-danger">${escHtml(k)}</span>`).join(' ')}</div>`;
+    }
+    if (data.missing_skills?.length) {
+      html += `<div><strong>${escHtml(t('ats.missing_skills'))}:</strong> ${data.missing_skills.map(k => `<span class="badge badge-danger">${escHtml(k)}</span>`).join(' ')}</div>`;
+    }
+    if (data.categories_missing?.length) {
+      html += `<div><strong>${escHtml(t('ats.categories_missing'))}:</strong> ${data.categories_missing.map(k => `<span class="badge badge-danger">${escHtml(k)}</span>`).join(' ')}</div>`;
+    }
+    html += '</div>';
+  } else {
+    html += `<p class="text-success">${escHtml(t('ats.no_gaps'))}</p>`;
+  }
+
+  // Matched keywords
+  if (data.matched_keywords?.length) {
+    html += `<div class="ats-matched"><strong>${escHtml(t('ats.matched_keywords'))}:</strong> ${data.matched_keywords.slice(0, 20).map(k => `<span class="badge badge-success">${escHtml(k)}</span>`).join(' ')}</div>`;
+  }
+
+  html += '</div>';
+  el.innerHTML = html;
+  _applyDataI18n(el);
+}
+
+// ---------------------------------------------------------------------------
 // Event delegation init
 // ---------------------------------------------------------------------------
 

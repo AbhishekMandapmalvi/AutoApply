@@ -592,5 +592,26 @@
     "font_family": "Font Family",
     "font_size": "Font Size",
     "margin": "Page Margin"
+  },
+
+  "ats": {
+    "title": "ATS Compatibility Score",
+    "score_label": "ATS Score",
+    "analyze_btn": "Analyze ATS Compatibility",
+    "platform_label": "ATS Platform",
+    "platform_default": "Default (Balanced)",
+    "component_keyword": "Keyword Match",
+    "component_section": "Section Completeness",
+    "component_skill": "Skill Match",
+    "component_length": "Content Length",
+    "component_format": "Format Compliance",
+    "matched_keywords": "Matched Keywords",
+    "missing_keywords": "Missing Keywords",
+    "matched_skills": "Matched Skills",
+    "missing_skills": "Missing Skills",
+    "categories_present": "Sections Present",
+    "categories_missing": "Sections Missing",
+    "no_gaps": "No gaps found — excellent match!",
+    "analyzing": "Analyzing ATS compatibility..."
   }
 }

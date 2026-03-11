@@ -126,6 +126,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - **i18n**: `nav.knowledge_base` key added to en.json and es.json (33 KB + 13 reuse keys already from M1)
   - **19 new tests**: Stats (2), list (4), get (2), update (3), delete (2), upload (3), documents (1), preview (2)
   - **WCAG 2.1 AA**: ARIA labels, roles, aria-live regions, keyboard navigation, semantic HTML
+- **Smart Resume Reuse M6: ATS Scoring + Platform Profiles (TASK-030)**: ATS compatibility scoring with gap analysis and vendor-specific profiles. (FR-030-43 to FR-030-48, NFR-030-19 to NFR-030-20)
+  - **ATS composite scorer**: 5-component weighted score (keyword match 35%, section completeness 20%, skill match 20%, content length 15%, format compliance 10%)
+  - **Gap analysis**: Identifies matched/missing keywords, skills, and resume sections
+  - **7 ATS platform profiles**: Default, Greenhouse, Lever, Workday, Ashby, iCIMS, Taleo — each with vendor-specific weight adjustments
+  - **2 API endpoints**: `POST /api/kb/ats-score` (composite score + gaps), `GET /api/kb/ats-profiles` (list profiles)
+  - **ATS scoring UI**: Platform selector, JD textarea, color-coded score badge, component progress bars, missing keyword/skill/section badges
+  - **i18n**: 18 new keys in `ats` section (en.json + es.json)
+  - **31 new tests**: Component scorers (16), composite scorer (4), platform profiles (6), API endpoints (5)
+  - **WCAG 2.1 AA**: ARIA labels, aria-live results region, semantic HTML, keyboard navigation
 
 ### Changed
 - **Traceability matrix v14.0**: 186 requirements, all ✅ (0 ⚠️). M5 adds 13 new requirements (10 FRs + 3 NFRs).
