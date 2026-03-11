@@ -189,13 +189,13 @@ def _escape_context(context: dict) -> dict:
     return result
 
 
-def _escape_entry(entry) -> dict | str:
+def _escape_entry(entry: dict | str | object) -> dict | str:
     """Escape string values in a list entry."""
     if isinstance(entry, dict):
         return {k: escape_latex(v) if isinstance(v, str) else v for k, v in entry.items()}
     if isinstance(entry, str):
         return escape_latex(entry)
-    return entry
+    return str(entry)
 
 
 # ---------------------------------------------------------------------------
