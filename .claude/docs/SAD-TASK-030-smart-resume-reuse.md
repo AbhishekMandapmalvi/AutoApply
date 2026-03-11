@@ -282,6 +282,88 @@ Output: `int | None` — new row ID if inserted, None if duplicate
 
 ---
 
+### 3.11 resume_scorer.score_kb_entries() (M2)
+
+**Purpose**: Score KB entries against a job description using TF-IDF cosine similarity with keyword boosting and optional ONNX blending.
+**Category**: query (read-only, no side effects)
+
+**Signature**:
+
+Input Parameters:
+| Parameter | Type | Required | Constraints | Description |
+|-----------|------|----------|-------------|-------------|
+| jd_text | str | yes | Non-empty | Job description text |
+| entries | list[dict] | yes | Each dict has 'id', 'text', 'category' | KB entry dicts |
+| config | ResumeReuseConfig or None | no | default: None (uses min_score=0.60, method="auto") | Scoring configuration |
+
+Output:
+| Field | Type | Nullable | Description |
+|-------|------|----------|-------------|
+| (return) | list[dict] | no | Entry dicts with added 'score' (float) and 'scoring_method' (str) keys, sorted by score descending, filtered to >= min_score |
+
+Errors:
+| Error Condition | Error Type | HTTP Status |
+|----------------|------------|-------------|
+| Empty jd_text or entries | (no error) returns [] | N/A |
+
+**Preconditions**: KB entries must have 'text' field.
+**Postconditions**: No state change. Input entries not modified (new dicts created).
+**Side Effects**: None.
+**Idempotency**: Yes.
+**Thread Safety**: Safe (no shared mutable state).
+
+---
+
+### 3.12 jd_analyzer.analyze_jd() (M2)
+
+**Purpose**: Analyze a job description to extract structured keyword data for scoring.
+**Category**: query (pure function)
+
+**Signature**:
+
+Input Parameters:
+| Parameter | Type | Required | Constraints | Description |
+|-----------|------|----------|-------------|-------------|
+| text | str | yes | May be empty/None | Job description text |
+
+Output:
+| Field | Type | Nullable | Description |
+|-------|------|----------|-------------|
+| keywords | list[str] | no | All extracted keywords (normalized) |
+| required_keywords | list[str] | no | Keywords from requirements section |
+| preferred_keywords | list[str] | no | Keywords from preferred/nice-to-have section |
+| tech_terms | list[str] | no | Recognized technology terms from TECH_TERMS dict |
+| ngrams | list[str] | no | 2-3 word phrases |
+| sections | dict[str, str] | no | Detected sections (requirements, preferred, responsibilities, benefits, about) |
+| keyword_counts | dict[str, int] | no | Frequency counts per keyword |
+
+**Preconditions**: None.
+**Postconditions**: No state change.
+**Idempotency**: Yes.
+**Thread Safety**: Safe (pure function).
+
+---
+
+### 3.13 jd_analyzer.normalize_term() (M2)
+
+**Purpose**: Normalize a technology term using the synonym map.
+**Category**: query (pure function)
+
+Input: `term: str`
+Output: `str` — canonical form (e.g., "JS" → "javascript", unknown terms lowered)
+
+---
+
+### 3.14 resume_scorer.compute_tfidf_score() (M2)
+
+**Purpose**: Compute TF-IDF cosine similarity between a JD text and a single entry text. Utility function for testing and one-off scoring.
+**Category**: query (pure function)
+
+Input: `jd_text: str`, `entry_text: str`
+Output: `float` in [0.0, 1.0]
+
+---
+
 ## 4. Data Model
 
 ### 4.1 Entity Definitions
@@ -489,8 +571,19 @@ uploaded_documents ──1:N──▶ knowledge_base  (via knowledge_base.source
 | NFR-030-04 | NFR | Config Models | Pydantic defaults | — |
 | NFR-030-05 | NFR | pyproject.toml | pinned versions | — |
 | NFR-030-06 | NFR | All new modules | t() for user strings | — |
+| FR-030-13 | FR | ResumeScorer | score_kb_entries(), compute_tfidf_score() | ADR-029 |
+| FR-030-14 | FR | JDAnalyzer | analyze_jd() | — |
+| FR-030-15 | FR | JDAnalyzer | _detect_sections() | — |
+| FR-030-16 | FR | JDAnalyzer | normalize_term(), SYNONYM_MAP | — |
+| FR-030-17 | FR | ResumeScorer | _compute_tfidf_scores() (keyword boost) | — |
+| FR-030-18 | FR | ResumeScorer | _onnx_score_entries(), blending logic | ADR-030 |
+| FR-030-19 | FR | JDAnalyzer | TECH_TERMS frozenset, _extract_tech_terms() | — |
+| NFR-030-07 | NFR | ResumeScorer | _compute_tfidf_scores() (batch) | ADR-029 |
+| NFR-030-08 | NFR | Test suite (M2) | pytest | — |
+| NFR-030-09 | NFR | pyproject.toml | No new deps for M2 | ADR-029 |
+| NFR-030-10 | NFR | ResumeScorer, JDAnalyzer | logging.getLogger(__name__) | — |
 
-**Completeness**: 12/12 FRs mapped, 6/6 NFRs mapped. Zero gaps.
+**Completeness**: 19/19 FRs mapped, 10/10 NFRs mapped. Zero gaps.
 
 ---
 
@@ -545,21 +638,91 @@ uploaded_documents ──1:N──▶ knowledge_base  (via knowledge_base.source
 - **Tests**: Manual verification
 - **Done when**: kb and reuse sections present in both locale files
 
-#### IMPL-008: Unit Tests
+#### IMPL-008: Unit Tests (M1)
 - **Creates**: 6 test files, 89+ tests
 - **Done when**: All tests pass; ruff clean; coverage > 80% on new modules
+
+---
+
+### M2 Implementation Tasks
+
+| Order | Task ID | Description | Depends On | Size | Risk | FR Coverage |
+|-------|---------|------------|------------|------|------|-------------|
+| 9 | IMPL-009 | JD Analyzer module | — | M | Low | FR-030-14, FR-030-15, FR-030-16, FR-030-19 |
+| 10 | IMPL-010 | TF-IDF Resume Scorer module | IMPL-009 | M | Low | FR-030-13, FR-030-17, FR-030-18 |
+| 11 | IMPL-011 | M2 Unit Tests | IMPL-009, IMPL-010 | M | Low | All M2 FRs |
+
+#### IMPL-009: JD Analyzer
+- **Creates**: `core/jd_analyzer.py`
+- **Contains**: `analyze_jd()`, `normalize_term()`, `SYNONYM_MAP` (40+ aliases), `TECH_TERMS` (100+ terms), `_detect_sections()`, `_extract_keywords()`, `_extract_tech_terms()`, `_extract_ngrams()`
+- **Tests**: `test_resume_scorer.py::TestJDAnalyzer`, `TestSectionDetection`
+- **Done when**: JD analysis returns keywords, tech terms, sections, n-grams; synonyms normalize correctly
+
+#### IMPL-010: TF-IDF Resume Scorer
+- **Creates**: `core/resume_scorer.py`
+- **Contains**: `score_kb_entries()`, `compute_tfidf_score()`, TF-IDF engine (`_tokenize`, `_term_frequency`, `_inverse_document_frequency`, `_tfidf_vector`, `_cosine_similarity`), keyword boost logic, ONNX interface (`_onnx_available()`, `_onnx_score_entries()`)
+- **Tests**: `test_resume_scorer.py::TestTFIDF`, `TestScoreKBEntries`, `TestONNXBlending`
+- **Done when**: score_kb_entries() returns ranked, filtered results; ONNX blending works with mocked scores; TF-IDF is stdlib-only
+
+#### IMPL-011: M2 Unit Tests
+- **Creates**: `tests/test_resume_scorer.py` — 38 tests across 5 test classes
+- **Done when**: All tests pass; ruff clean; coverage > 90% on new modules
+
+---
+
+### ADR-029: Stdlib-Only TF-IDF Scoring
+
+**Status**: accepted
+**Context**: KB entries must be scored against job descriptions for relevance ranking. The scoring engine must work offline, be fast (<30ms for 200 entries), and add zero new dependencies.
+
+**Decision**: Hand-rolled TF-IDF cosine similarity using only `collections.Counter`, `math`, and `re` from the Python stdlib. IDF uses smoothing: `log((N+1) / (df+1)) + 1`. Keyword boost adds up to +0.25 total (required +0.15, preferred +0.05, tech +0.05).
+
+**Alternatives Considered**:
+
+| Option | Pros | Cons |
+|--------|------|------|
+| scikit-learn TfidfVectorizer | Battle-tested, fast | Heavy dependency (~150MB with NumPy/SciPy) |
+| Sentence-Transformers | Best semantic quality | Requires PyTorch (~2GB), slow on CPU |
+| **stdlib TF-IDF + keyword boost** | **Zero deps, <30ms, good enough for ranking** | **No semantic understanding** |
+
+**Consequences**:
+- Positive: Zero dependency footprint, fast, deterministic, easy to test
+- Negative: Cannot capture semantic similarity (e.g., "ML" and "machine learning" only match via synonym map, not semantically)
+- Risks: Accuracy may be lower than embedding-based approaches → mitigated by optional ONNX blending (ADR-030)
+
+---
+
+### ADR-030: Optional ONNX Embedding Blending
+
+**Status**: accepted
+**Context**: TF-IDF is keyword-based and misses semantic relationships. ONNX embeddings provide better matching but require optional dependencies (`onnxruntime`, `tokenizers`).
+
+**Decision**: M2 defines the blending interface (0.3 × TF-IDF + 0.7 × ONNX). ONNX scoring returns None when unavailable, triggering pure TF-IDF fallback. Full ONNX implementation deferred to M8 (Performance milestone).
+
+**Alternatives Considered**:
+
+| Option | Pros | Cons |
+|--------|------|------|
+| ONNX required | Best quality scoring | Adds ~130MB, not all users need it |
+| **ONNX optional with TF-IDF fallback** | **Works everywhere, upgradeable** | **Two code paths to maintain** |
+| No ONNX support | Simplest | No upgrade path for semantic scoring |
+
+**Consequences**:
+- Positive: Zero runtime cost when not installed; clear upgrade path
+- Negative: Two scoring paths (TF-IDF only vs blended) require separate test coverage
+- Risks: Blending weights (0.3/0.7) may need tuning → configurable in future milestones
 
 ---
 
 ## System Architecture -- GATE 4 OUTPUT
 
 **Document**: SAD-TASK-030-smart-resume-reuse
-**Components**: 7 components defined
-**Interfaces**: 10 contracts specified
+**Components**: 9 components defined (7 M1 + 2 M2)
+**Interfaces**: 14 contracts specified (10 M1 + 4 M2)
 **Entities**: 4 data entities modeled (3 new tables + 1 modified)
-**ADRs**: 2 decisions documented (ADR-027, ADR-028)
-**Impl Tasks**: 8 tasks in dependency order
-**Traceability**: 18/18 requirements mapped (100%)
+**ADRs**: 4 decisions documented (ADR-027, ADR-028, ADR-029, ADR-030)
+**Impl Tasks**: 11 tasks in dependency order (8 M1 + 3 M2)
+**Traceability**: 29/29 requirements mapped (100%)
 **Checklist**: 20/20 items passed
 
 ### Handoff Routing

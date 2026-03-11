@@ -87,8 +87,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - **FR-030**: Log capture — backend.log, 10MB rotation, stdout/stderr piping, append mode
   - **Traceability**: 7 items upgraded from ⚠️ to ✅
 
+- **Smart Resume Reuse M1: KB Foundation (TASK-030)**: Backend data layer for smart resume reuse pipeline. (FR-030-01 to FR-030-12, NFR-030-01 to NFR-030-06, ADR-027, ADR-028)
+  - **Document parser**: Extract text from PDF, DOCX, TXT, and MD files via `core/document_parser.py`
+  - **Knowledge Base**: LLM-based extraction of categorized entries, CRUD with dedup, soft-delete, stats
+  - **Resume parser**: Parse markdown resumes into KB entries for migration and ingestion
+  - **Experience calculator**: Domain-specific years calculation from roles table
+  - **Config models**: `ResumeReuseConfig` and `LatexConfig` Pydantic models with backward-compatible defaults
+  - **DB schema**: 3 new tables (knowledge_base, uploaded_documents, roles) + 2 new columns on resume_versions
+  - **i18n**: 46 new keys (33 kb + 13 reuse) in en.json and es.json
+  - **89 unit tests + 11 integration tests**: Full coverage of all M1 modules
+- **Smart Resume Reuse M2: Scoring Engine (TASK-030)**: TF-IDF scoring engine and JD analyzer. (FR-030-13 to FR-030-19, NFR-030-07 to NFR-030-10, ADR-029, ADR-030)
+  - **TF-IDF scorer**: Hand-rolled cosine similarity using only stdlib (collections.Counter, math, re)
+  - **JD analyzer**: Keyword extraction, section detection, 100+ tech terms, 40+ synonym aliases, n-gram extraction
+  - **Keyword boosting**: Required (+0.15 max), preferred (+0.05 max), tech term (+0.05 max) bonuses
+  - **ONNX interface**: Optional embedding blending (0.3*TF-IDF + 0.7*ONNX), TF-IDF fallback when unavailable
+  - **38 new tests**: JD analysis (10), TF-IDF internals (13), scoring (8), ONNX blending (3), section detection (4)
+  - **Zero new dependencies**: Stdlib only for M2
+
 ### Changed
-- **Traceability matrix v10.0**: ALL 126 requirements now ✅ (0 ⚠️ remaining). TASK-026 to TASK-029 cleared final 13 items: analytics UI (3), resume library UI (5), resume comparison UI (4), electron distribution (1)
+- **Traceability matrix v11.0**: 155 requirements, all ✅ (0 ⚠️). M2 adds 11 new requirements (7 FRs + 4 NFRs).
+- **CLAUDE.md v5.0**: Gitflow-lite branching model (develop + master), shared-workflows.md as single source of truth
 - **CLAUDE.md v4.2**: Added principle #9 (GitHub Issues for every implementation), lesson 12.8 (issue lifecycle)
 
 ## [1.9.0] - 2026-03-11
