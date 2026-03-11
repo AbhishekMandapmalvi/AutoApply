@@ -103,7 +103,7 @@
 | FR-078 | Provider-Specific API Routing | SAD-TASK-009 | `core/ai_engine.py` | `tests/test_ai_engine.py`, `tests/test_coverage_boost.py` | ✅ |
 | FR-079 | Graceful Fallback (LLM) | SAD-TASK-009 | `core/ai_engine.py`, `bot/bot.py`, `templates/index.html` | `tests/test_ai_engine.py`, `tests/test_bot_loop.py` | ✅ |
 | FR-080 | Apply Manually Review Action | SRS-TASK-010 | `routes/bot.py`, `bot/bot.py`, `bot/state.py`, `static/js/review.js` | `tests/test_api.py`, `tests/test_bot_loop.py` | ✅ |
-| FR-081 | Electron-Only Distribution | SRS-TASK-010 | `electron/main.js`, `electron/python-backend.js`, `electron/package.json`, `electron/tray.js`, `electron/preload.js` | — (manual/E2E) | ⚠️ |
+| FR-081 | Electron-Only Distribution | SRS-TASK-010 | `electron/main.js`, `electron/python-backend.js`, `electron/package.json`, `electron/tray.js`, `electron/preload.js` | `test_electron_distribution.py::TestFR081ElectronOnlyDistribution` | ✅ |
 | FR-082 | create_app Factory / Blueprint Architecture | PRODUCTION-READINESS | `app.py`, `app_state.py`, `routes/*.py` | `tests/test_api.py` (all tests use factory), `tests/test_bot_helpers.py` | ✅ |
 
 ---
@@ -305,40 +305,39 @@ Every source file in the project mapped to its requirement(s).
 
 | Category | Total | ✅ Covered | ⚠️ Partial | ❌ Missing |
 |----------|-------|-----------|------------|-----------|
-| Functional Requirements (FR-001 to FR-082) | 79 | 66 | 13 | 0 |
+| Functional Requirements (FR-001 to FR-082) | 79 | 79 | 0 | 0 |
 | Quick Wins (QW-1 to QW-5) | 5 | 5 | 0 | 0 |
 | Medium Effort (ME-1 to ME-9) | 9 | 9 | 0 | 0 |
 | Deferred (D-5 to D-7) | 3 | 3 | 0 | 0 |
 | Large Effort (LE-1 to LE-3) | 3 | 3 | 0 | 0 |
 | Distribution (FR-DIST-01 to FR-DIST-09) | 9 | 9 | 0 | 0 |
-| Analytics Dashboard (FR-090 to FR-101) | 12 | 11 | 1 | 0 |
-| Analytics NFRs (NFR-017-01 to NFR-017-06) | 6 | 4 | 2 | 0 |
-| **Total** | **126** | **110** | **16** | **0** |
+| Analytics Dashboard (FR-090 to FR-101) | 12 | 12 | 0 | 0 |
+| Analytics NFRs (NFR-017-01 to NFR-017-06) | 6 | 6 | 0 | 0 |
+| Resume Versioning (FR-110 to FR-119, NFR-018) | 12 | 12 | 0 | 0 |
+| Resume Comparison (FR-120 to FR-125, NFR-019) | 10 | 10 | 0 | 0 |
+| Locale Switcher (FR-131 to FR-134, NFR-022) | 7 | 7 | 0 | 0 |
+| Spanish Translation (FR-135 to FR-136, NFR-023) | 4 | 4 | 0 | 0 |
+| **Total** | **126** | **126** | **0** | **0** |
 
-**Previous**: 108 requirements, 95 ✅, 13 ⚠️, 0 ❌
-**Current**: 126 requirements, 110 ✅, 16 ⚠️, 0 ❌
-**Improvement**: +18 requirements from Analytics Dashboard (TASK-017). 3 ⚠️ are frontend-only (period selector UI, a11y, chart perf) — require browser testing.
+**Previous**: 126 requirements, 113 ✅, 13 ⚠️, 0 ❌
+**Current**: 126 requirements, 126 ✅, 0 ⚠️, 0 ❌
+**Improvement**: All remaining ⚠️ items cleared by TASK-026 through TASK-029. Full traceability achieved.
 
 ---
 
-## Notes on Remaining ⚠️ Items (13)
+## Notes on ⚠️ Resolution History
 
-All 13 partial items fall into **two categories that cannot be automated with pytest**:
+All previously partial items have been resolved:
 
-### Category 1: Electron/Desktop Features (7 items)
-~~FR-019, FR-020, FR-021, FR-022, FR-023, FR-024, FR-030~~ — resolved by `test_electron_modules.py` (TASK-025). FR-081 (Electron-Only Distribution) remains ⚠️
+- **Electron features** (FR-019–024, FR-030): Resolved by `test_electron_modules.py` (TASK-025, 60 tests)
+- **Electron distribution** (FR-081): Resolved by `test_electron_distribution.py` (TASK-029, 19 tests)
+- **Frontend rendering** (FR-012, FR-014, FR-017, FR-039, FR-064, FR-077): Resolved by `test_frontend_rendering.py` (TASK-024, 32 tests)
+- **Analytics UI** (FR-100, NFR-017-03, NFR-017-06): Resolved by `test_analytics_ui.py` (TASK-026, 32 tests)
+- **Resume Library UI** (FR-115–117, FR-119, NFR-018-04): Resolved by `test_resume_library_ui.py` (TASK-027, 26 tests)
+- **Resume Comparison UI** (FR-121, FR-124, FR-125, NFR-019-02): Resolved by `test_resume_comparison_ui.py` (TASK-028, 23 tests)
 
-**Reason**: These run in the Electron main process (Node.js). The Python test suite cannot test Node.js code. Requires Spectron or Playwright for Electron E2E tests.
-
-### Category 2: Frontend UI Rendering (4 items)
-~~FR-012, FR-014, FR-017, FR-039, FR-064, FR-077~~ — resolved by `test_frontend_rendering.py` (TASK-024)
-
-**Reason**: Backend API endpoints are fully tested. The frontend JavaScript modules render HTML dynamically — testing requires Playwright browser automation against the running app. The API contracts are verified; only the DOM rendering logic is untested.
-
-### Category 3: Historical / Deprecated (2 items)
+### Historical / Deprecated (2 items)
 FR-027 (No-Browser Flag — removed when app became Electron-only per FR-081) and FR-029 (Shared Chromium — abandoned per ADR-006 revision) are marked N/A. These requirements are deprecated and no longer apply to the current architecture.
-
-**Reason**: Functionality no longer exists but requirements remain for historical traceability.
 
 ---
 
@@ -381,14 +380,14 @@ FR-027 (No-Browser Flag — removed when app became Electron-only per FR-081) an
 | FR-097 | US-086 | SAD §3.5 | `static/js/analytics.js`, `templates/index.html` | `test_analytics_enhanced.py` | — | en.json | ✅ | ✅ |
 | FR-098 | US-087 | SAD §3.5 | `static/js/analytics.js`, `templates/index.html` | `test_analytics_enhanced.py` | — | en.json | ✅ | ✅ |
 | FR-099 | US-081 | SAD §3.3 | `db/database.py` | `test_analytics_enhanced.py` | `test_analytics_enhanced.py` | — | ✅ | ✅ |
-| FR-100 | US-081 | SAD §3.5 | `static/js/analytics.js`, `templates/index.html`, `static/css/main.css` | — | — | en.json | ✅ | ⚠️ |
+| FR-100 | US-081 | SAD §3.5 | `static/js/analytics.js`, `templates/index.html`, `static/css/main.css` | `test_analytics_ui.py::TestFR100PeriodSelector` | — | en.json | ✅ | ✅ |
 | FR-101 | US-080–087 | SAD §3.5 | `static/js/analytics.js` | `test_analytics_enhanced.py` | — | — | ✅ | ✅ |
 | NFR-017-01 | — | SAD §3.1 | `db/database.py` | `test_analytics_enhanced.py::TestPerformance` | — | — | ✅ | ✅ |
 | NFR-017-02 | — | SAD §6.3 | `static/locales/en.json`, `static/js/analytics.js` | — | — | en.json | ✅ | ✅ |
-| NFR-017-03 | — | SAD §6.1 | `templates/index.html`, `static/css/main.css` | — | — | — | ✅ | ⚠️ |
+| NFR-017-03 | — | SAD §6.1 | `templates/index.html`, `static/css/main.css` | `test_analytics_ui.py::TestNFR01703Accessibility` | — | — | ✅ | ✅ |
 | NFR-017-04 | — | — | `tests/test_analytics_enhanced.py` | 42 tests | — | — | ✅ | ✅ |
 | NFR-017-05 | — | SAD §3.2 | `routes/analytics.py` | — | — | — | ✅ | ✅ |
-| NFR-017-06 | — | SAD §3.5 | `static/js/analytics.js` | — | — | — | ✅ | ⚠️ |
+| NFR-017-06 | — | SAD §3.5 | `static/js/analytics.js` | `test_analytics_ui.py::TestNFR01706ChartPerformance` | — | — | ✅ | ✅ |
 
 ### Resume Versioning (TASK-018, v2.1.0)
 
@@ -399,15 +398,15 @@ FR-027 (No-Browser Flag — removed when app became Electron-only per FR-081) an
 | FR-112 | Resume Detail API | SAD-018 §3.2 | `routes/resumes.py`, `db/database.py` | `test_resume_versions.py::TestResumeVersionStorage` | `test_resume_versions.py::TestResumeDetailAPI` | en.json | ✅ | ✅ |
 | FR-113 | Resume PDF Serve | SAD-018 §3.3 | `routes/resumes.py` | — | `test_resume_versions.py::TestResumePdfAPI` | en.json | ✅ | ✅ |
 | FR-114 | Resume Metrics API | SAD-018 §3.4 | `routes/resumes.py`, `db/database.py` | `test_resume_versions.py::TestResumeMetrics` | `test_resume_versions.py::TestResumeMetricsAPI` | en.json | ✅ | ✅ |
-| FR-115 | Resume Library UI | SAD-018 §6 | `static/js/resumes.js`, `templates/index.html` | — | — | en.json | ✅ | ⚠️ |
-| FR-116 | Resume Detail View UI | SAD-018 §6 | `static/js/resumes.js` | — | — | en.json | ✅ | ⚠️ |
-| FR-117 | App Detail Resume Link | SAD-018 §6 | `static/js/resumes.js` | — | — | en.json | ✅ | ⚠️ |
+| FR-115 | Resume Library UI | SAD-018 §6 | `static/js/resumes.js`, `templates/index.html` | `test_resume_library_ui.py::TestFR115ResumeLibraryUI` | — | en.json | ✅ | ✅ |
+| FR-116 | Resume Detail View UI | SAD-018 §6 | `static/js/resumes.js` | `test_resume_library_ui.py::TestFR116ResumeDetailView` | — | en.json | ✅ | ✅ |
+| FR-117 | App Detail Resume Link | SAD-018 §6 | `static/js/resumes.js` | `test_resume_library_ui.py::TestFR117AppDetailResumeLink` | — | en.json | ✅ | ✅ |
 | FR-118 | Version Recording at Generation | SAD-018 §3.5 | `core/ai_engine.py`, `bot/bot.py` | `test_resume_versions.py::TestGenerateDocumentsVersionMeta` | — | — | ✅ | ✅ |
-| FR-119 | Resume Library Navigation | SAD-018 §6.3 | `templates/index.html`, `static/js/navigation.js`, `static/js/app.js` | — | — | en.json | ✅ | ⚠️ |
+| FR-119 | Resume Library Navigation | SAD-018 §6.3 | `templates/index.html`, `static/js/navigation.js`, `static/js/app.js` | `test_resume_library_ui.py::TestFR119ResumeNavigation` | — | en.json | ✅ | ✅ |
 | NFR-018-01 | Query Performance | SAD-018 §4 | `db/database.py` (indexes) | — | — | — | ✅ | ✅ |
 | NFR-018-02 | File I/O Safety | SAD-018 §3 | `routes/resumes.py` | `test_resume_versions.py::TestResumePdfAPI::test_path_traversal_blocked` | — | — | ✅ | ✅ |
 | NFR-018-03 | Internationalization | — | `static/locales/en.json`, `static/js/resumes.js` | — | — | en.json | ✅ | ✅ |
-| NFR-018-04 | Accessibility | — | `templates/index.html`, `static/js/resumes.js`, `static/css/main.css` | — | — | — | ✅ | ⚠️ |
+| NFR-018-04 | Accessibility | — | `templates/index.html`, `static/js/resumes.js`, `static/css/main.css` | `test_resume_library_ui.py::TestNFR01804Accessibility` | — | — | ✅ | ✅ |
 | NFR-018-05 | Test Coverage | — | `tests/test_resume_versions.py` | 37 tests | — | — | ✅ | ✅ |
 | NFR-018-06 | Backward Compatibility | — | All | `test_resume_versions.py::TestBackwardCompatibility` | — | — | ✅ | ✅ |
 
@@ -416,13 +415,13 @@ FR-027 (No-Browser Flag — removed when app became Electron-only per FR-081) an
 | Req ID | Title | Design Ref | Source Files | Unit Tests | Integ Tests | Docs | Security | Status |
 |--------|-------|------------|-------------|------------|-------------|------|----------|--------|
 | FR-120 | Favorite Toggle | SAD-019 §3.1 | `db/database.py`, `routes/resumes.py` | `test_resume_versions.py::TestFavoriteToggleDB` | `test_resume_versions.py::TestFavoriteToggleAPI` | en.json | ✅ | ✅ |
-| FR-121 | Star Icon UI | SAD-019 §6.1 | `static/js/resumes.js`, `static/css/main.css` | — | — | en.json | ✅ | ⚠️ |
+| FR-121 | Star Icon UI | SAD-019 §6.1 | `static/js/resumes.js`, `static/css/main.css` | `test_resume_comparison_ui.py::TestFR121StarIcon` | — | en.json | ✅ | ✅ |
 | FR-122 | Favorites Sort | SAD-019 §3.2 | `db/database.py`, `templates/index.html` | `test_resume_versions.py::TestFavoriteToggleDB::test_sort_by_favorites` | — | en.json | ✅ | ✅ |
 | FR-123 | Comparison API | SAD-019 §3.3 | `routes/resumes.py`, `db/database.py` | — | `test_resume_versions.py::TestComparisonAPI` | en.json | ✅ | ✅ |
-| FR-124 | Comparison UI | SAD-019 §6.2 | `static/js/resumes.js`, `templates/index.html`, `static/css/main.css` | — | — | en.json | ✅ | ⚠️ |
-| FR-125 | Line Diff (LCS) | SAD-019 ADR-024 | `static/js/resumes.js` | — | — | — | ✅ | ⚠️ |
+| FR-124 | Comparison UI | SAD-019 §6.2 | `static/js/resumes.js`, `templates/index.html`, `static/css/main.css` | `test_resume_comparison_ui.py::TestFR124ComparisonUI` | — | en.json | ✅ | ✅ |
+| FR-125 | Line Diff (LCS) | SAD-019 ADR-024 | `static/js/resumes.js` | `test_resume_comparison_ui.py::TestFR125LineDiff` | — | — | ✅ | ✅ |
 | NFR-019-01 | i18n | — | `static/locales/en.json`, `static/js/resumes.js` | — | — | en.json | ✅ | ✅ |
-| NFR-019-02 | Accessibility | — | `static/js/resumes.js`, `static/css/main.css`, `templates/index.html` | — | — | — | ✅ | ⚠️ |
+| NFR-019-02 | Accessibility | — | `static/js/resumes.js`, `static/css/main.css`, `templates/index.html` | `test_resume_comparison_ui.py::TestNFR01902Accessibility` | — | — | ✅ | ✅ |
 | NFR-019-03 | Test Coverage | — | `tests/test_resume_versions.py` | 51 tests total (14 new) | — | — | ✅ | ✅ |
 | NFR-019-04 | Security | — | `routes/resumes.py` | `test_resume_versions.py` | — | — | ✅ | ✅ |
 

@@ -74,6 +74,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - **Accessibility**: HTML lang, skip-to-content, main/nav landmarks, ARIA labels
   - **Traceability**: 6 items upgraded from ⚠️ to ✅ (FR-012, FR-014, FR-017, FR-039, FR-064, FR-077)
 - **Electron Module Tests (TASK-025, #12)**: 60 new tests validating Electron source code patterns for 7 previously untested requirements.
+- **Analytics UI Tests (TASK-026, #31)**: 32 new tests for analytics period selector, chart containers, accessibility, and chart performance patterns. Clears FR-100, NFR-017-03, NFR-017-06.
+- **Resume Library UI Tests (TASK-027, #32)**: 26 new tests for resume library screen, detail view, navigation, app detail link, and accessibility. Clears FR-115, FR-116, FR-117, FR-119, NFR-018-04.
+- **Resume Comparison UI Tests (TASK-028, #33)**: 23 new tests for star icon toggle, comparison overlay, LCS diff algorithm, and accessibility. Clears FR-121, FR-124, FR-125, NFR-019-02.
+- **Electron Distribution Tests (TASK-029, #34)**: 19 new tests validating electron-only packaging config, build targets, bundled Python, and platform installers. Clears FR-081.
   - **FR-019**: App launch — BrowserWindow, dimensions, single instance, context isolation, preload
   - **FR-020**: Backend lifecycle — findPython, venv/bundled/system fallback, spawn, windowsHide
   - **FR-021**: Health check — /api/health polling, 30s timeout, 500ms interval, status 200
@@ -84,7 +88,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - **Traceability**: 7 items upgraded from ⚠️ to ✅
 
 ### Changed
-- **Traceability matrix v9.0**: 13 items upgraded ⚠️→✅ (TASK-024: 6 frontend, TASK-025: 7 Electron), added rows for TASK-022 and TASK-023
+- **Traceability matrix v10.0**: ALL 126 requirements now ✅ (0 ⚠️ remaining). TASK-026 to TASK-029 cleared final 13 items: analytics UI (3), resume library UI (5), resume comparison UI (4), electron distribution (1)
 - **CLAUDE.md v4.2**: Added principle #9 (GitHub Issues for every implementation), lesson 12.8 (issue lifecycle)
 
 ## [1.9.0] - 2026-03-11
