@@ -1,0 +1,85 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{helvet}
+\renewcommand{\familydefault}{\sfdefault}
+\usepackage[margin=0.5in]{geometry}
+\usepackage{enumitem}
+\usepackage{hyperref}
+
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0pt}
+
+\newcommand{\sectionheading}[1]{%
+    \vspace{6pt}{\small\bfseries\uppercase{#1}}\vspace{2pt}\hrule\vspace{4pt}%
+}
+
+\begin{document}
+
+% Header — compact single line
+{\large\bfseries \VAR{name}} \hfill
+{\small \VAR{email}
+\BLOCK{if phone} $\cdot$ \VAR{phone}\BLOCK{endif}
+\BLOCK{if location} $\cdot$ \VAR{location}\BLOCK{endif}
+}
+\vspace{2pt}\hrule\vspace{4pt}
+
+% Summary
+\BLOCK{if summary}
+{\small \VAR{summary}}
+\vspace{2pt}
+\BLOCK{endif}
+
+% Experience
+\BLOCK{if experience}
+\sectionheading{Experience}
+\BLOCK{for entry in experience}
+\BLOCK{if entry.subsection}{\small\bfseries \VAR{entry.subsection}}\\*\BLOCK{endif}
+\begin{itemize}[leftmargin=1em,topsep=0pt,itemsep=0pt,parsep=0pt]
+    \item {\small \VAR{entry.text}}
+\end{itemize}
+\BLOCK{endfor}
+\BLOCK{endif}
+
+% Skills
+\BLOCK{if skills}
+\sectionheading{Skills}
+{\small
+\BLOCK{for entry in skills}
+\VAR{entry.text}\BLOCK{if not loop.last}, \BLOCK{endif}
+\BLOCK{endfor}
+}
+\BLOCK{endif}
+
+% Education
+\BLOCK{if education}
+\sectionheading{Education}
+\BLOCK{for entry in education}
+\BLOCK{if entry.subsection}{\small\bfseries \VAR{entry.subsection}} --- \BLOCK{endif}{\small \VAR{entry.text}}
+\BLOCK{if not loop.last}\\[1pt]\BLOCK{endif}
+\BLOCK{endfor}
+\BLOCK{endif}
+
+% Projects
+\BLOCK{if projects}
+\sectionheading{Projects}
+\BLOCK{for entry in projects}
+\BLOCK{if entry.subsection}{\small\bfseries \VAR{entry.subsection}}\\*\BLOCK{endif}
+\begin{itemize}[leftmargin=1em,topsep=0pt,itemsep=0pt,parsep=0pt]
+    \item {\small \VAR{entry.text}}
+\end{itemize}
+\BLOCK{endfor}
+\BLOCK{endif}
+
+% Certifications
+\BLOCK{if certifications}
+\sectionheading{Certifications}
+{\small
+\BLOCK{for entry in certifications}
+\VAR{entry.text}\BLOCK{if not loop.last} $\cdot$ \BLOCK{endif}
+\BLOCK{endfor}
+}
+\BLOCK{endif}
+
+\end{document}
