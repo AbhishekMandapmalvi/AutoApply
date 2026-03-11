@@ -218,6 +218,7 @@ Every source file in the project mapped to its requirement(s).
 | `core/experience_calculator.py` | FR-030-09 |
 | `core/resume_scorer.py` | FR-030-13, FR-030-17, FR-030-18 |
 | `core/jd_analyzer.py` | FR-030-14, FR-030-15, FR-030-16, FR-030-19 |
+| `core/latex_compiler.py` | FR-030-20, FR-030-21, FR-030-22, FR-030-23, FR-030-26, NFR-030-11, NFR-030-12, NFR-030-13 |
 
 ### Frontend
 
@@ -260,6 +261,7 @@ Every source file in the project mapped to its requirement(s).
 | `electron/scripts/sync-version.js` | FR-DIST-02 |
 | `electron/scripts/generate-icon.js` | FR-DIST-01 |
 | `electron/scripts/bundle-python.js` | FR-DIST-03 |
+| `electron/scripts/bundle-tinytex.js` | FR-030-25 |
 
 ### DevOps & Config
 
@@ -517,3 +519,18 @@ FR-027 and FR-029 marked N/A (deprecated). See rows above.
 | NFR-030-08 | M2 Test Coverage ≥ 90% | — | — | 38 tests across 5 classes | — | SRS | — | ✅ |
 | NFR-030-09 | No New Runtime Dependencies (M2) | SAD ADR-029 | `pyproject.toml` (unchanged) | — | — | SRS | SEC ✅ | ✅ |
 | NFR-030-10 | Structured Logging (M2) | SAD §5 | `core/resume_scorer.py`, `core/jd_analyzer.py` | Code review (0 print statements) | — | SRS | SEC ✅ | ✅ |
+
+### Smart Resume Reuse M3 — LaTeX Engine (TASK-030)
+
+| Req ID | User Story | Design Ref | Source Files | Unit Tests | Integ Tests | Docs | Security | Status |
+|--------|------------|------------|--------------|------------|-------------|------|----------|--------|
+| FR-030-20 | US-030-07 | SAD §3.15 | `core/latex_compiler.py` | `test_latex_compiler.py::TestEscapeLaTeX` | — | SRS §M3 | SEC #15 | ✅ |
+| FR-030-21 | US-030-07 | SAD §3.16 | `core/latex_compiler.py` | `test_latex_compiler.py::TestFindPdflatex` | — | SRS §M3 | SEC #13 | ✅ |
+| FR-030-22 | US-030-07 | SAD §3.17, ADR-031 | `core/latex_compiler.py` | `test_latex_compiler.py::TestRenderTemplate` | — | SRS §M3 | SEC #15 | ✅ |
+| FR-030-23 | US-030-07 | SAD §3.18 | `core/latex_compiler.py` | `test_latex_compiler.py::TestCompileLatex` | — | SRS §M3 | SEC #13,#14,#16 | ✅ |
+| FR-030-24 | US-030-07 | SAD IMPL-013 | `templates/latex/*.tex.j2` | `test_latex_compiler.py::TestRenderTemplate` | — | SRS §M3 | SEC #15 | ✅ |
+| FR-030-25 | US-030-08 | SAD IMPL-014 | `electron/scripts/bundle-tinytex.js` | — | — | SRS §M3 | SEC #17 | ✅ |
+| FR-030-26 | US-030-07 | SAD §3.19 | `core/latex_compiler.py` | `test_latex_compiler.py::TestCompileResume` | — | SRS §M3 | SEC #13 | ✅ |
+| NFR-030-11 | — | SAD §perf | `core/latex_compiler.py` | `test_latex_compiler.py` | — | SRS §M3 | — | ✅ |
+| NFR-030-12 | — | SAD §perf | `core/latex_compiler.py` | `test_latex_compiler.py::test_compile_timeout` | — | SRS §M3 | SEC #16 | ✅ |
+| NFR-030-13 | — | SAD §robust | `core/latex_compiler.py` | `test_latex_compiler.py::test_escape_empty,test_escape_none` | — | SRS §M3 | — | ✅ |

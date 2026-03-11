@@ -1,0 +1,86 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{palatino}
+\usepackage[margin=0.8in]{geometry}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{hyperref}
+
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+
+\titleformat{\section}{\large\bfseries\scshape}{}{0em}{}[\hrule]
+\titlespacing{\section}{0pt}{14pt}{6pt}
+
+\titleformat{\subsection}{\normalsize\bfseries}{}{0em}{}
+\titlespacing{\subsection}{0pt}{8pt}{3pt}
+
+\begin{document}
+
+% Header
+\begin{center}
+    {\LARGE\bfseries\scshape \VAR{name}}\\[6pt]
+    {\small
+    \VAR{email}
+    \BLOCK{if phone} \quad \VAR{phone}\BLOCK{endif}
+    \BLOCK{if location} \quad \VAR{location}\BLOCK{endif}
+    }
+\end{center}
+\vspace{6pt}
+
+% Summary
+\BLOCK{if summary}
+\section{Research Interests}
+\VAR{summary}
+\BLOCK{endif}
+
+% Education (first for academic CV)
+\BLOCK{if education}
+\section{Education}
+\BLOCK{for entry in education}
+\BLOCK{if entry.subsection}\subsection{\VAR{entry.subsection}}\BLOCK{endif}
+\VAR{entry.text}
+\BLOCK{if not loop.last}\vspace{4pt}\BLOCK{endif}
+\BLOCK{endfor}
+\BLOCK{endif}
+
+% Experience
+\BLOCK{if experience}
+\section{Professional Experience}
+\BLOCK{for entry in experience}
+\BLOCK{if entry.subsection}\subsection{\VAR{entry.subsection}}\BLOCK{endif}
+\begin{itemize}[leftmargin=1.5em,topsep=0pt,itemsep=2pt]
+    \item \VAR{entry.text}
+\end{itemize}
+\BLOCK{endfor}
+\BLOCK{endif}
+
+% Projects / Publications
+\BLOCK{if projects}
+\section{Selected Projects}
+\BLOCK{for entry in projects}
+\BLOCK{if entry.subsection}\subsection{\VAR{entry.subsection}}\BLOCK{endif}
+\begin{itemize}[leftmargin=1.5em,topsep=0pt,itemsep=2pt]
+    \item \VAR{entry.text}
+\end{itemize}
+\BLOCK{endfor}
+\BLOCK{endif}
+
+% Skills
+\BLOCK{if skills}
+\section{Technical Proficiencies}
+\BLOCK{for entry in skills}
+\VAR{entry.text}\BLOCK{if not loop.last}; \BLOCK{endif}
+\BLOCK{endfor}
+\BLOCK{endif}
+
+% Certifications / Awards
+\BLOCK{if certifications}
+\section{Certifications \& Awards}
+\BLOCK{for entry in certifications}
+\VAR{entry.text}\BLOCK{if not loop.last}\\[2pt]\BLOCK{endif}
+\BLOCK{endfor}
+\BLOCK{endif}
+
+\end{document}

@@ -1,0 +1,89 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{helvet}
+\renewcommand{\familydefault}{\sfdefault}
+\usepackage[margin=0.6in]{geometry}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{hyperref}
+\usepackage{xcolor}
+
+\definecolor{accent}{RGB}{0,90,160}
+\definecolor{lightgray}{RGB}{240,240,240}
+
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+
+\titleformat{\section}{\large\bfseries\color{accent}}{}{0em}{}[\color{accent}\titlerule]
+\titlespacing{\section}{0pt}{10pt}{5pt}
+
+\begin{document}
+
+% Header
+\begin{center}
+    {\Huge\bfseries\color{accent} \VAR{name}}\\[6pt]
+    {\small
+    \VAR{email}
+    \BLOCK{if phone} $|$ \VAR{phone}\BLOCK{endif}
+    \BLOCK{if location} $|$ \VAR{location}\BLOCK{endif}
+    }
+\end{center}
+\vspace{4pt}
+
+% Summary
+\BLOCK{if summary}
+\section{Profile}
+\VAR{summary}
+\BLOCK{endif}
+
+% Experience
+\BLOCK{if experience}
+\section{Professional Experience}
+\BLOCK{for entry in experience}
+\BLOCK{if entry.subsection}{\bfseries\color{accent} \VAR{entry.subsection}}\\[2pt]\BLOCK{endif}
+\begin{itemize}[leftmargin=1.2em,topsep=0pt,itemsep=1pt,label=\textcolor{accent}{\textbullet}]
+    \item \VAR{entry.text}
+\end{itemize}
+\BLOCK{if not loop.last}\vspace{3pt}\BLOCK{endif}
+\BLOCK{endfor}
+\BLOCK{endif}
+
+% Education
+\BLOCK{if education}
+\section{Education}
+\BLOCK{for entry in education}
+\BLOCK{if entry.subsection}{\bfseries \VAR{entry.subsection}}\\[2pt]\BLOCK{endif}
+\VAR{entry.text}
+\BLOCK{if not loop.last}\\[3pt]\BLOCK{endif}
+\BLOCK{endfor}
+\BLOCK{endif}
+
+% Skills
+\BLOCK{if skills}
+\section{Technical Skills}
+\BLOCK{for entry in skills}
+\VAR{entry.text}\BLOCK{if not loop.last} $\cdot$ \BLOCK{endif}
+\BLOCK{endfor}
+\BLOCK{endif}
+
+% Projects
+\BLOCK{if projects}
+\section{Projects}
+\BLOCK{for entry in projects}
+\BLOCK{if entry.subsection}{\bfseries\color{accent} \VAR{entry.subsection}}\\[2pt]\BLOCK{endif}
+\begin{itemize}[leftmargin=1.2em,topsep=0pt,itemsep=1pt,label=\textcolor{accent}{\textbullet}]
+    \item \VAR{entry.text}
+\end{itemize}
+\BLOCK{endfor}
+\BLOCK{endif}
+
+% Certifications
+\BLOCK{if certifications}
+\section{Certifications}
+\BLOCK{for entry in certifications}
+\VAR{entry.text}\BLOCK{if not loop.last}\\[2pt]\BLOCK{endif}
+\BLOCK{endfor}
+\BLOCK{endif}
+
+\end{document}
