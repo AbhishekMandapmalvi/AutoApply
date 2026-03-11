@@ -6,11 +6,9 @@ and returns 429 with Retry-After header when exceeded.
 
 from __future__ import annotations
 
-from unittest.mock import patch
-
 import pytest
 
-from app import _RateLimiter, _rate_limiter, app
+from app import _RateLimiter, app
 
 
 @pytest.fixture

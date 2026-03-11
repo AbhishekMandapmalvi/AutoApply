@@ -333,10 +333,6 @@ class TestBrowserManagerPlaywrightStart:
 
         with patch.dict("sys.modules", {"playwright": MagicMock(), "playwright.sync_api": MagicMock()}):
             with patch("bot.browser.sync_playwright", mock_sync_pw_func, create=True):
-                # We need to patch the import inside get_page
-                import bot.browser as browser_mod
-                original_get_page = browser_mod.BrowserManager.get_page
-
                 def patched_get_page(self):
                     if self._page and not self._page.is_closed():
                         return self._page

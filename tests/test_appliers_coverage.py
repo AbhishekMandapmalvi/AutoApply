@@ -535,7 +535,6 @@ class TestIndeedRanOutOfSteps:
 
         page.query_selector.side_effect = qs
         # After clicking apply, URL changes to external
-        original_goto = page.goto
         def fake_goto(*args, **kwargs):
             page.url = "https://external-ats.com/apply"
         page.goto.side_effect = fake_goto
