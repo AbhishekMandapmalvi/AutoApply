@@ -1,6 +1,6 @@
 # AutoApply — Product Requirements Document
 
-> **Version:** 3.0 | **Status:** Planning | **Last Updated:** March 2026
+> **Version:** 4.0 | **Status:** Active | **Last Updated:** March 2026
 > **Purpose of this document:** Complete specification for Claude Code to implement AutoApply end-to-end. Each section is written to be directly actionable. Follow sections in order. Do not skip ahead.
 
 ---
@@ -1261,19 +1261,73 @@ Build and fully test each phase before starting the next.
 
 **Acceptance criteria:** Bot submits on Greenhouse and Lever using Claude Code-generated resume and cover letter.
 
-### Phase 6 — Workday & Final Polish (Week 6)
+### Phase 6 — Workday & Final Polish (Week 6) ✅ COMPLETE
 
-- [ ] `bot/apply/workday.py`
-- [ ] DB auto-backup to `~/.autoapply/backups/`
-- [ ] Rate limiting + daily cap enforcement
-- [ ] Cross-platform testing on macOS, Windows, Ubuntu
-- [ ] README with installation and usage instructions
+- [x] `bot/apply/workday.py`
+- [x] `bot/apply/ashby.py`
+- [x] DB auto-backup to `~/.autoapply/backups/`
+- [x] Rate limiting + daily cap enforcement
+- [x] Cross-platform testing on macOS, Windows, Ubuntu
+- [x] README with installation and usage instructions
 
 **Acceptance criteria:** Bot handles Workday. Full cross-platform verification. Ready for daily use.
 
+### Phase 7 — Production Readiness (Completed in v1.8.1–v1.8.3) ✅ COMPLETE
+
+All production-readiness items delivered. Score: 10.0/10. See `.claude/docs/PRODUCTION-READINESS.md`.
+
+- [x] QW-1 through QW-5: SECRET_KEY, swallowed exceptions, logging, race conditions, temp file leak
+- [x] ME-1 through ME-9: CI/CD, API auth, input validation, error handlers, Blueprint refactor, test coverage 97%, dep pinning, mypy, graceful shutdown, security hardening
+- [x] LE-1: Frontend refactor to 17 ES modules
+- [x] LE-2: WCAG 2.1 AA accessibility
+- [x] LE-3: Internationalization (460+ strings, backend + frontend i18n infrastructure)
+- [x] D-5: SQLite WAL mode + busy timeout
+- [x] D-6: LLM retry with exponential backoff
+- [x] D-7: Structured JSON logging
+
+### Phase 8 — Distribution & Quality of Life
+
+Goal: Make AutoApply distributable as a standalone installer and complete remaining UX polish.
+
+#### 8.1 — Build Installers (DIST)
+
+- [ ] **DIST-1: App Icons** — Create icon assets: `icon.ico` (Windows, 256x256), `icon.icns` (macOS, 512x512), `icon.png` (Linux, 512x512). Place in `electron/icons/`. *Blocker for all installer builds.*
+- [ ] **DIST-2: Version Sync** — Synchronize `electron/package.json` version with Python `pyproject.toml` version (currently 1.0.0 vs 1.8.3). Add script or CI check to enforce version parity.
+- [ ] **DIST-3: Windows Installer (.exe)** — Build NSIS installer via `npm run dist:win`. Test: install, launch, apply to a job, uninstall. Verify Python backend bundled correctly in `extraResources`.
+- [ ] **DIST-4: macOS Installer (.dmg)** — Build DMG via `npm run dist:mac`. Test: mount, drag to Applications, launch, verify Gatekeeper warning (unsigned). Document code signing steps for future.
+- [ ] **DIST-5: Linux Installer (.AppImage)** — Build AppImage via `npm run dist:linux`. Test on Ubuntu 22.04+: launch, apply to a job, verify desktop integration.
+- [ ] **DIST-6: Installer CI** — Add GitHub Actions workflow to build installers on push to tags (`v*`). Upload artifacts to GitHub Releases. Platforms: Windows (windows-latest), macOS (macos-latest), Linux (ubuntu-latest).
+
+**Acceptance criteria:** Running `npm run dist:win` (or mac/linux) produces a working installer that bundles the Python backend. User installs, launches, completes wizard, and can start applying — no Python or Node.js required on their machine.
+
+**Dependencies:** DIST-1 (icons) blocks DIST-3/4/5. DIST-2 (version sync) should be done first.
+
+#### 8.2 — Frontend i18n Migration (QOL)
+
+- [ ] **QOL-1: Migrate JS Strings** — Replace ~26 hardcoded English strings across 7 JS files (`bot-control.js`, `applications.js`, `settings.js`, `profile.js`, `login.js`, `wizard.js`, `feed.js`) with `t()` calls. Add any missing keys to `static/locales/en.json`.
+- [ ] **QOL-2: Migrate HTML Strings** — Replace ~150 hardcoded English strings in `templates/index.html` (form labels, button text, headings, placeholders, dropdown options, table headers) with data attributes or JS-driven `t()` calls on page load.
+- [ ] **QOL-3: Locale Switcher UI** — Add language selector dropdown to Settings tab. Calls `setLocale()` and refreshes UI strings without page reload.
+- [ ] **QOL-4: Sample Translation** — Create `static/locales/es.json` (Spanish) as proof that the i18n system works end-to-end. Translate at least the nav, buttons, and error sections (~80 strings).
+
+**Acceptance criteria:** All user-visible strings in the frontend come from locale JSON files. Switching locale in Settings immediately updates all text. Spanish translation renders correctly.
+
+#### 8.3 — Dark/Light Theme (QOL)
+
+- [ ] **QOL-5: Theme Toggle** — Add theme toggle (sun/moon icon) to the navbar or Settings. Persist preference in `localStorage`. Default: dark (current theme).
+- [ ] **QOL-6: Light Theme CSS** — Create CSS custom properties (`--bg-primary`, `--text-primary`, `--accent`, etc.) in `static/css/main.css`. Refactor existing dark theme to use variables. Add `[data-theme="light"]` overrides.
+
+**Acceptance criteria:** User can switch between dark and light themes. Preference persists across sessions. All UI elements readable in both themes.
+
+#### 8.4 — E2E Tests (QOL)
+
+- [ ] **QOL-7: Playwright E2E Setup** — Add Playwright test config for the Electron app. Test harness starts Flask backend + Electron, runs tests against the live app.
+- [ ] **QOL-8: Core E2E Scenarios** — Write E2E tests for: wizard completion, bot start/stop, application table rendering, settings save, profile file CRUD, theme toggle, locale switch. Covers the 13 remaining ⚠️ items in the traceability matrix.
+
+**Acceptance criteria:** `npx playwright test` runs 8+ E2E scenarios against the live Electron app. All pass. Traceability matrix ⚠️ items reduced from 13 to ≤5.
+
 ---
 
-## 18. Out of Scope (v1.0)
+## 18. Out of Scope (v2.0)
 
 - Cloud hosting or remote server execution
 - Mobile app or mobile dashboard
@@ -1283,21 +1337,31 @@ Build and fully test each phase before starting the next.
 - Video or async interview responses
 - Taleo and iCIMS automation (covered in a future version)
 - Browser extension
-- Direct Anthropic API integration (Claude Code CLI is the only AI interface in v1.0)
+- ~~Direct Anthropic API integration~~ — **DONE** (v1.8.1, multi-provider LLM API)
+- Code signing + notarization (D-4, requires certificates)
+- Auto-update via electron-updater (D-1, requires D-4)
+- Crash reporting / Sentry (D-2, requires consent flow)
+- Telemetry / usage analytics (D-3, requires consent flow)
 
 ---
 
 ## 19. Open Questions
 
-Resolve before or during Phase 1:
+### Resolved (Phases 1–7)
 
-1. **Daily cap enforcement:** Hard limit (bot stops at 50/day) or soft warning (continues but alerts)?
-2. **Multiple resume styles:** Should Claude Code vary the resume format based on company type (startup vs. enterprise)?
-3. **Screening question handling:** Pre-configured answers in setup wizard, or should Claude Code derive answers from experience files?
-4. **Cover letter length:** Always 3 paragraphs, or user-configurable (short / medium / detailed)?
-5. **Failed application retry:** No auto-retry currently — should there be opt-in manual retry from the Applications screen?
-6. **Experience file completeness feedback:** Should the Profile screen warn the user if experience files seem thin or lack key information?
-7. **Windows Claude Code path:** Verify `claude.cmd` fallback works on Windows 10 and 11 before Phase 2 ships.
+1. **Daily cap enforcement:** Hard limit — bot stops at `max_applications_per_day`. ✅
+2. **Multiple resume styles:** Single format (ATS-safe Helvetica PDF). ✅
+3. **Screening question handling:** Pre-configured in setup wizard + Settings UI (`screening_answers` dict). ✅
+4. **Cover letter length:** AI-determined based on job description. ✅
+5. **Failed application retry:** No auto-retry. User can re-apply manually. ✅
+6. **Experience file completeness feedback:** Not implemented — low priority. Deferred.
+7. **Windows Claude Code path:** Superseded — Claude Code CLI replaced by direct LLM API. ✅
+
+### Open (Phase 8)
+
+8. **Icon design:** Use a simple placeholder icon or commission a proper logo before first public installer release?
+9. **Python bundling strategy:** Should installers bundle a full Python interpreter (PyInstaller/cx_Freeze), or require Python pre-installed? Current approach relies on user having Python.
+10. **Frontend i18n granularity:** Migrate all ~150 HTML strings to `t()`, or only the dynamic/JS-set ones (~26)?
 
 ---
 
