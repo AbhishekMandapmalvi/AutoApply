@@ -552,3 +552,21 @@ FR-027 and FR-029 marked N/A (deprecated). See rows above.
 | FR-030-32 | US-030-11 | SAD IMPL-017 | `db/database.py` | `test_resume_assembler.py::TestSaveResumeVersionReuse` | — | SRS §M4 | SEC #21 | ✅ |
 | NFR-030-14 | — | SAD §perf | `core/resume_assembler.py` | — | — | SRS §M4 | — | ✅ |
 | NFR-030-15 | — | SAD §compat | `db/database.py` | `test_resume_assembler.py::test_backward_compat` | — | SRS §M4 | — | ✅ |
+
+### Smart Resume Reuse M5 — Upload UI + KB Viewer + Preview (TASK-030)
+
+| Req ID | User Story | Design Ref | Source Files | Unit Tests | Integ Tests | Docs | Security | Status |
+|--------|------------|------------|--------------|------------|-------------|------|----------|--------|
+| FR-030-33 | US-107 | SAD §3.25, IC-025 | `routes/knowledge_base.py` | `test_knowledge_base_routes.py::TestKBUpload` | — | SRS §M5 | SEC #22, #23 | ✅ |
+| FR-030-34 | US-109 | SAD §3.25 | `routes/knowledge_base.py` | `test_knowledge_base_routes.py::TestKBStats` | — | SRS §M5 | SEC #25 | ✅ |
+| FR-030-35 | US-108 | SAD §3.25, IC-026 | `routes/knowledge_base.py` | `test_knowledge_base_routes.py::TestKBList` | — | SRS §M5 | SEC #25, #26 | ✅ |
+| FR-030-36 | US-108 | SAD §3.25 | `routes/knowledge_base.py` | `test_knowledge_base_routes.py::TestKBGetEntry, TestKBUpdateEntry, TestKBDeleteEntry` | — | SRS §M5 | SEC #25 | ✅ |
+| FR-030-37 | US-109 | SAD §3.25 | `routes/knowledge_base.py` | `test_knowledge_base_routes.py::TestKBDocuments` | — | SRS §M5 | SEC #24 | ✅ |
+| FR-030-38 | US-110 | SAD §3.26 | `static/js/knowledge-base.js` | — | — | SRS §M5 | SEC #27 | ✅ |
+| FR-030-39 | US-110 | SAD §3.26 | `static/js/knowledge-base.js` | — | — | SRS §M5 | SEC #27 | ✅ |
+| FR-030-40 | US-111 | SAD §3.27 | `static/js/resume-preview.js` | — | — | SRS §M5 | SEC #27 | ✅ |
+| FR-030-41 | US-111 | SAD §3.25, IC-027 | `routes/knowledge_base.py` | `test_knowledge_base_routes.py::TestKBPreview` | — | SRS §M5 | SEC #24 | ✅ |
+| FR-030-42 | US-112 | SAD §3.28 | `templates/index.html`, `static/js/navigation.js` | — | — | SRS §M5 | — | ✅ |
+| NFR-030-16 | — | SAD §i18n | `static/locales/en.json`, `static/locales/es.json` | — | — | SRS §M5 | — | ✅ |
+| NFR-030-17 | — | SAD §a11y | `templates/index.html`, `static/js/knowledge-base.js` | — | — | SRS §M5 | — | ✅ |
+| NFR-030-18 | — | SAD §3.25 | `routes/knowledge_base.py` | `test_knowledge_base_routes.py::TestKBUpload` | — | SRS §M5 | SEC #22, #26 | ✅ |

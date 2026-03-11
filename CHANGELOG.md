@@ -116,9 +116,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - **Post-LLM ingestion**: LLM-generated resumes automatically parsed and inserted into KB for future reuse
   - **Version tracking**: `resume_versions.reuse_source` (kb_assembly/llm_generated) + `source_entry_ids` (JSON array)
   - **23 new tests**: Entry selection (5), context building (4), full assembly (5), PDF saving (3), ingestion (3), DB reuse (3)
+- **Smart Resume Reuse M5: Upload UI + KB Viewer + Preview (TASK-030)**: Full-stack KB management UI with upload, viewer, and resume preview. (FR-030-33 to FR-030-42, NFR-030-16 to NFR-030-18, ADR-033)
+  - **8 REST API endpoints**: Upload (`POST /api/kb/upload`), stats, list with filter/search/pagination, get/update/delete entry, documents list, resume preview (`POST /api/kb/preview`)
+  - **KB viewer module**: `static/js/knowledge-base.js` — stats cards, entries table, category filter, debounced search, pagination, edit/delete overlays, upload with status feedback
+  - **Resume preview module**: `static/js/resume-preview.js` — template picker (4 styles), JD textarea for auto-scoring, PDF iframe display with download
+  - **KB navigation tab**: New "Knowledge Base" tab between Resume Library and Settings, with full ARIA tablist integration
+  - **HTML screen**: Upload card, filter controls, entries table, edit/preview overlays, documents list
+  - **Blueprint registration**: `kb_bp` registered in `create_app()` with existing auth/rate-limit middleware
+  - **i18n**: `nav.knowledge_base` key added to en.json and es.json (33 KB + 13 reuse keys already from M1)
+  - **19 new tests**: Stats (2), list (4), get (2), update (3), delete (2), upload (3), documents (1), preview (2)
+  - **WCAG 2.1 AA**: ARIA labels, roles, aria-live regions, keyboard navigation, semantic HTML
 
 ### Changed
-- **Traceability matrix v13.0**: 173 requirements, all ✅ (0 ⚠️). M4 adds 8 new requirements (6 FRs + 2 NFRs).
+- **Traceability matrix v14.0**: 186 requirements, all ✅ (0 ⚠️). M5 adds 13 new requirements (10 FRs + 3 NFRs).
 - **CLAUDE.md v5.0**: Gitflow-lite branching model (develop + master), shared-workflows.md as single source of truth
 - **CLAUDE.md v4.2**: Added principle #9 (GitHub Issues for every implementation), lesson 12.8 (issue lifecycle)
 

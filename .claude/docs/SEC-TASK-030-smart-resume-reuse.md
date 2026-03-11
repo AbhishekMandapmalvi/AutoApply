@@ -31,19 +31,26 @@
 | 19 | Info | B1 | `save_assembled_resume` sanitizes filenames via character allowlist. No path traversal possible. | PASS |
 | 20 | Info | B6 | `_ingest_llm_output` reads `.md` files from local profile directory only. No user-supplied paths. | PASS |
 | 21 | Info | B5 | `save_resume_version` uses parameterized SQL for `reuse_source` and `source_entry_ids`. JSON serialized via `json.dumps` (safe). | PASS |
+| 22 | Low | A5 | **Upload endpoint input validation**: File extension validated via allowlist (`_ALLOWED_EXTENSIONS`). Filename sanitized via regex (`_safe_filename`). File size checked before processing (10 MB cap). Empty filename rejected. | PASS |
+| 23 | Low | B1 | **Path traversal in upload**: `_safe_filename()` strips all chars except `[a-zA-Z0-9._-]`, truncates to 100 chars. `tempfile.NamedTemporaryFile` used for temp storage. Upload dir is `~/.autoapply/uploads/` (hardcoded, not user-supplied). | PASS |
+| 24 | Info | C1 | **KB endpoint auth**: All 8 KB endpoints go through existing `@app.before_request` Bearer token middleware. No separate auth needed. Verified via test client (AUTOAPPLY_DEV=1 bypass in tests). | PASS |
+| 25 | Info | B5 | **KB CRUD SQL injection**: All DB methods (`get_kb_entries`, `update_kb_entry`, `soft_delete_kb_entry`, `save_kb_entry`) use parameterized queries. Route params are typed (`<int:entry_id>`). | PASS |
+| 26 | Low | A5 | **Query param validation**: `limit` capped at 500 via `min()`. `offset` parsed as int. `category` and `search` are strings passed to parameterized SQL. | PASS |
+| 27 | Info | B3 | **Frontend XSS prevention**: All user content rendered via `escHtml()` and `escAttr()`. No `innerHTML` with unsanitized data. `_applyDataI18n()` uses translation keys (not user data). | PASS |
+| 28 | Info | H1 | **Upload error handling**: Temp file cleaned up in `finally` block. Upload errors caught and logged. All route errors go through Flask `abort()` which uses global error handlers (no stack trace leakage). | PASS |
 
 ## Checklist Summary
 
 | Section | Pass | Fail | N/A | Notes |
 |---------|:----:|:----:|:---:|-------|
-| A. Input Validation | 6 | 0 | 1 | A5 N/A (no API endpoints in M1/M2/M3/M4). M2 input is pre-validated JD text from DB. M3 escape_latex() validates all user content. M4 reads from local profile dir only. |
-| B. Injection Prevention | 15 | 0 | 0 | B3 covered by M3 LaTeX escaping + M4 no subprocess. B1 M4 filename allowlist. B5 M4 parameterized SQL + json.dumps. B6 M4 local-only file reads. |
-| C. Authentication | 0 | 0 | 6 | No new endpoints in M1/M2/M3/M4 |
-| D. Authorization | 0 | 0 | 5 | No new endpoints in M1/M2/M3/M4 |
-| E. Secrets Management | 7 | 0 | 0 | No secrets in code, LLM keys not stored |
-| F. Data Protection | 1 | 0 | 3 | Raw text stored locally (acceptable for desktop app) |
-| G. Dependencies | 6 | 0 | 0 | All pinned, no known CVEs. M2 adds zero new deps. M3 uses Jinja2 (already added in M1). M4 adds zero new deps. |
-| H. Error Handling | 7 | 0 | 0 | Errors logged, no stack trace leakage. M2 returns empty list on edge cases. M3 try/finally cleanup on temp files, TimeoutExpired caught. |
+| A. Input Validation | 9 | 0 | 0 | M5: Upload file validation (extension, size, filename). Query param capping. Route param typing. |
+| B. Injection Prevention | 18 | 0 | 0 | M5: Parameterized SQL in all CRUD. XSS prevention via escHtml/escAttr. Path traversal blocked by filename sanitizer. |
+| C. Authentication | 1 | 0 | 5 | M5: All 8 KB endpoints covered by existing Bearer token middleware. |
+| D. Authorization | 0 | 0 | 5 | Single-user desktop app, no authorization needed. |
+| E. Secrets Management | 7 | 0 | 0 | No secrets in code, LLM keys not stored. |
+| F. Data Protection | 1 | 0 | 3 | Raw text stored locally (acceptable for desktop app). |
+| G. Dependencies | 6 | 0 | 0 | M5 adds zero new deps. All existing deps pinned, no known CVEs. |
+| H. Error Handling | 8 | 0 | 0 | M5: Temp file cleanup in finally. Flask abort() with t() messages. Logger on all error paths. |
 | I. Transport Security | 1 | 0 | 4 | M3 TinyTeX download uses HTTPS only. No HTTP fallback. |
 | J. Logging & Monitoring | 3 | 0 | 0 | Structured logging, no sensitive data logged |
 | K. C/C++ Memory Safety | 0 | 0 | 7 | Python only |

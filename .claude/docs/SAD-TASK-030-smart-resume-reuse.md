@@ -1291,16 +1291,98 @@ _generate_docs(job, profile, llm_config)
 
 ---
 
+## 9. Design — M5: Upload UI + KB Viewer + Preview
+
+### §3.25 Component: KB Routes Blueprint (`routes/knowledge_base.py`)
+
+**Responsibility**: Flask Blueprint providing 8 REST API endpoints for KB management.
+
+**Endpoints**:
+| Method | Path | Purpose | FR |
+|--------|------|---------|-----|
+| POST | /api/kb/upload | Upload document, extract entries | FR-030-33 |
+| GET | /api/kb/stats | Entry counts by category | FR-030-34 |
+| GET | /api/kb | List entries with filter/search/pagination | FR-030-35 |
+| GET | /api/kb/<id> | Get single entry | FR-030-36 |
+| PUT | /api/kb/<id> | Update entry text/subsection/tags | FR-030-36 |
+| DELETE | /api/kb/<id> | Soft-delete entry | FR-030-36 |
+| GET | /api/kb/documents | List uploaded documents | FR-030-37 |
+| POST | /api/kb/preview | Preview assembled resume as PDF | FR-030-41 |
+
+**Dependencies**: `app_state.db`, `core.i18n.t()`, `core.knowledge_base.KnowledgeBase`, `core.resume_assembler`, `core.resume_scorer`, `core.latex_compiler`.
+
+### §3.26 Component: KB Frontend Module (`static/js/knowledge-base.js`)
+
+**Responsibility**: ES module for KB viewer UI — stats display, entries table, category filter, search, pagination, upload, edit/delete overlays.
+
+**Exports**: `loadKnowledgeBase`, `loadKBEntries`, `uploadKBDocument`, `editKBEntry`, `saveKBEntry`, `closeKBEdit`, `deleteKBEntry`, `filterKBCategory`, `searchKB`, `switchKBPage`, `loadKBDocuments`, `initKnowledgeBase`.
+
+**Pattern**: Uses `fetch()` (auto-patched by auth.js), `escHtml()`/`escAttr()` for XSS prevention, `t()`/`_applyDataI18n()` for i18n, event delegation for dynamic buttons.
+
+### §3.27 Component: Resume Preview Module (`static/js/resume-preview.js`)
+
+**Responsibility**: ES module for previewing assembled resumes — template picker, JD textarea, PDF display in iframe.
+
+**Exports**: `previewKBResume`, `closeKBPreview`, `initResumePreview`.
+
+### §3.28 ADR-033: KB Blueprint Registration Pattern
+
+**Context**: KB routes need to integrate with existing Flask app.
+**Decision**: Register `kb_bp` Blueprint in `create_app()` alongside existing 8 blueprints. Auth, rate limiting, security headers, error handlers applied via existing middleware.
+**Rationale**: Consistent with existing architecture. No special middleware needed.
+
+### §3.29 Interface Contracts — M5
+
+#### IC-025: Upload API
+```
+POST /api/kb/upload
+Content-Type: multipart/form-data
+Body: file=<binary>
+Response 201: { success: true, entries_created: int, message: str }
+Response 400: { description: str }  (no file / bad type)
+Response 413: { description: str }  (file > 10 MB)
+```
+
+#### IC-026: KB List API
+```
+GET /api/kb?category=&search=&limit=100&offset=0
+Response 200: { entries: [{id, category, text, subsection, tags, ...}], count: int }
+```
+
+#### IC-027: KB Preview API
+```
+POST /api/kb/preview
+Content-Type: application/json
+Body: { template: str, entry_ids?: int[], jd_text?: str }
+Response 200: application/pdf (binary)
+Response 400: { description: str }
+```
+
+### §3.30 Implementation Tasks — M5
+
+| Task | Name | Depends On | Files |
+|------|------|------------|-------|
+| IMPL-018 | KB Routes Blueprint | M1 DB methods | `routes/knowledge_base.py` |
+| IMPL-019 | Blueprint Registration | IMPL-018 | `app.py` |
+| IMPL-020 | KB Frontend Module | IMPL-018 | `static/js/knowledge-base.js` |
+| IMPL-021 | Resume Preview Module | IMPL-018 | `static/js/resume-preview.js` |
+| IMPL-022 | HTML Screen + Nav Tab | IMPL-020, IMPL-021 | `templates/index.html` |
+| IMPL-023 | App.js Integration | IMPL-020, IMPL-021 | `static/js/app.js`, `static/js/navigation.js` |
+| IMPL-024 | i18n Keys | IMPL-022 | `static/locales/en.json`, `static/locales/es.json` |
+| IMPL-025 | Route Tests | IMPL-018 | `tests/test_knowledge_base_routes.py` |
+
+---
+
 ## System Architecture -- GATE 4 OUTPUT
 
 **Document**: SAD-TASK-030-smart-resume-reuse
-**Components**: 15 components defined (7 M1 + 2 M2 + 3 M3 + 3 M4)
-**Interfaces**: 24 contracts specified (10 M1 + 4 M2 + 5 M3 + 5 M4)
+**Components**: 19 components defined (7 M1 + 2 M2 + 3 M3 + 3 M4 + 4 M5)
+**Interfaces**: 27 contracts specified (10 M1 + 4 M2 + 5 M3 + 5 M4 + 3 M5)
 **Entities**: 4 data entities modeled (3 new tables + 1 modified with 2 new columns)
-**ADRs**: 6 decisions documented (ADR-027, ADR-028, ADR-029, ADR-030, ADR-031, ADR-032)
-**Impl Tasks**: 17 tasks in dependency order (8 M1 + 3 M2 + 3 M3 + 3 M4)
-**Traceability**: 47/47 requirements mapped (100%)
-**Checklist**: 20/20 items passed
+**ADRs**: 7 decisions documented (ADR-027 to ADR-033)
+**Impl Tasks**: 25 tasks in dependency order (8 M1 + 3 M2 + 3 M3 + 3 M4 + 8 M5)
+**Traceability**: 60/60 requirements mapped (100%)
+**Checklist**: 25/25 items passed
 
 ### Handoff Routing
 | Recipient | What They Receive |
