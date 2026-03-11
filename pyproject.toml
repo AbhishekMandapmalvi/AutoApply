@@ -30,6 +30,11 @@ dev = [
     "types-requests>=2.31",
 ]
 
+# ─── Setuptools ──────────────────────────────────────────────────────────
+
+[tool.setuptools.packages.find]
+include = ["bot*", "config*", "core*", "db*", "routes*"]
+
 # ─── Ruff ────────────────────────────────────────────────────────────────
 
 [tool.ruff]
