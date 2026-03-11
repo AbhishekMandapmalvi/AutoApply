@@ -239,14 +239,286 @@ class Database:
 
     def get_daily_analytics(self, days: int = 30) -> list[dict]:
         with self._connect() as conn:
-            rows = conn.execute(
-                """
-                SELECT DATE(applied_at) as date, COUNT(*) as count
-                FROM applications
-                WHERE applied_at >= DATE('now', ?)
-                GROUP BY DATE(applied_at)
-                ORDER BY date
-                """,
-                (f"-{days} days",),
-            ).fetchall()
+            if days > 0:
+                rows = conn.execute(
+                    """
+                    SELECT DATE(applied_at) as date, COUNT(*) as count
+                    FROM applications
+                    WHERE applied_at >= DATE('now', ?)
+                    GROUP BY DATE(applied_at)
+                    ORDER BY date
+                    """,
+                    (f"-{days} days",),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT DATE(applied_at) as date, COUNT(*) as count
+                    FROM applications
+                    GROUP BY DATE(applied_at)
+                    ORDER BY date
+                    """
+                ).fetchall()
             return [{"date": row["date"], "count": row["count"]} for row in rows]
+
+    def get_enhanced_analytics(self, days: int = 30) -> dict:
+        """Compute all analytics metrics in a single database connection.
+
+        Implements: FR-094 (enhanced analytics endpoint).
+        """
+        interview_statuses = ("interview", "interviewing", "interviewed")
+        offer_statuses = ("offer", "accepted")
+        funnel_statuses = ("applied",) + interview_statuses + offer_statuses
+
+        with self._connect() as conn:
+            # --- Summary metrics ---
+            total = conn.execute("SELECT COUNT(*) FROM applications").fetchone()[0]
+
+            avg_row = conn.execute(
+                "SELECT AVG(match_score) as avg_score FROM applications"
+            ).fetchone()
+            avg_score = round(avg_row["avg_score"], 1) if avg_row["avg_score"] is not None else None
+
+            this_week = conn.execute(
+                "SELECT COUNT(*) FROM applications WHERE applied_at >= date('now', 'weekday 1', '-7 days')"
+            ).fetchone()[0]
+
+            applied_count = conn.execute(
+                "SELECT COUNT(*) FROM applications WHERE status = 'applied'"
+            ).fetchone()[0]
+
+            interview_count = conn.execute(
+                "SELECT COUNT(*) FROM applications WHERE status IN (?, ?, ?)",
+                interview_statuses,
+            ).fetchone()[0]
+
+            interview_rate = round((interview_count / applied_count) * 100, 1) if applied_count > 0 else 0.0
+
+            summary = {
+                "total": total,
+                "interview_rate": interview_rate,
+                "avg_score": avg_score,
+                "this_week": this_week,
+            }
+
+            # --- Conversion funnel ---
+            funnel_row = conn.execute(
+                """
+                SELECT
+                  SUM(CASE WHEN status IN (?,?,?,?,?,?) THEN 1 ELSE 0 END) as funnel_applied,
+                  SUM(CASE WHEN status IN (?,?,?,?,?) THEN 1 ELSE 0 END) as funnel_interview,
+                  SUM(CASE WHEN status IN (?,?) THEN 1 ELSE 0 END) as funnel_offer
+                FROM applications
+                """,
+                funnel_statuses + interview_statuses + offer_statuses + offer_statuses,
+            ).fetchone()
+
+            fa = funnel_row["funnel_applied"] or 0
+            fi = funnel_row["funnel_interview"] or 0
+            fo = funnel_row["funnel_offer"] or 0
+
+            funnel = {
+                "applied": fa,
+                "interview": fi,
+                "offer": fo,
+                "applied_to_interview_rate": round((fi / fa) * 100, 1) if fa > 0 else 0.0,
+                "interview_to_offer_rate": round((fo / fi) * 100, 1) if fi > 0 else 0.0,
+            }
+
+            # --- Platform performance ---
+            platform_rows = conn.execute(
+                """
+                SELECT
+                  platform,
+                  COUNT(*) as total,
+                  SUM(CASE WHEN status IN (?,?,?) THEN 1 ELSE 0 END) as interviews,
+                  ROUND(AVG(match_score), 1) as avg_score,
+                  SUM(CASE WHEN status IN (?,?) THEN 1 ELSE 0 END) as offers
+                FROM applications
+                GROUP BY platform
+                ORDER BY total DESC
+                """,
+                interview_statuses + offer_statuses,
+            ).fetchall()
+
+            platforms = []
+            for row in platform_rows:
+                pt = row["total"]
+                pi = row["interviews"]
+                platforms.append({
+                    "platform": row["platform"],
+                    "total": pt,
+                    "interviews": pi,
+                    "interview_rate": round((pi / pt) * 100, 1) if pt > 0 else 0.0,
+                    "avg_score": row["avg_score"] if row["avg_score"] is not None else 0.0,
+                    "offers": row["offers"],
+                })
+
+            # --- Score distribution ---
+            score_rows = conn.execute(
+                """
+                SELECT
+                  CASE
+                    WHEN match_score BETWEEN 0  AND 9  THEN 0
+                    WHEN match_score BETWEEN 10 AND 19 THEN 1
+                    WHEN match_score BETWEEN 20 AND 29 THEN 2
+                    WHEN match_score BETWEEN 30 AND 39 THEN 3
+                    WHEN match_score BETWEEN 40 AND 49 THEN 4
+                    WHEN match_score BETWEEN 50 AND 59 THEN 5
+                    WHEN match_score BETWEEN 60 AND 69 THEN 6
+                    WHEN match_score BETWEEN 70 AND 79 THEN 7
+                    WHEN match_score BETWEEN 80 AND 89 THEN 8
+                    ELSE 9
+                  END as bucket_idx,
+                  COUNT(*) as count,
+                  SUM(CASE WHEN status IN (?,?,?) THEN 1 ELSE 0 END) as interview_count
+                FROM applications
+                GROUP BY bucket_idx
+                ORDER BY bucket_idx
+                """,
+                interview_statuses,
+            ).fetchall()
+
+            bucket_labels = [
+                "0-9", "10-19", "20-29", "30-39", "40-49",
+                "50-59", "60-69", "70-79", "80-89", "90-100",
+            ]
+            score_map = {row["bucket_idx"]: row for row in score_rows}
+            score_distribution = []
+            for i, label in enumerate(bucket_labels):
+                row = score_map.get(i)
+                cnt = row["count"] if row else 0
+                ic = row["interview_count"] if row else 0
+                score_distribution.append({
+                    "bucket": label,
+                    "count": cnt,
+                    "interview_count": ic,
+                    "interview_rate": round((ic / cnt) * 100, 1) if cnt > 0 else 0.0,
+                })
+
+            # --- Weekly comparison ---
+            current_row = conn.execute(
+                """
+                SELECT COUNT(*) as applications,
+                  SUM(CASE WHEN status IN (?,?,?) THEN 1 ELSE 0 END) as interviews,
+                  ROUND(AVG(match_score), 1) as avg_score
+                FROM applications
+                WHERE applied_at >= date('now', 'weekday 1', '-7 days')
+                """,
+                interview_statuses,
+            ).fetchone()
+
+            previous_row = conn.execute(
+                """
+                SELECT COUNT(*) as applications,
+                  SUM(CASE WHEN status IN (?,?,?) THEN 1 ELSE 0 END) as interviews,
+                  ROUND(AVG(match_score), 1) as avg_score
+                FROM applications
+                WHERE applied_at >= date('now', 'weekday 1', '-14 days')
+                  AND applied_at < date('now', 'weekday 1', '-7 days')
+                """,
+                interview_statuses,
+            ).fetchone()
+
+            cur = {
+                "applications": current_row["applications"],
+                "interviews": current_row["interviews"] or 0,
+                "avg_score": current_row["avg_score"],
+            }
+            prev = {
+                "applications": previous_row["applications"],
+                "interviews": previous_row["interviews"] or 0,
+                "avg_score": previous_row["avg_score"],
+            }
+            changes_avg = None
+            if cur["avg_score"] is not None and prev["avg_score"] is not None:
+                changes_avg = round(cur["avg_score"] - prev["avg_score"], 1)
+
+            weekly = {
+                "current": cur,
+                "previous": prev,
+                "changes": {
+                    "applications": cur["applications"] - prev["applications"],
+                    "interviews": cur["interviews"] - prev["interviews"],
+                    "avg_score": changes_avg,
+                },
+            }
+
+            # --- Top companies ---
+            top_rows = conn.execute(
+                """
+                SELECT company, COUNT(*) as total
+                FROM applications
+                GROUP BY company
+                ORDER BY total DESC, company ASC
+                LIMIT 10
+                """
+            ).fetchall()
+
+            top_company_names = [row["company"] for row in top_rows]
+            top_companies = []
+
+            if top_company_names:
+                placeholders = ",".join("?" * len(top_company_names))
+                status_rows = conn.execute(
+                    f"""
+                    SELECT company, status, COUNT(*) as count
+                    FROM applications
+                    WHERE company IN ({placeholders})
+                    GROUP BY company, status
+                    """,
+                    top_company_names,
+                ).fetchall()
+
+                status_map: dict[str, dict[str, int]] = {}
+                for sr in status_rows:
+                    status_map.setdefault(sr["company"], {})[sr["status"]] = sr["count"]
+
+                for row in top_rows:
+                    top_companies.append({
+                        "company": row["company"],
+                        "total": row["total"],
+                        "statuses": status_map.get(row["company"], {}),
+                    })
+
+            # --- Response times ---
+            def _compute_response_times(statuses: tuple[str, ...]) -> dict:
+                placeholders = ",".join("?" * len(statuses))
+                rt_rows = conn.execute(
+                    f"""
+                    SELECT JULIANDAY(updated_at) - JULIANDAY(applied_at) as days_to_respond
+                    FROM applications
+                    WHERE status IN ({placeholders})
+                      AND updated_at != applied_at
+                    ORDER BY days_to_respond
+                    """,
+                    statuses,
+                ).fetchall()
+
+                if not rt_rows:
+                    return {"median_days": None, "avg_days": None}
+
+                days_list = [row["days_to_respond"] for row in rt_rows]
+                n = len(days_list)
+                median = days_list[n // 2] if n % 2 == 1 else (days_list[n // 2 - 1] + days_list[n // 2]) / 2
+                avg = sum(days_list) / n
+                return {"median_days": round(median, 1), "avg_days": round(avg, 1)}
+
+            response_times = {
+                "to_interview": _compute_response_times(interview_statuses),
+                "to_rejected": _compute_response_times(("rejected",)),
+            }
+
+            # --- Daily trend ---
+            daily = self.get_daily_analytics(days)
+
+        return {
+            "summary": summary,
+            "funnel": funnel,
+            "platforms": platforms,
+            "score_distribution": score_distribution,
+            "weekly": weekly,
+            "top_companies": top_companies,
+            "response_times": response_times,
+            "daily": daily,
+        }

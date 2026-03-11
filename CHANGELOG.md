@@ -6,7 +6,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-*No unreleased changes.*
+### Added
+- **Analytics Dashboard v2.0 (TASK-017)**: Complete analytics overhaul replacing 3 basic charts with 8 rich visualizations. (FR-090 to FR-101, ADR-021)
+  - **Summary metric cards**: Total applications, interview rate, average match score, this week count
+  - **Period selector**: Switch between 7d, 30d, 90d, and all-time views
+  - **Enhanced trend chart**: Daily application counts with configurable period
+  - **Conversion funnel**: Applied → Interview → Offer with percentage rates
+  - **Platform performance table**: Per-platform totals, interview rates, avg scores, offer counts
+  - **Score distribution histogram**: Match score buckets (0-100) with interview overlay
+  - **Weekly summary**: This week vs last week comparison with trend indicators
+  - **Top companies table**: Top 10 companies by application count with status breakdown
+  - **Response time metrics**: Median and average days to interview/rejection
+  - **Single enhanced API endpoint**: `GET /api/analytics/enhanced?days=N` returning all data in one request
+  - **42 new tests**: Unit tests (34) + integration tests (8) covering all analytics, including 10K-row performance test
+  - **30 new i18n keys**: Full translation coverage for all analytics labels
+  - **WCAG 2.1 AA accessible**: ARIA regions, keyboard-navigable period selector, semantic tables
+- **GitHub repo & PR rules in CLAUDE.md**: Section 9 codifies branch naming, commit format, PR process, CI checks, and merge strategy (CLAUDE.md v4.1)
 
 ## [1.9.0] - 2026-03-11
 

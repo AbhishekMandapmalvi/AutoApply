@@ -54,6 +54,82 @@ HEALTHCHECK --interval=30s CMD wget -q --spider http://localhost:3000/health
 ENTRYPOINT ["node", "/app/index.js"]
 ```
 
+## GitHub Repository & PR Workflow
+
+### Branch Strategy
+```
+master (protected) ← PR only, squash-merge
+  ├── feature/locale-switcher
+  ├── fix/login-timeout
+  ├── refactor/split-bot-loop
+  ├── docs/update-api-reference
+  ├── test/applier-edge-cases
+  └── chore/upgrade-playwright
+```
+
+### PR Lifecycle
+```
+1. Create branch: git checkout -b type/short-description
+2. Develop + test locally: ruff check . && python -m pytest tests/ -v
+3. Push: git push -u origin type/short-description
+4. Open PR: gh pr create --title "..." --body "..."
+5. CI runs: lint → test → security (all 3 must pass)
+6. Review: address feedback with new commits (no force-push)
+7. Merge: squash-merge to master
+8. Cleanup: delete remote branch
+```
+
+### PR Template Sections
+```markdown
+## Summary         — What and why (1-3 sentences)
+## Changes         — Bullet list of specific changes
+## Test plan       — Checkboxes: tests pass, lint pass, no security issues
+## Related issues  — Closes #N, Fixes #N
+```
+
+### GitHub Actions (AutoApply-specific)
+```yaml
+# CI (.github/workflows/ci.yml)
+Triggers: push, pull_request
+Jobs: lint (ruff), test (pytest), security (pip-audit)
+Node.js 24 actions: checkout@v6, setup-python@v6
+
+# Release (.github/workflows/release.yml)
+Triggers: v* tag push
+Jobs: 3 parallel OS builds (Windows/macOS/Linux)
+Outputs: .exe, .dmg, .AppImage → GitHub Releases
+```
+
+### Branch Protection Rules
+- Require 3 CI checks: `lint`, `test`, `security`
+- No direct pushes to `master`
+- No force-pushes to `master`
+- CODEOWNERS: `@AbhishekMandapmalvi`
+
+### gh CLI Quick Reference
+```bash
+# PRs
+gh pr create --title "feat: ..." --body "..."
+gh pr list
+gh pr view 123
+gh pr merge 123 --squash --delete-branch
+
+# Issues
+gh issue create --title "..." --body "..."
+gh issue list --label bug
+gh issue close 123
+
+# Releases
+gh release create v1.9.0 --generate-notes
+gh release view v1.9.0
+gh release upload v1.9.0 ./dist/*
+
+# Actions
+gh run list
+gh run view 123456
+gh run watch 123456
+```
+
 ## Rollback Decision Matrix
 | Signal | Auto-Rollback | Manual Decision |
 |--------|:---:|:---:|

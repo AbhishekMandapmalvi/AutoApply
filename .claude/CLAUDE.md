@@ -1,4 +1,4 @@
-# Enterprise Engineering Framework — CLAUDE.md v4.0
+# Enterprise Engineering Framework — CLAUDE.md v4.1
 
 > **Supreme Governance Document**
 > Claude MUST read this file completely before taking any action.
@@ -274,7 +274,64 @@ building it in from the start.
 
 ---
 
-## 9. EMERGENCY OVERRIDE
+## 9. GITHUB REPOSITORY & PR RULES
+
+### 9.1 Repository Conventions
+- **Main branch**: `master` — protected with 3 required CI checks (lint, test, security)
+- **Never push directly to `master`** — always use a PR
+- **Never force-push to `master`** — branch protection blocks this
+- **Branch naming**: `type/short-description` (e.g., `feature/locale-switcher`, `fix/login-timeout`)
+  - Types: `feature/`, `fix/`, `refactor/`, `docs/`, `test/`, `chore/`
+
+### 9.2 Commit Messages
+```
+<type>: <short summary in imperative mood>
+
+<optional body — explain WHY, not WHAT>
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+```
+- **Types**: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `perf`, `security`
+- Keep summary under 72 characters, imperative mood ("add", not "added")
+- Reference issues in body when applicable (`Closes #42`)
+
+### 9.3 Pull Request Rules
+- **One feature or fix per PR** — keep changes focused
+- **Title**: Under 72 characters, describes the change
+- **Description**: Must include Summary, Changes, Test plan (use PR template)
+- **CI must be green**: All 3 checks (lint, test, security) must pass before merge
+- **Branch must be current** with `master` before merge
+- **Tests required**: New code must have corresponding tests
+- **No secrets**: Never commit API keys, tokens, `.env`, or `config.json` with real data
+- **Review**: Address all review feedback with new commits (don't force-push during review)
+- **Merge strategy**: Squash-merge to `master`
+
+### 9.4 PR Size Guidelines
+| Size   | LOC Changed | Expectation |
+|--------|-------------|-------------|
+| Small  | < 50        | Quick review, merge same day |
+| Medium | 50–300      | Detailed review, may need revisions |
+| Large  | 300+        | Break into smaller PRs when possible |
+
+### 9.5 Before Opening a PR
+1. Create branch from `master` using naming convention
+2. Run locally: `ruff check .` (lint) + `python -m pytest tests/ -v` (tests)
+3. Update `CHANGELOG.md` under `[Unreleased]` if user-facing
+4. Update `docs/` and `README.md` if features/test count changed
+
+### 9.6 GitHub Workflows
+- **CI** (`.github/workflows/ci.yml`): Runs on every push/PR — lint, test, security
+- **Release** (`.github/workflows/release.yml`): Runs on `v*` tag push — builds Windows/macOS/Linux installers, uploads to GitHub Releases
+- **Dependabot** (`.github/dependabot.yml`): Automated dependency update PRs
+
+### 9.7 Issue Templates
+- **Bug reports**: `.github/ISSUE_TEMPLATE/bug_report.md` — OS, Python version, logs
+- **Feature requests**: `.github/ISSUE_TEMPLATE/feature_request.md` — describe problem first
+- **CODEOWNERS**: `@AbhishekMandapmalvi` auto-assigned on all PRs
+
+---
+
+## 10. EMERGENCY OVERRIDE
 
 If user says "skip the process" or "just code it":
 1. Acknowledge. 2. Log bypass. 3. Still apply coding + basic test standards.
@@ -283,43 +340,43 @@ If user says "skip the process" or "just code it":
 
 ---
 
-## 10. CONTINUOUS IMPROVEMENT
+## 11. CONTINUOUS IMPROVEMENT
 
 After every task: what went well, what to improve, patterns to capture.
 
 ---
 
-## 11. LESSONS LEARNED
+## 12. LESSONS LEARNED
 
 Patterns confirmed during delivery. Apply to all future work.
 
-### 11.1 API Contract Alignment
+### 12.1 API Contract Alignment
 - Define field names in SAD interface contracts BEFORE any frontend work.
 - Frontend and backend MUST use identical field names (e.g., `full_name` not `name`,
   `search_criteria` not `preferences`). Mismatches cause cascading fixes.
 - Run a contract check between SAD field names and frontend code before integration.
 
-### 11.2 Flask Route Ordering
+### 12.2 Flask Route Ordering
 - Place static routes BEFORE parameterized routes (`/api/x/export` before `/api/x/<id>`).
 - Flask matches routes top-down; a parameterized route can shadow a static sibling.
 
-### 11.3 Pydantic Model Serialization
+### 12.3 Pydantic Model Serialization
 - Pydantic models are NOT directly JSON-serializable by Flask's `jsonify`.
 - Always call `.model_dump()` before passing to `jsonify`.
 - Use attribute access (`obj.field`), not dict access (`obj["field"]`), on Pydantic models.
 
-### 11.4 Security Checks During Build
+### 12.4 Security Checks During Build
 - Add path traversal protection (allowlist regex) on ANY endpoint accepting filenames.
 - Add global error handlers early — unhandled exceptions leak stack traces as HTML.
 - Bind to `127.0.0.1`, never `0.0.0.0`, for local-only applications.
 
-### 11.5 Testing Insights
+### 12.5 Testing Insights
 - Thread safety tests should use multiple threads with high iteration counts (10 x 1000).
 - Integration tests catch field name mismatches that unit tests miss — run them early.
 - Use `tmp_path` fixtures for filesystem tests to avoid polluting real data directories.
 - Exit code 15 on Windows with gevent is a signal handling quirk, not a test failure.
 
-### 11.6 Electron + Python Integration
+### 12.6 Electron + Python Integration
 - `python-backend.js` must check for a local venv (`venv/Scripts/python.exe`) before system Python.
   Otherwise the spawned process gets `ModuleNotFoundError` because system Python lacks Flask.
 - Electron's `app.isPackaged` is undefined outside Electron context — guard with
@@ -331,7 +388,7 @@ Patterns confirmed during delivery. Apply to all future work.
   contexts with a custom user data directory, which is incompatible with Electron's embedded binary.
   The original shared-Chromium strategy (ADR-006) was abandoned after discovering this limitation.
 
-### 11.7 Production-Readiness Is Not a Phase
+### 12.7 Production-Readiness Is Not a Phase
 - Retrofitting i18n into 460+ hardcoded strings across 7 route files, 19 JS modules, and 1 HTML
   template cost an entire session. Had `t()` been used from the first endpoint, it would have been
   free — just a different function call for the same string.

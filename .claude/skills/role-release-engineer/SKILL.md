@@ -147,6 +147,20 @@ Requirements ✅ | Design ✅ | Review ✅ | Security ✅ | Docs ✅ | Traceabil
 
 ---
 
+### 9. GitHub PR Workflow
+
+When creating PRs for releases or feature delivery:
+
+1. **Branch**: Create from `master` using `type/short-description` convention
+2. **Commits**: Use conventional format (`feat:`, `fix:`, `chore:`, etc.)
+3. **PR**: Use `gh pr create` with Summary, Changes, Test plan sections
+4. **CI**: Ensure all 3 checks pass (lint, test, security) before merge
+5. **Merge**: Squash-merge to `master`, delete branch after merge
+6. **Tag**: For releases, create `v{semver}` tag to trigger release workflow
+7. **Release notes**: Use `gh release create` with changelog summary
+
+See `references/cicd-patterns.md` for gh CLI commands and PR templates.
+
 ## Release Checklist
 
 - [ ] All files in manifest.
@@ -159,6 +173,9 @@ Requirements ✅ | Design ✅ | Review ✅ | Security ✅ | Docs ✅ | Traceabil
 - [ ] Rollback plan documented.
 - [ ] Deploy config tested.
 - [ ] Delivery summary complete.
+- [ ] PR created with full description (if applicable).
+- [ ] CI checks green (lint, test, security).
+- [ ] Squash-merged to `master`.
 
 ## Escalation
 - **To Security Engineer**: Last-minute finding.

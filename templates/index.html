@@ -502,18 +502,74 @@
   <!-- ANALYTICS -->
   <div class="screen hidden" id="screen-analytics">
     <h2 style="color:var(--text-bright); margin-bottom:20px;" data-i18n="analytics.screen_title">Analytics</h2>
+
+    <!-- Summary Cards (FR-090) -->
+    <div class="analytics-summary-cards" id="analytics-summary" role="region" aria-label="Summary metrics">
+      <div class="summary-card">
+        <div class="summary-value" id="summary-total">—</div>
+        <div class="summary-label" data-i18n="analytics.summary_total">Total Applications</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-value" id="summary-interview-rate">—</div>
+        <div class="summary-label" data-i18n="analytics.summary_interview_rate">Interview Rate</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-value" id="summary-avg-score">—</div>
+        <div class="summary-label" data-i18n="analytics.summary_avg_score">Avg Match Score</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-value" id="summary-this-week">—</div>
+        <div class="summary-label" data-i18n="analytics.summary_this_week">This Week</div>
+      </div>
+    </div>
+
+    <!-- Period Selector (FR-100) -->
+    <div class="analytics-period-selector" role="group" aria-label="Time period">
+      <button class="period-btn" data-days="7" data-i18n="analytics.period_7d" onclick="window.switchAnalyticsPeriod(7)">7d</button>
+      <button class="period-btn active" data-days="30" data-i18n="analytics.period_30d" onclick="window.switchAnalyticsPeriod(30)">30d</button>
+      <button class="period-btn" data-days="90" data-i18n="analytics.period_90d" onclick="window.switchAnalyticsPeriod(90)">90d</button>
+      <button class="period-btn" data-days="0" data-i18n="analytics.period_all" onclick="window.switchAnalyticsPeriod(0)">All</button>
+    </div>
+
+    <!-- Trend Chart (FR-091) -->
     <div class="card" style="margin-bottom:20px">
       <h3 style="margin-bottom:16px;" data-i18n="analytics.chart_daily_title">Applications Over Time</h3>
       <div class="chart-container"><canvas id="chart-daily"></canvas></div>
     </div>
+
+    <!-- Funnel + Platform Table (FR-092, FR-093) -->
     <div class="analytics-grid">
       <div class="card">
-        <h3 style="margin-bottom:16px;" data-i18n="analytics.chart_status_title">Status Breakdown</h3>
-        <div class="chart-container"><canvas id="chart-status"></canvas></div>
+        <h3 style="margin-bottom:16px;" data-i18n="analytics.funnel_title">Conversion Funnel</h3>
+        <div class="chart-container"><canvas id="chart-funnel"></canvas></div>
       </div>
       <div class="card">
-        <h3 style="margin-bottom:16px;" data-i18n="analytics.chart_platform_title">By Platform</h3>
-        <div class="chart-container"><canvas id="chart-platform"></canvas></div>
+        <h3 style="margin-bottom:16px;" data-i18n="analytics.platform_title">Platform Performance</h3>
+        <div id="platform-table-container"></div>
+      </div>
+    </div>
+
+    <!-- Score Distribution + Weekly Summary (FR-095, FR-096) -->
+    <div class="analytics-grid">
+      <div class="card">
+        <h3 style="margin-bottom:16px;" data-i18n="analytics.score_title">Score Distribution</h3>
+        <div class="chart-container"><canvas id="chart-score"></canvas></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:16px;" data-i18n="analytics.weekly_title">Weekly Summary</h3>
+        <div id="weekly-summary-container"></div>
+      </div>
+    </div>
+
+    <!-- Top Companies + Response Times (FR-097, FR-098) -->
+    <div class="analytics-grid">
+      <div class="card">
+        <h3 style="margin-bottom:16px;" data-i18n="analytics.companies_title">Top Companies</h3>
+        <div id="top-companies-container"></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:16px;" data-i18n="analytics.response_title">Response Times</h3>
+        <div id="response-times-container"></div>
       </div>
     </div>
   </div>
