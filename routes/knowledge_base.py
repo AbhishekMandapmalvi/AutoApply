@@ -254,7 +254,8 @@ def preview_resume():
         scored = score_kb_entries(jd_text, all_entries, reuse_cfg)
         if not scored:
             abort(400, description=t("kb.entries_empty"))
-        selected_result = _select_entries(scored, reuse_cfg)
+        from config.settings import ResumeReuseConfig
+        selected_result = _select_entries(scored, reuse_cfg or ResumeReuseConfig())
         if selected_result is None:
             abort(400, description=t("kb.entries_empty"))
         selected = selected_result
