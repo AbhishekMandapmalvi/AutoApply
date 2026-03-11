@@ -121,6 +121,23 @@ class LLMConfig(BaseModel):
     model: str = ""  # Empty = use default for provider
 
 
+class ResumeReuseConfig(BaseModel):
+    """Configuration for smart resume reuse via Knowledge Base assembly."""
+    enabled: bool = True
+    min_score: float = 0.60
+    min_experience_bullets: int = 6
+    scoring_method: str = "auto"  # "tfidf" | "onnx" | "auto"
+    cover_letter_strategy: str = "generate"  # "generate" | "template"
+
+
+class LatexConfig(BaseModel):
+    """Configuration for LaTeX resume compilation."""
+    template: str = "classic"  # template name in templates/latex/
+    font_family: str = "helvetica"  # helvetica, times, palatino
+    font_size: int = 11  # 10, 11, 12
+    margin: str = "0.75in"
+
+
 class BotConfig(BaseModel):
     enabled_platforms: list[str] = ["linkedin", "indeed"]
     min_match_score: int = 75
@@ -138,6 +155,8 @@ class AppConfig(BaseModel):
     search_criteria: SearchCriteria
     bot: BotConfig = BotConfig()
     llm: LLMConfig = LLMConfig()
+    resume_reuse: ResumeReuseConfig = ResumeReuseConfig()
+    latex: LatexConfig = LatexConfig()
     company_blacklist: list[str] = []
     version: str = "2.0"
 

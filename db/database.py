@@ -58,10 +58,53 @@ CREATE TABLE IF NOT EXISTS resume_versions (
     llm_provider TEXT,
     llm_model TEXT,
     is_favorite INTEGER NOT NULL DEFAULT 0,
+    reuse_source TEXT,
+    source_entry_ids TEXT,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_rv_app_id ON resume_versions(application_id);
 CREATE INDEX IF NOT EXISTS idx_rv_created_at ON resume_versions(created_at);
+
+CREATE TABLE IF NOT EXISTS uploaded_documents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    filename TEXT NOT NULL,
+    file_type TEXT NOT NULL,
+    file_path TEXT NOT NULL,
+    raw_text TEXT,
+    llm_provider TEXT,
+    llm_model TEXT,
+    processed_at DATETIME,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS knowledge_base (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category TEXT NOT NULL,
+    text TEXT NOT NULL,
+    subsection TEXT,
+    job_types TEXT,
+    tags TEXT,
+    source_doc_id INTEGER REFERENCES uploaded_documents(id),
+    embedding BLOB,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_kb_dedup ON knowledge_base(category, text);
+CREATE INDEX IF NOT EXISTS idx_kb_category ON knowledge_base(category);
+CREATE INDEX IF NOT EXISTS idx_kb_active ON knowledge_base(is_active);
+
+CREATE TABLE IF NOT EXISTS roles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    company TEXT NOT NULL,
+    start_date TEXT,
+    end_date TEXT,
+    domain TEXT,
+    source_doc_id INTEGER REFERENCES uploaded_documents(id),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(title, company, start_date)
+);
 """
 
 
@@ -95,6 +138,15 @@ class Database:
         }
         if "description_path" not in columns:
             conn.execute("ALTER TABLE applications ADD COLUMN description_path TEXT")
+
+        # M1: Add reuse columns to resume_versions for existing DBs
+        rv_columns = {
+            row[1] for row in conn.execute("PRAGMA table_info(resume_versions)").fetchall()
+        }
+        if "reuse_source" not in rv_columns:
+            conn.execute("ALTER TABLE resume_versions ADD COLUMN reuse_source TEXT")
+        if "source_entry_ids" not in rv_columns:
+            conn.execute("ALTER TABLE resume_versions ADD COLUMN source_entry_ids TEXT")
 
     def save_application(
         self,
@@ -453,6 +505,227 @@ class Database:
                     for r in provider_rows
                 ],
             }
+
+    # ------------------------------------------------------------------
+    # Uploaded documents (TASK-030 M1)
+    # ------------------------------------------------------------------
+
+    def save_uploaded_document(
+        self,
+        filename: str,
+        file_type: str,
+        file_path: str,
+        raw_text: str | None = None,
+        llm_provider: str | None = None,
+        llm_model: str | None = None,
+    ) -> int:
+        """Insert an uploaded document record. Returns the new id."""
+        with self._connect() as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO uploaded_documents (
+                    filename, file_type, file_path, raw_text,
+                    llm_provider, llm_model, processed_at
+                ) VALUES (?, ?, ?, ?, ?, ?, CASE WHEN ? IS NOT NULL THEN CURRENT_TIMESTAMP END)
+                """,
+                (filename, file_type, file_path, raw_text,
+                 llm_provider, llm_model, llm_provider),
+            )
+            return cursor.lastrowid  # type: ignore[return-value]
+
+    def get_uploaded_documents(self) -> list[dict]:
+        """Return all uploaded documents ordered by creation date."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM uploaded_documents ORDER BY created_at DESC"
+            ).fetchall()
+            return [dict(row) for row in rows]
+
+    def get_uploaded_document(self, doc_id: int) -> dict | None:
+        """Return a single uploaded document by id."""
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM uploaded_documents WHERE id = ?", (doc_id,)
+            ).fetchone()
+            return dict(row) if row else None
+
+    def delete_uploaded_document(self, doc_id: int) -> None:
+        """Delete an uploaded document and its KB entries."""
+        with self._connect() as conn:
+            conn.execute(
+                "DELETE FROM knowledge_base WHERE source_doc_id = ?", (doc_id,)
+            )
+            conn.execute(
+                "DELETE FROM uploaded_documents WHERE id = ?", (doc_id,)
+            )
+
+    # ------------------------------------------------------------------
+    # Knowledge base entries (TASK-030 M1)
+    # ------------------------------------------------------------------
+
+    def save_kb_entry(
+        self,
+        category: str,
+        text: str,
+        subsection: str | None = None,
+        job_types: str | None = None,
+        tags: str | None = None,
+        source_doc_id: int | None = None,
+        embedding: bytes | None = None,
+    ) -> int | None:
+        """Insert a KB entry with dedup. Returns id or None if duplicate."""
+        with self._connect() as conn:
+            try:
+                cursor = conn.execute(
+                    """
+                    INSERT INTO knowledge_base (
+                        category, text, subsection, job_types, tags,
+                        source_doc_id, embedding
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (category, text, subsection, job_types, tags,
+                     source_doc_id, embedding),
+                )
+                return cursor.lastrowid  # type: ignore[return-value]
+            except sqlite3.IntegrityError:
+                return None  # duplicate (category, text)
+
+    def get_kb_entries(
+        self,
+        category: str | None = None,
+        active_only: bool = True,
+        search: str | None = None,
+        limit: int = 500,
+        offset: int = 0,
+    ) -> list[dict]:
+        """Return KB entries with optional filtering."""
+        query = "SELECT * FROM knowledge_base WHERE 1=1"
+        params: list = []
+        if active_only:
+            query += " AND is_active = 1"
+        if category:
+            query += " AND category = ?"
+            params.append(category)
+        if search:
+            query += " AND (text LIKE ? OR subsection LIKE ? OR tags LIKE ?)"
+            params.extend([f"%{search}%", f"%{search}%", f"%{search}%"])
+        query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+
+        with self._connect() as conn:
+            rows = conn.execute(query, params).fetchall()
+            return [dict(row) for row in rows]
+
+    def get_kb_entry(self, entry_id: int) -> dict | None:
+        """Return a single KB entry by id."""
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM knowledge_base WHERE id = ?", (entry_id,)
+            ).fetchone()
+            return dict(row) if row else None
+
+    def get_kb_entries_by_ids(self, entry_ids: list[int]) -> list[dict]:
+        """Fetch specific KB entries by their IDs, preserving order."""
+        if not entry_ids:
+            return []
+        placeholders = ",".join("?" for _ in entry_ids)
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"SELECT * FROM knowledge_base WHERE id IN ({placeholders})",
+                entry_ids,
+            ).fetchall()
+            entries_map = {row["id"]: dict(row) for row in rows}
+            return [entries_map[eid] for eid in entry_ids if eid in entries_map]
+
+    def update_kb_entry(
+        self,
+        entry_id: int,
+        text: str | None = None,
+        subsection: str | None = None,
+        job_types: str | None = None,
+        tags: str | None = None,
+    ) -> bool:
+        """Update a KB entry. Returns True if found and updated."""
+        sets: list[str] = ["updated_at = CURRENT_TIMESTAMP"]
+        params: list = []
+        if text is not None:
+            sets.append("text = ?")
+            params.append(text)
+        if subsection is not None:
+            sets.append("subsection = ?")
+            params.append(subsection)
+        if job_types is not None:
+            sets.append("job_types = ?")
+            params.append(job_types)
+        if tags is not None:
+            sets.append("tags = ?")
+            params.append(tags)
+
+        params.append(entry_id)
+        with self._connect() as conn:
+            cursor = conn.execute(
+                f"UPDATE knowledge_base SET {', '.join(sets)} WHERE id = ?",
+                params,
+            )
+            return cursor.rowcount > 0
+
+    def soft_delete_kb_entry(self, entry_id: int) -> bool:
+        """Soft-delete a KB entry by setting is_active=0."""
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "UPDATE knowledge_base SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (entry_id,),
+            )
+            return cursor.rowcount > 0
+
+    def get_kb_stats(self) -> dict:
+        """Return KB statistics: counts by category and total."""
+        with self._connect() as conn:
+            total = conn.execute(
+                "SELECT COUNT(*) FROM knowledge_base WHERE is_active = 1"
+            ).fetchone()[0]
+            by_category = conn.execute(
+                "SELECT category, COUNT(*) as count FROM knowledge_base WHERE is_active = 1 GROUP BY category"
+            ).fetchall()
+            return {
+                "total": total,
+                "by_category": {row["category"]: row["count"] for row in by_category},
+            }
+
+    # ------------------------------------------------------------------
+    # Roles (TASK-030 M1)
+    # ------------------------------------------------------------------
+
+    def save_role(
+        self,
+        title: str,
+        company: str,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        domain: str | None = None,
+        source_doc_id: int | None = None,
+    ) -> int | None:
+        """Insert a role record with dedup. Returns id or None if duplicate."""
+        with self._connect() as conn:
+            try:
+                cursor = conn.execute(
+                    """
+                    INSERT INTO roles (title, company, start_date, end_date, domain, source_doc_id)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (title, company, start_date, end_date, domain, source_doc_id),
+                )
+                return cursor.lastrowid  # type: ignore[return-value]
+            except sqlite3.IntegrityError:
+                return None
+
+    def get_roles(self) -> list[dict]:
+        """Return all roles ordered by start_date descending."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM roles ORDER BY start_date DESC"
+            ).fetchall()
+            return [dict(row) for row in rows]
 
     def get_analytics_summary(self) -> dict:
         with self._connect() as conn:
