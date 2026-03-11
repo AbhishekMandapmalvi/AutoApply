@@ -132,7 +132,7 @@ function parseDependencies() {
   }
   const deps = match[1]
     .split('\n')
-    .map((line) => line.replace(/#.*/, '').trim().replace(/^"|"$/g, '').replace(/,$/, ''))
+    .map((line) => line.replace(/#.*/, '').trim().replace(/,$/, '').replace(/^"/, '').replace(/"$/, ''))
     .filter((line) => line.length > 0);
   return deps;
 }
@@ -229,10 +229,13 @@ async function main() {
   console.log('Step 5: Installing dependencies...');
   const deps = parseDependencies();
   console.log(`  Dependencies (${deps.length}): ${deps.map((d) => d.split('==')[0]).join(', ')}`);
-  const depsStr = deps.map((d) => `"${d}"`).join(' ');
-  run(`"${pythonExe}" -m pip install ${depsStr} --no-cache-dir --no-warn-script-location`, {
+  // Write deps to a temp requirements file to avoid shell quoting issues
+  const reqsPath = path.join(RUNTIME_DIR, '_requirements.txt');
+  fs.writeFileSync(reqsPath, deps.join('\n') + '\n');
+  run(`"${pythonExe}" -m pip install -r "${reqsPath}" --no-cache-dir --no-warn-script-location`, {
     timeout: 600000,
   });
+  fs.unlinkSync(reqsPath);
 
   // Step 6: Install Playwright Chromium
   console.log('Step 6: Installing Playwright Chromium...');
