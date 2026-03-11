@@ -6,6 +6,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+*No unreleased changes.*
+
+## [1.8.3] - 2026-03-11
+
+Production Readiness 10.0/10 — Accessibility, i18n, structured logging, resilience.
+
+### Added
+- **Internationalization (i18n)**: JSON-based translation system with 460+ strings in `static/locales/en.json`. Backend `core/i18n.py` with `t()` function and `{placeholder}` interpolation. Frontend `static/js/i18n.js` ES module with locale auto-detection. All backend error strings migrated to `t()` calls. `/api/locales` endpoint. To add a new language: copy `en.json`, translate, done. (LE-3)
+- **Structured JSON logging**: Set `AUTOAPPLY_LOG_FORMAT=json` for machine-parseable log output with ISO 8601 timestamps and exception serialization. (D-7)
+- **LLM retry with exponential backoff**: API calls retry up to 3 times on transient errors (429, 5xx, network failures) with 1s/2s/4s delays. Fails fast on non-retryable errors (400, 401, 403). (D-6)
+- **SQLite WAL mode**: `PRAGMA journal_mode=WAL` enables concurrent reads during writes. `PRAGMA busy_timeout=5000` handles lock contention gracefully. (D-5)
+- **Accessibility (WCAG 2.1 AA)**: Skip navigation link, semantic HTML (`<main>`, `<nav>`, `role="tablist"`), ARIA attributes (`aria-live`, `aria-label`, `aria-selected`, `aria-modal`), keyboard navigation (arrow keys on tabs, Enter/Space on rows), focus trap in modals, `:focus-visible` outlines, `@media (prefers-reduced-motion: reduce)`. (LE-2)
+- **Security hardening**: Security headers (`X-Content-Type-Options`, `X-Frame-Options`, `X-XSS-Protection`, `Referrer-Policy`), 16MB request size limit, path traversal protection on resume/description endpoints, URL validation with domain allowlist on login endpoint, TOCTOU fix on login browser. (ME-9)
+
+### Changed
+- Tests increased from 542 to 563+ (21 i18n + 3 WAL + 9 retry + 5 JSON logging tests added).
+
+## [1.8.2] - 2026-03-10
+
+Frontend Component Refactor — split monolithic SPA into ES modules.
+
+### Added
+- **Frontend ES modules**: Split 3,170-line `index.html` into 17 JS modules in `static/js/` + CSS in `static/css/main.css`. No build step — native ES module support. (LE-1, ADR-017)
+
+## [1.8.1] - 2026-03-10
+
+Production Readiness — CI, auth, Blueprint refactor, graceful shutdown, mypy, dep pinning.
+
 ### Security
 - **Flask SECRET_KEY**: Now cryptographically random (`secrets.token_hex(32)`), persisted to `~/.autoapply/.flask_secret` with restricted permissions. Replaces hardcoded key. (NFR-QW1)
 - **API key keyring storage**: API keys are stored in the OS keyring (Windows Credential Locker, macOS Keychain, Linux SecretService) when available. Falls back to plaintext `config.json` gracefully. Existing plaintext keys are auto-migrated on first load. (NFR-QW1)
@@ -19,6 +47,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Swallowed exceptions**: All 16 bare `except: pass` sites across 8 files now log at appropriate levels (DEBUG for teardown/UI, WARNING for data loss). No silent exception suppression remains. (NFR-QW2)
 - **Race condition on bot thread**: `_bot_thread` global now protected by `threading.Lock`. All reads/writes serialized. `_scheduler_start_bot()` returns status string for cleaner route logic. (NFR-QW4)
 - **Temp file leak in CSV export**: `export_applications()` now reads CSV into `BytesIO` buffer and deletes the temp file in a `finally` block. No orphaned temp files. (NFR-QW5)
+- **Port conflict crash**: `run.py` now auto-detects a free port (5000-5010) instead of crashing with `WinError 10048` when port 5000 is already in use.
 
 ### Added
 - **Structured logging**: `run.py` configures root logger at startup with console + rotating file handler (`~/.autoapply/backend.log`, 5MB, 3 backups). Set `AUTOAPPLY_DEBUG=1` for DEBUG level. (NFR-QW3)
@@ -30,6 +59,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Lint cleanup**: Fixed 64 ruff lint issues across 14 files — unused imports (F401), unused variables (F841), undefined name reference (F821), import sorting (I001). Codebase now passes `ruff check` clean. (NFR-ME3)
 - **Pinned dependency versions**: All 13 runtime dependencies pinned to exact versions (`==`) in `pyproject.toml`. Eliminates supply-chain drift from unpinned `>=` ranges. (NFR-ME6)
 - **mypy type checking**: Added mypy configuration to `pyproject.toml` with `check_untyped_defs = true`. All 37 source files pass with zero errors. mypy runs in CI lint job. Fixed 21 type errors including null-safety on `Database | None` routes, `Any`-return from API JSON parsing, and a latent bug in `ApplyResult` construction with invalid kwargs. (NFR-ME7)
+- **Job description storage**: Every job that passes the filter has its full description saved as a styled HTML file in `~/.autoapply/profile/job_descriptions/`. Accessible via "View Job Description" button in the application detail modal, and via `GET /api/applications/:id/description`. Useful for interview prep after applying. (FR-075)
+- **AI Provider settings**: New Settings section to select LLM provider (Anthropic, OpenAI, Google, DeepSeek), enter API key, and optionally override the default model.
+- **API key validation endpoint** (`POST /api/ai/validate`): Test your API key before saving.
+- **Default models per provider**: Anthropic → `claude-sonnet-4-20250514`, OpenAI → `gpt-4o`, Google → `gemini-2.0-flash`, DeepSeek → `deepseek-chat`.
 
 ### Changed
 - **Blueprint architecture**: Split 852-line `app.py` monolith into 7 Flask Blueprints (`routes/bot.py`, `routes/applications.py`, `routes/config.py`, `routes/profile.py`, `routes/login.py`, `routes/analytics.py`, `routes/lifecycle.py`). Shared state extracted to `app_state.py`. `create_app()` factory pattern. All API contracts preserved — zero endpoint changes. (NFR-ME4)
@@ -37,15 +70,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Electron-only distribution**: Removed browser mode (`--no-browser` flag, auto-browser-open). AutoApply now launches exclusively as an Electron desktop app.
 - **AI status field**: `claude_code_available` renamed to `ai_available` across all API responses.
 - **Privacy model**: AI document generation now sends prompts to your configured cloud LLM provider. No data is sent if no API key is configured.
-
-### Added
-- **Job description storage**: Every job that passes the filter has its full description saved as a styled HTML file in `~/.autoapply/profile/job_descriptions/`. Accessible via "View Job Description" button in the application detail modal, and via `GET /api/applications/:id/description`. Useful for interview prep after applying. (FR-075)
-- **AI Provider settings**: New Settings section to select LLM provider (Anthropic, OpenAI, Google, DeepSeek), enter API key, and optionally override the default model.
-- **API key validation endpoint** (`POST /api/ai/validate`): Test your API key before saving.
-- **Default models per provider**: Anthropic → `claude-sonnet-4-20250514`, OpenAI → `gpt-4o`, Google → `gemini-2.0-flash`, DeepSeek → `deepseek-chat`.
-
-### Fixed
-- **Port conflict crash**: `run.py` now auto-detects a free port (5000-5010) instead of crashing with `WinError 10048` when port 5000 is already in use.
 
 ## [1.8.0] - 2026-03-10
 

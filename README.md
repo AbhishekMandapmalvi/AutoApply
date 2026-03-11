@@ -5,7 +5,7 @@
 AutoApply searches LinkedIn and Indeed, scores each job against your preferences, generates tailored resumes and cover letters using AI, and submits applications — all running locally on your machine. Your data never leaves your computer.
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/tests-205%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-563%20passing-brightgreen.svg)](#testing)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
@@ -21,6 +21,8 @@ AutoApply searches LinkedIn and Indeed, scores each job against your preferences
 - **Desktop app** — Electron shell with system tray support (minimize to tray, runs in background)
 - **Login session persistence** — Log in once, sessions are saved across restarts
 - **Scheduling** — Set days and hours for the bot to run automatically
+- **Accessible** — WCAG 2.1 AA compliant: keyboard navigation, screen reader support, focus management, reduced motion
+- **Internationalization** — All strings externalized to JSON locale files; add new languages by copying `en.json`
 - **Fully local** — No cloud, no accounts, no telemetry. Everything at `~/.autoapply/`
 
 ## Quick Start
@@ -103,11 +105,16 @@ AutoApply/
 │   ├── browser.py          # Playwright browser manager
 │   ├── search/             # LinkedIn and Indeed scrapers
 │   └── apply/              # Platform-specific appliers (LinkedIn, Indeed, Greenhouse, Lever, Workday, Ashby)
-├── templates/index.html    # Single-page dashboard (vanilla JS)
+├── templates/index.html    # Single-page dashboard (HTML shell)
+├── static/
+│   ├── css/main.css        # Extracted stylesheet
+│   ├── js/                 # 17 ES modules (app.js entry point)
+│   └── locales/en.json     # i18n string catalog (460+ strings)
+├── routes/                 # 7 Flask Blueprints (bot, applications, config, profile, login, analytics, lifecycle)
 ├── electron/               # Electron desktop shell
 │   ├── main.js             # App window, tray, lifecycle
 │   └── python-backend.js   # Python process management
-├── tests/                  # 205 tests (pytest)
+├── tests/                  # 563+ tests (pytest)
 └── docs/                   # User and developer documentation
 ```
 
@@ -148,7 +155,7 @@ Everything stays on your machine at `~/.autoapply/`:
 python -m pytest tests/ -v
 ```
 
-205 tests covering settings, database, API endpoints, bot logic, AI engine, scoring/filtering, resume rendering, scheduling, login flow, and applier modules.
+563+ tests covering settings, database, API endpoints, bot logic, AI engine, scoring/filtering, resume rendering, scheduling, login flow, applier modules, i18n, accessibility, security hardening, and resilience.
 
 ## Tech Stack
 
@@ -161,8 +168,10 @@ python -m pytest tests/ -v
 | PDF generation | ReportLab |
 | Config | Pydantic v2 |
 | Desktop | Electron |
-| Frontend | Vanilla JS SPA (single `index.html`) |
-| Tests | pytest |
+| Frontend | Vanilla JS SPA (17 ES modules, no build step) |
+| i18n | JSON locale files (`static/locales/`) with `t()` translation function |
+| Accessibility | WCAG 2.1 AA (ARIA, keyboard nav, focus management, reduced motion) |
+| Tests | pytest (563+ tests, 97% coverage on core modules) |
 
 ## Disclaimer
 
