@@ -348,3 +348,110 @@ class TestLocaleSwitcherFrontend:
         data = json.loads(Path("static/locales/en.json").read_text(encoding="utf-8"))
         assert data["settings"]["section_language"] == "Language"
         assert data["settings"]["label_language"] == "Language"
+
+
+# ===================================================================
+# TASK-023 — Sample Spanish Translation (QOL-4)
+# ===================================================================
+
+
+class TestSpanishTranslation:
+    """TASK-023: es.json locale file (FR-135, FR-136)."""
+
+    def test_es_json_exists(self):
+        """es.json exists in static/locales/.  # FR-135"""
+        assert Path("static/locales/es.json").exists()
+
+    def test_es_json_valid(self):
+        """es.json is valid JSON."""
+        data = json.loads(Path("static/locales/es.json").read_text(encoding="utf-8"))
+        assert isinstance(data, dict)
+        assert len(data) > 0
+
+    def test_es_json_key_parity(self):
+        """es.json has all the same keys as en.json.  # NFR-023-02"""
+        en = json.loads(Path("static/locales/en.json").read_text(encoding="utf-8"))
+        es = json.loads(Path("static/locales/es.json").read_text(encoding="utf-8"))
+
+        def _get_keys(d, prefix=""):
+            keys = set()
+            for k, v in d.items():
+                full = f"{prefix}.{k}" if prefix else k
+                if isinstance(v, dict):
+                    keys |= _get_keys(v, full)
+                else:
+                    keys.add(full)
+            return keys
+
+        en_keys = _get_keys(en)
+        es_keys = _get_keys(es)
+        missing = en_keys - es_keys
+        assert not missing, f"Keys in en.json missing from es.json: {missing}"
+
+    def test_es_json_no_extra_keys(self):
+        """es.json has no keys that don't exist in en.json."""
+        en = json.loads(Path("static/locales/en.json").read_text(encoding="utf-8"))
+        es = json.loads(Path("static/locales/es.json").read_text(encoding="utf-8"))
+
+        def _get_keys(d, prefix=""):
+            keys = set()
+            for k, v in d.items():
+                full = f"{prefix}.{k}" if prefix else k
+                if isinstance(v, dict):
+                    keys |= _get_keys(v, full)
+                else:
+                    keys.add(full)
+            return keys
+
+        en_keys = _get_keys(en)
+        es_keys = _get_keys(es)
+        extra = es_keys - en_keys
+        assert not extra, f"Keys in es.json not in en.json: {extra}"
+
+    def test_es_json_no_untranslated(self):
+        """es.json values differ from en.json (spot check key sections)."""
+        en = json.loads(Path("static/locales/en.json").read_text(encoding="utf-8"))
+        es = json.loads(Path("static/locales/es.json").read_text(encoding="utf-8"))
+        # Check that major sections are translated (not just copied)
+        assert es["nav"]["dashboard"] != en["nav"]["dashboard"]
+        assert es["button"]["save"] != en["button"]["save"]
+        assert es["settings"]["screen_title"] != en["settings"]["screen_title"]
+        assert es["errors"]["unauthorized"] != en["errors"]["unauthorized"]
+
+    def test_es_json_preserves_placeholders(self):
+        """es.json preserves {placeholder} tokens for interpolation."""
+        es = json.loads(Path("static/locales/es.json").read_text(encoding="utf-8"))
+        assert "{valid_statuses}" in es["errors"]["invalid_status"]
+        assert "{days}" in es["errors"]["invalid_days"]
+        assert "{error}" in es["errors"]["chrome_failed"]
+        assert "{count}" in es["analytics"]["score_tooltip_interviews"]
+        assert "{rate}" in es["analytics"]["score_tooltip_interviews"]
+        assert "{days}" in es["analytics"]["response_days"]
+
+    def test_locales_api_includes_es(self, tmp_path, monkeypatch):
+        """GET /api/locales includes 'es' in available.  # FR-136"""
+        monkeypatch.setattr("config.settings.get_data_dir", lambda: tmp_path)
+        monkeypatch.setattr("routes.profile.get_data_dir", lambda: tmp_path)
+        (tmp_path / "profile" / "experiences").mkdir(parents=True, exist_ok=True)
+        monkeypatch.setenv("AUTOAPPLY_DEV", "1")
+        from app import create_app
+        app, _ = create_app()
+        app.config["TESTING"] = True
+        with app.test_client() as c:
+            rv = c.get("/api/locales")
+            data = rv.get_json()
+            assert "es" in data["available"]
+
+    def test_set_locale_to_es(self, tmp_path, monkeypatch):
+        """PUT /api/locale with 'es' succeeds."""
+        monkeypatch.setattr("config.settings.get_data_dir", lambda: tmp_path)
+        monkeypatch.setattr("routes.profile.get_data_dir", lambda: tmp_path)
+        (tmp_path / "profile" / "experiences").mkdir(parents=True, exist_ok=True)
+        monkeypatch.setenv("AUTOAPPLY_DEV", "1")
+        from app import create_app
+        app, _ = create_app()
+        app.config["TESTING"] = True
+        with app.test_client() as c:
+            rv = c.put("/api/locale", json={"locale": "es"})
+            assert rv.status_code == 200
+            assert rv.get_json()["locale"] == "es"

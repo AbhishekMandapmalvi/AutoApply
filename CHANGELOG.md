@@ -58,6 +58,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - **Backend sync**: `PUT /api/locale` endpoint updates backend `set_locale()` for translated error messages (FR-133)
   - **12 new tests**: 5 endpoint tests + 7 frontend code tests — total 33 i18n tests
   - **WCAG 2.1 AA accessible**: Proper `<label>` and `aria-label` on dropdown
+- **Sample Spanish Translation (TASK-023, QOL-4)**: Complete `es.json` locale file with all 385+ keys translated. (FR-135, FR-136)
+  - **Full parity**: Every key in `en.json` has a corresponding Spanish translation
+  - **Placeholder preservation**: All `{placeholder}` tokens preserved for interpolation
+  - **Localized placeholders**: Spanish example data (e.g., "María García", "Madrid", "+34")
+  - **8 new tests**: File validation, key parity, no-extra-keys, untranslated spot check, placeholder preservation, API integration
+  - **End-to-end**: Locale switcher dropdown now shows "English" and "Español"
 
 ### Changed
 - **Traceability matrix v7.0**: Added 7 rows for TASK-022 (FR-131 to FR-134, NFR-022-01 to NFR-022-03)
