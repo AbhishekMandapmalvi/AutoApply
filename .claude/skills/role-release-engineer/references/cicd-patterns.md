@@ -56,27 +56,31 @@ ENTRYPOINT ["node", "/app/index.js"]
 
 ## GitHub Repository & PR Workflow
 
-### Branch Strategy
+### Branch Strategy (Gitflow-lite)
 ```
-master (protected) ← PR only, squash-merge
-  ├── feature/locale-switcher
-  ├── fix/login-timeout
-  ├── refactor/split-bot-loop
-  ├── docs/update-api-reference
-  ├── test/applier-edge-cases
-  └── chore/upgrade-playwright
+master (release — protected, squash-merge only, enforce admins)
+  └── develop (integration — protected, CI required)
+        ├── feature/task-030-smart-resume-reuse-m1
+        ├── fix/login-timeout
+        ├── refactor/split-bot-loop
+        ├── docs/update-api-reference
+        ├── test/applier-edge-cases
+        └── chore/upgrade-playwright
+  ← release/vX.Y.Z (develop → master)
+  ← hotfix/critical-fix (master → master, back-merge → develop)
 ```
 
 ### PR Lifecycle
 ```
-1. Create branch: git checkout -b type/short-description
-2. Develop + test locally: ruff check . && python -m pytest tests/ -v
-3. Push: git push -u origin type/short-description
-4. Open PR: gh pr create --title "..." --body "..."
-5. CI runs: lint → test → security (all 3 must pass)
-6. Review: address feedback with new commits (no force-push)
-7. Merge: squash-merge to master
-8. Cleanup: delete remote branch
+1. Start from develop: git checkout develop && git pull origin develop
+2. Create branch: git checkout -b type/short-description
+3. Develop + test locally: ruff check . && python -m pytest tests/ -v
+4. Push: git push -u origin type/short-description
+5. Open PR targeting develop: gh pr create --base develop --title "..." --body "..."
+6. CI runs: lint → test → security (all 3 must pass)
+7. Review: address feedback with new commits (no force-push)
+8. Merge to develop, delete remote branch
+9. Release: develop → master via release/ branch PR (squash-merge)
 ```
 
 ### PR Template Sections
@@ -101,10 +105,20 @@ Outputs: .exe, .dmg, .AppImage → GitHub Releases
 ```
 
 ### Branch Protection Rules
-- Require 3 CI checks: `lint`, `test`, `security`
-- No direct pushes to `master`
-- No force-pushes to `master`
-- CODEOWNERS: `@AbhishekMandapmalvi`
+
+| Rule | `master` | `develop` |
+|------|----------|-----------|
+| PR required | Yes | Yes |
+| CI checks (lint, test, security) | Yes (strict) | Yes (strict) |
+| Enforce for admins | Yes | No |
+| Squash-merge only (linear history) | Yes | No |
+| Force-push blocked | Yes | Yes |
+| Deletion blocked | Yes | Yes |
+| Dismiss stale reviews | Yes | Yes |
+| Conversation resolution required | Yes | Yes |
+| GitHub Ruleset (zero bypass) | Yes | No |
+
+CODEOWNERS: `@AbhishekMandapmalvi`
 
 ### gh CLI Quick Reference
 ```bash

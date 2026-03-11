@@ -147,7 +147,7 @@ Test         Test         Audit        ation         Package
 
 ## 3. NON-NEGOTIABLE PRINCIPLES
 
-1. **Branch before work** — Create a named branch from clean `master` BEFORE any code changes. See `references/shared-workflows.md` §1.
+1. **Branch before work** — Create a named branch from clean `develop` BEFORE any code changes. Only `release/` and `hotfix/` branches target `master`. See `references/shared-workflows.md` §1.
 2. **Requirements before design** — No system design without approved SRS.
 3. **Design before code** — No implementation without approved architecture.
 4. **Tests before merge** — No delivery without unit AND integration tests.
@@ -292,9 +292,12 @@ building it in from the start.
 > file on any conflict.
 
 ### 9.1 Repository Conventions
-- **Main branch**: `master` — protected with 3 required CI checks (lint, test, security)
-- **Never push directly to `master`** — always use a PR
-- **Never force-push to `master`** — branch protection blocks this
+- **Release branch**: `master` — protected, squash-merge only, enforced for admins, 3 CI checks
+- **Integration branch**: `develop` — protected, 3 CI checks, all feature work merges here
+- **Never push directly to `master` or `develop`** — always use a PR
+- **Never force-push to `master` or `develop`** — branch protection blocks this
+- **Feature branches** branch from `develop`, merge into `develop` via PR
+- **Release/hotfix branches** merge into `master` via PR, then back-merge into `develop`
 - **Branch naming**: `type/short-description` — see `references/shared-workflows.md` §1
 
 ### 9.2 Commit Messages
