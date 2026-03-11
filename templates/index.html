@@ -688,6 +688,35 @@
       <div class="kb-edit-content resume-detail-body"></div>
     </div>
 
+    <!-- ATS Scoring section -->
+    <div class="card" style="margin:16px 0;">
+      <h3 data-i18n="ats.title">ATS Compatibility Score</h3>
+      <div class="flex-col gap-md">
+        <label data-i18n="ats.platform_label">ATS Platform
+          <select id="kb-ats-platform" class="form-input" aria-label="ATS platform profile">
+            <option value="default" data-i18n="ats.platform_default">Default (Balanced)</option>
+            <option value="greenhouse">Greenhouse</option>
+            <option value="lever">Lever</option>
+            <option value="workday">Workday</option>
+            <option value="ashby">Ashby</option>
+            <option value="icims">iCIMS</option>
+            <option value="taleo">Taleo</option>
+          </select>
+        </label>
+        <label>Job Description
+          <textarea id="kb-ats-jd" class="form-input" rows="4"
+                    placeholder="Paste a job description to analyze ATS compatibility..."
+                    aria-label="Job description for ATS scoring"></textarea>
+        </label>
+        <div>
+          <button type="button" class="btn btn-primary" onclick="analyzeATS()"
+                  data-i18n="ats.analyze_btn">Analyze ATS Compatibility</button>
+          <span id="kb-ats-status" aria-live="polite"></span>
+        </div>
+        <div id="kb-ats-result" role="region" aria-label="ATS scoring results" aria-live="polite"></div>
+      </div>
+    </div>
+
     <!-- Resume Preview section -->
     <div class="card" style="margin:16px 0;">
       <h3 data-i18n="reuse.settings_title">Smart Resume Assembly</h3>

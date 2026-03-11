@@ -23,7 +23,7 @@ import { closeModal } from './modals.js';
 import { updateAIIndicators } from './ai-status.js';
 import { switchAnalyticsPeriod } from './analytics.js';
 import { loadResumes, viewResume, closeResumeDetail, previewResumePdf, downloadResume, switchResumePage, initResumeSearch, toggleFavorite, compareSelected, closeCompareView, onCompareCheck } from './resumes.js';
-import { loadKnowledgeBase, loadKBEntries, uploadKBDocument, editKBEntry, saveKBEntry, closeKBEdit, deleteKBEntry, filterKBCategory, searchKB, switchKBPage, loadKBDocuments, initKnowledgeBase } from './knowledge-base.js';
+import { loadKnowledgeBase, loadKBEntries, uploadKBDocument, editKBEntry, saveKBEntry, closeKBEdit, deleteKBEntry, filterKBCategory, searchKB, switchKBPage, loadKBDocuments, initKnowledgeBase, analyzeATS } from './knowledge-base.js';
 import { previewKBResume, closeKBPreview, initResumePreview } from './resume-preview.js';
 
 // ── Expose globals for inline onclick handlers in HTML ──────────
@@ -86,6 +86,7 @@ window.deleteKBEntry = deleteKBEntry;
 window.filterKBCategory = filterKBCategory;
 window.searchKB = searchKB;
 window.switchKBPage = switchKBPage;
+window.analyzeATS = analyzeATS;
 window.previewKBResume = previewKBResume;
 window.closeKBPreview = closeKBPreview;
 window.t = t;

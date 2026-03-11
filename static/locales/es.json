@@ -592,5 +592,26 @@
     "font_family": "Familia de Fuente",
     "font_size": "Tamaño de Fuente",
     "margin": "Margen de Página"
+  },
+
+  "ats": {
+    "title": "Puntuación de Compatibilidad ATS",
+    "score_label": "Puntuación ATS",
+    "analyze_btn": "Analizar Compatibilidad ATS",
+    "platform_label": "Plataforma ATS",
+    "platform_default": "Predeterminado (Equilibrado)",
+    "component_keyword": "Coincidencia de Palabras Clave",
+    "component_section": "Completitud de Secciones",
+    "component_skill": "Coincidencia de Habilidades",
+    "component_length": "Longitud del Contenido",
+    "component_format": "Cumplimiento de Formato",
+    "matched_keywords": "Palabras Clave Coincidentes",
+    "missing_keywords": "Palabras Clave Faltantes",
+    "matched_skills": "Habilidades Coincidentes",
+    "missing_skills": "Habilidades Faltantes",
+    "categories_present": "Secciones Presentes",
+    "categories_missing": "Secciones Faltantes",
+    "no_gaps": "Sin brechas — ¡excelente coincidencia!",
+    "analyzing": "Analizando compatibilidad ATS..."
   }
 }
