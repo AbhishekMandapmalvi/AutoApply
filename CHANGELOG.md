@@ -110,9 +110,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - **TinyTeX bundler**: `electron/scripts/bundle-tinytex.js` — platform-specific download, extraction, package installation
   - **31 new tests**: Escaping (12), pdflatex discovery (4), template rendering (8), compilation (5), convenience API (2)
   - **New dependency**: jinja2 (template rendering)
+- **Smart Resume Reuse M4: Resume Assembly + Bot Integration (TASK-030)**: KB-first resume generation pipeline. (FR-030-27 to FR-030-32, NFR-030-14 to NFR-030-15, ADR-032)
+  - **Resume assembler**: `core/resume_assembler.py` — score KB entries against JD, select top per category, build LaTeX context, compile PDF (0 API calls)
+  - **KB-first bot flow**: `bot/bot.py` `_generate_docs()` tries KB assembly first, falls through to LLM, then ingests LLM output back into KB
+  - **Post-LLM ingestion**: LLM-generated resumes automatically parsed and inserted into KB for future reuse
+  - **Version tracking**: `resume_versions.reuse_source` (kb_assembly/llm_generated) + `source_entry_ids` (JSON array)
+  - **23 new tests**: Entry selection (5), context building (4), full assembly (5), PDF saving (3), ingestion (3), DB reuse (3)
 
 ### Changed
-- **Traceability matrix v12.0**: 165 requirements, all ✅ (0 ⚠️). M3 adds 10 new requirements (7 FRs + 3 NFRs).
+- **Traceability matrix v13.0**: 173 requirements, all ✅ (0 ⚠️). M4 adds 8 new requirements (6 FRs + 2 NFRs).
 - **CLAUDE.md v5.0**: Gitflow-lite branching model (develop + master), shared-workflows.md as single source of truth
 - **CLAUDE.md v4.2**: Added principle #9 (GitHub Issues for every implementation), lesson 12.8 (issue lifecycle)
 

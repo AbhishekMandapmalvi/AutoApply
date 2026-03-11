@@ -299,6 +299,8 @@ class Database:
         match_score: int | None,
         llm_provider: str | None,
         llm_model: str | None,
+        reuse_source: str | None = None,
+        source_entry_ids: str | None = None,
     ) -> int:
         """Insert a resume version record. Returns the new id."""
         with self._connect() as conn:
@@ -307,13 +309,15 @@ class Database:
                 INSERT INTO resume_versions (
                     application_id, job_title, company,
                     resume_md_path, resume_pdf_path,
-                    match_score, llm_provider, llm_model
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    match_score, llm_provider, llm_model,
+                    reuse_source, source_entry_ids
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     application_id, job_title, company,
                     resume_md_path, resume_pdf_path,
                     match_score, llm_provider, llm_model,
+                    reuse_source, source_entry_ids,
                 ),
             )
             return cursor.lastrowid  # type: ignore[return-value]

@@ -160,7 +160,7 @@ def run_bot(
                         )
 
                         resume_path, cl_path, cover_letter_text, version_meta = _generate_docs(
-                            scored, config, profile_dir
+                            scored, config, profile_dir, db=db
                         )
 
                         # Review gate — pause for user approval in review/watch modes
@@ -317,8 +317,14 @@ def _wait_for_review(state: "BotState") -> tuple[str, str | None]:
     return state.wait_for_review()
 
 
-def _generate_docs(scored: ScoredJob, config, profile_dir: Path):
-    """Generate resume and cover letter, with fallback on failure."""
+def _generate_docs(scored: ScoredJob, config, profile_dir: Path, db=None):
+    """Generate resume and cover letter, KB-first with LLM fallback.
+
+    Pipeline (TASK-030 M4):
+      1. Try KB assembly (0 API calls) if resume reuse enabled + KB populated
+      2. Fall through to LLM generation if KB assembly returns None
+      3. After LLM generation, ingest new entries into KB for future reuse
+    """
     from core.ai_engine import generate_documents
 
     resume_path = None
@@ -326,6 +332,23 @@ def _generate_docs(scored: ScoredJob, config, profile_dir: Path):
     cover_letter_text = ""
     version_meta = None
 
+    # --- Phase 1: Try KB assembly (0 API calls) ---
+    kb_result = _try_kb_assembly(scored, config, profile_dir)
+    if kb_result is not None:
+        resume_path = kb_result["resume_path"]
+        cover_letter_text = config.bot.cover_letter_template or ""
+        version_meta = {
+            "resume_md_path": "",  # KB assembly has no .md
+            "resume_pdf_path": str(resume_path),
+            "llm_provider": None,
+            "llm_model": None,
+            "reuse_source": "kb_assembly",
+            "source_entry_ids": kb_result["entry_ids"],
+        }
+        logger.info("KB assembly produced resume for %s at %s", scored.raw.company, scored.raw.title)
+        return resume_path, cl_path, cover_letter_text, version_meta
+
+    # --- Phase 2: LLM generation (standard path) ---
     try:
         resume_path, cl_path, version_meta = generate_documents(
             job=scored,
@@ -336,6 +359,15 @@ def _generate_docs(scored: ScoredJob, config, profile_dir: Path):
             llm_config=config.llm,
         )
         cover_letter_text = cl_path.read_text(encoding="utf-8")
+
+        # Tag as LLM-generated for version tracking
+        if version_meta:
+            version_meta["reuse_source"] = "llm_generated"
+            version_meta["source_entry_ids"] = []
+
+        # --- Phase 3: Ingest LLM output into KB for future reuse ---
+        _ingest_llm_output(resume_path, config, db)
+
     except Exception as e:
         logger.warning("Document generation failed, using fallback: %s", e)
         # Fallback to static templates
@@ -346,6 +378,83 @@ def _generate_docs(scored: ScoredJob, config, profile_dir: Path):
         cover_letter_text = config.bot.cover_letter_template or ""
 
     return resume_path, cl_path, cover_letter_text, version_meta
+
+
+def _try_kb_assembly(scored: ScoredJob, config, profile_dir: Path) -> dict | None:
+    """Attempt to assemble a resume from KB entries. Returns None if not viable."""
+    try:
+        from core.knowledge_base import KnowledgeBase
+        from core.resume_assembler import assemble_resume, save_assembled_resume
+        from db.database import Database
+
+        data_dir = Path.home() / ".autoapply"
+        db = Database(data_dir / "autoapply.db")
+        kb = KnowledgeBase(db)
+
+        profile = {
+            "name": config.profile.full_name or "",
+            "email": config.profile.email or "",
+            "phone": config.profile.phone or "",
+            "location": config.profile.location or "",
+        }
+
+        jd_text = scored.raw.description or ""
+        if not jd_text:
+            return None
+
+        result = assemble_resume(
+            jd_text=jd_text,
+            profile=profile,
+            kb=kb,
+            reuse_config=config.resume_reuse,
+            latex_config=config.latex,
+        )
+
+        if result is None:
+            return None
+
+        # Save PDF to resumes directory
+        output_dir = profile_dir / "resumes"
+        pdf_path = save_assembled_resume(
+            pdf_bytes=result["pdf_bytes"],
+            output_dir=output_dir,
+            company=scored.raw.company or "unknown",
+            job_title=scored.raw.title or "unknown",
+        )
+
+        return {
+            "resume_path": pdf_path,
+            "entry_ids": result["entry_ids"],
+        }
+
+    except Exception as e:
+        logger.debug("KB assembly not available: %s", e)
+        return None
+
+
+def _ingest_llm_output(resume_path, config, db) -> None:
+    """Ingest LLM-generated resume into KB for future reuse."""
+    if not config.resume_reuse.enabled:
+        return
+
+    try:
+        from core.knowledge_base import KnowledgeBase
+        from core.resume_assembler import ingest_llm_resume
+        from db.database import Database
+
+        if db is None:
+            data_dir = Path.home() / ".autoapply"
+            db = Database(data_dir / "autoapply.db")
+        kb = KnowledgeBase(db)
+
+        # Try to read .md version (same name, .md extension)
+        if resume_path and resume_path.exists():
+            md_path = resume_path.with_suffix(".md")
+            if md_path.exists():
+                resume_md = md_path.read_text(encoding="utf-8")
+                ingest_llm_resume(resume_md, kb)
+    except Exception as e:
+        logger.debug("LLM resume ingestion skipped: %s", e)
 
 
 def _apply_to_job(scored, resume_path, cover_letter_text, config, page):
@@ -450,18 +559,22 @@ def _save_application(db, scored, resume_path, cl_path, cover_letter_text, resul
             description_path=str(description_path) if description_path else None,
         )
 
-        # Record resume version if AI-generated (FR-118)
+        # Record resume version if generated (FR-118, TASK-030 M4)
         if version_meta and app_id:
             try:
+                import json as _json
+                entry_ids = version_meta.get("source_entry_ids", [])
                 db.save_resume_version(
                     application_id=app_id,
                     job_title=scored.raw.title,
                     company=scored.raw.company,
-                    resume_md_path=version_meta["resume_md_path"],
-                    resume_pdf_path=version_meta["resume_pdf_path"],
+                    resume_md_path=version_meta.get("resume_md_path", ""),
+                    resume_pdf_path=version_meta.get("resume_pdf_path", ""),
                     match_score=scored.score,
                     llm_provider=version_meta.get("llm_provider"),
                     llm_model=version_meta.get("llm_model"),
+                    reuse_source=version_meta.get("reuse_source"),
+                    source_entry_ids=_json.dumps(entry_ids) if entry_ids else None,
                 )
             except Exception as e:
                 logger.warning("Failed to save resume version: %s", e)

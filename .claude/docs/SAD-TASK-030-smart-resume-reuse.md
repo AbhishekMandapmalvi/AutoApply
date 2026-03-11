@@ -11,7 +11,7 @@
 
 ## 1. Executive Summary
 
-This architecture defines the M1 foundation for the Smart Resume Reuse feature: a Knowledge Base pipeline that extracts structured career entries from uploaded documents via a single LLM call and stores them in SQLite for later assembly (M2+). The design introduces 4 new Python modules, 3 new SQLite tables, 2 new config models, and extends the existing Database class with 13 new methods. All components follow the existing layer architecture and integrate via the established patterns (SQLite, Pydantic, structured logging).
+This architecture defines the Smart Resume Reuse feature across four milestones: M1 (Knowledge Base foundation), M2 (TF-IDF scoring), M3 (LaTeX compilation), and M4 (Resume Assembly + Bot Integration). The design introduces 8 new Python modules, 3 new SQLite tables, 2 new config models, and extends the existing Database class with 15 new methods. M4 adds the assembly pipeline that ties M1-M3 together: score KB entries against a JD, select top entries per section, render via LaTeX (with ReportLab fallback), and integrate into the bot's document generation flow with a KB-first strategy and LLM fallback with ingestion. All components follow the existing layer architecture and integrate via the established patterns (SQLite, Pydantic, structured logging).
 
 ## 2. Architecture Overview
 
@@ -42,6 +42,22 @@ This architecture defines the M1 foundation for the Smart Resume Reuse feature: 
                  │ Config Models│  (ResumeReuseConfig, LatexConfig)
                  │ [Pydantic]   │
                  └──────────────┘
+
+M4 Assembly + Bot Integration:
+
+┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐
+│ Bot (bot.py)     │─────▶│ ResumeAssembler  │─────▶│ ResumeScorer     │
+│ _generate_docs() │      │ (assembly pipe)  │      │ (TF-IDF scoring) │
+│ _try_kb_assembly │      │ [core logic]     │      │ [M2 scorer]      │
+│ _ingest_llm_out  │      └────────┬─────────┘      └─────────────────┘
+└─────────────────┘               │
+                          ┌───────┼────────┐
+                          ▼       ▼        ▼
+                 ┌──────────┐ ┌────────┐ ┌──────────────┐
+                 │ LaTeX    │ │ReportLab│ │ KnowledgeBase│
+                 │ Compiler │ │Renderer │ │ (KB read +   │
+                 │ [M3]     │ │[fallback]│ │  ingestion)  │
+                 └──────────┘ └────────┘ └──────────────┘
 ```
 
 ### 2.2 Data Flow
@@ -68,10 +84,10 @@ This architecture defines the M1 foundation for the Smart Resume Reuse feature: 
 
 | Layer | Responsibility | Components |
 |-------|---------------|------------|
-| Service | Business logic, orchestration | `KnowledgeBase`, `calculate_experience()` |
-| Domain | Pure data parsing, no I/O | `parse_resume_md()`, `_parse_date()`, config models |
-| Repository | Data access | `Database` (KB CRUD methods) |
-| Infrastructure | External calls, filesystem | `extract_text()`, `invoke_llm()` |
+| Service | Business logic, orchestration | `KnowledgeBase`, `calculate_experience()`, `ResumeAssembler`, Bot KB-first flow |
+| Domain | Pure data parsing, no I/O | `parse_resume_md()`, `_parse_date()`, `_select_entries()`, `_build_context()`, config models |
+| Repository | Data access | `Database` (KB CRUD methods, resume_versions extension) |
+| Infrastructure | External calls, filesystem | `extract_text()`, `invoke_llm()`, `compile_latex()`, `save_assembled_resume()` |
 
 ### 2.4 Component Catalog
 
@@ -87,6 +103,9 @@ This architecture defines the M1 foundation for the Smart Resume Reuse feature: 
 | LatexCompiler | LaTeX escaping, template rendering, PDF compilation | Jinja2, subprocess | Infrastructure | `core/latex_compiler.py` |
 | LaTeX Templates | 4 resume templates with custom Jinja2 delimiters | Jinja2 (.tex.j2) | Infrastructure | `templates/latex/*.tex.j2` |
 | TinyTeX Bundler | Platform-specific TinyTeX download and packaging | Node.js | Infrastructure | `electron/scripts/bundle-tinytex.js` |
+| ResumeAssembler | Orchestrate KB-first resume assembly pipeline | stdlib | Service | `core/resume_assembler.py` |
+| Bot (KB-first flow) | Try KB assembly before LLM, ingest LLM output | stdlib | Service | `bot/bot.py` (modified) |
+| Database (resume_versions ext) | resume_versions +reuse_source, +source_entry_ids | sqlite3 | Repository | `db/database.py` (modified) |
 
 ---
 
@@ -765,8 +784,17 @@ uploaded_documents ──1:N──▶ knowledge_base  (via knowledge_base.source
 | NFR-030-11 | NFR | LatexCompiler | compile_latex() timeout, temp dir cleanup | — |
 | NFR-030-12 | NFR | LatexCompiler | logging.getLogger(__name__) | — |
 | NFR-030-13 | NFR | Test suite (M3) | pytest | — |
+| FR-030-26 | FR | ResumeAssembler | assemble_resume() | ADR-032 |
+| FR-030-27 | FR | ResumeAssembler | _select_entries() | — |
+| FR-030-28 | FR | ResumeAssembler | _build_context() | — |
+| FR-030-29 | FR | ResumeAssembler | save_assembled_resume() | — |
+| FR-030-30 | FR | ResumeAssembler, ResumeParser, KnowledgeBase | ingest_llm_resume() | ADR-032 |
+| FR-030-31 | FR | Bot (_generate_docs) | _try_kb_assembly(), _ingest_llm_output() | ADR-032 |
+| FR-030-32 | FR | Database (resume_versions) | save_resume_version() +reuse_source, +source_entry_ids | — |
+| NFR-030-14 | NFR | ResumeAssembler | logging.getLogger(__name__) | — |
+| NFR-030-15 | NFR | Test suite (M4) | pytest | — |
 
-**Completeness**: 25/25 FRs mapped, 13/13 NFRs mapped. Zero gaps.
+**Completeness**: 32/32 FRs mapped, 15/15 NFRs mapped. Zero gaps.
 
 ---
 
@@ -990,17 +1018,288 @@ env = jinja2.Environment(
 - Negative: Requires custom Jinja2 Environment setup (one-time, 6 lines); developers must learn non-default syntax
 - Risks: `}` as end delimiter could theoretically conflict with LaTeX's `}` in complex nesting → mitigated by placing Jinja2 tags on their own lines or at clear boundaries
 
+### 3.20 resume_assembler.assemble_resume() (M4)
+
+**Purpose**: Orchestrate KB-first resume assembly: score entries against JD, select top entries per section, build template context, render via LaTeX (or ReportLab fallback). Returns assembled resume dict or None if insufficient KB entries.
+**Category**: command (reads KB, writes PDF)
+
+**Signature**:
+
+Input Parameters:
+| Parameter | Type | Required | Constraints | Description |
+|-----------|------|----------|-------------|-------------|
+| jd_text | str | yes | Non-empty | Job description text for scoring |
+| profile | dict | yes | Keys: full_name, email, phone, location | User profile from config |
+| kb | KnowledgeBase | yes | Must have initialized DB | Knowledge base instance |
+| reuse_config | ResumeReuseConfig or None | no | default: None (uses defaults) | Resume reuse settings (min_score, min_experience_bullets, scoring_method) |
+| latex_config | LatexConfig or None | no | default: None (uses defaults) | LaTeX template/font settings |
+
+Output:
+| Field | Type | Nullable | Description |
+|-------|------|----------|-------------|
+| (return) | dict or None | yes | None if insufficient KB entries. Otherwise dict with keys: `pdf_bytes` (bytes), `entry_ids` (list[int]), `scoring_method` (str), `template` (str), `sections` (dict[str, int] — count of entries per section) |
+
+Errors:
+| Error Condition | Error Type | HTTP Status |
+|----------------|------------|-------------|
+| Empty jd_text | (no error) returns None | N/A |
+| Fewer entries than min_experience_bullets | (no error) returns None, logs INFO | N/A |
+| LaTeX compilation failure | (no error) falls back to ReportLab, logs WARNING | N/A |
+
+**Pipeline**:
+1. Fetch all active KB entries via `kb.get_all_entries(active_only=True)`
+2. Score entries via `score_kb_entries(jd_text, entries, reuse_config)`
+3. Call `_select_entries(scored, reuse_config)` → grouped entries or None
+4. If None (insufficient), return None
+5. Call `_build_context(profile, selected)` → template context dict
+6. Try LaTeX: `compile_resume(template, context, pdflatex_path)` → pdf_bytes
+7. If LaTeX returns None, fall back to `render_resume_to_pdf(context)` (ReportLab)
+8. Return result dict with pdf_bytes, entry_ids, scoring_method, template, sections
+
+**Preconditions**: KB populated with entries; profile has required contact fields.
+**Postconditions**: No DB mutation (read-only assembly). PDF bytes in memory.
+**Side Effects**: pdflatex subprocess if LaTeX available.
+**Idempotency**: Yes (same inputs → same output, assuming KB unchanged).
+**Thread Safety**: Safe (reads only; temp dirs isolated per call).
+
+---
+
+### 3.21 resume_assembler._select_entries() (M4)
+
+**Purpose**: Group scored entries by category and apply per-section limits. Returns None if experience section has fewer entries than `min_experience_bullets`.
+**Category**: query (pure function)
+
+**Signature**:
+
+Input Parameters:
+| Parameter | Type | Required | Constraints | Description |
+|-----------|------|----------|-------------|-------------|
+| scored | list[dict] | yes | Each dict has 'id', 'text', 'category', 'subsection', 'score' | Scored KB entries (already filtered by min_score) |
+| cfg | ResumeReuseConfig or None | no | default: None | Config with min_experience_bullets (default: 6) |
+
+Output:
+| Field | Type | Nullable | Description |
+|-------|------|----------|-------------|
+| (return) | dict[str, list[dict]] or None | yes | None if experience count < min_experience_bullets. Otherwise dict keyed by category: {"experience": [...], "skill": [...], "education": [...], "certification": [...], "project": [...], "summary": [...]} |
+
+**Section Limits** (per category, from highest score):
+| Category | Max Entries | Notes |
+|----------|------------|-------|
+| experience | 15 | Grouped by subsection (role), top entries per role |
+| skill | 20 | Flat list, highest scored first |
+| education | 5 | All included up to limit |
+| certification | 5 | All included up to limit |
+| project | 5 | All included up to limit |
+| summary | 1 | Best-scoring summary entry |
+
+**Preconditions**: Input entries already scored and filtered.
+**Postconditions**: No state change.
+**Side Effects**: None.
+**Idempotency**: Yes.
+**Thread Safety**: Safe (pure function).
+
+---
+
+### 3.22 resume_assembler._build_context() (M4)
+
+**Purpose**: Transform user profile + selected KB entries into a template context dict suitable for LaTeX or ReportLab rendering.
+**Category**: query (pure function)
+
+**Signature**:
+
+Input Parameters:
+| Parameter | Type | Required | Constraints | Description |
+|-----------|------|----------|-------------|-------------|
+| profile | dict | yes | Keys: full_name, email, phone, location | User profile |
+| selected | dict[str, list[dict]] | yes | Output of _select_entries() | Grouped entries by category |
+
+Output:
+| Field | Type | Nullable | Description |
+|-------|------|----------|-------------|
+| (return) | dict | no | Context dict with keys: `name` (str), `email` (str), `phone` (str), `location` (str), `summary` (str), `experiences` (list[dict] with title, company, start_date, end_date, bullets), `education` (list[dict] with institution, degree, year), `skills` (list[str]), `certifications` (list[str]), `projects` (list[dict] with name, description) |
+
+**Transformation Rules**:
+- `experience` entries grouped by subsection → each group becomes one experience block with role=subsection, bullets=entry texts
+- `skill` entries → flat list of entry texts
+- `education` entries → parsed into institution/degree/year from entry text
+- `certification` entries → flat list of entry texts
+- `project` entries → parsed into name/description from entry text
+- `summary` → single best entry text, or empty string if none
+
+**Preconditions**: selected dict has expected category keys.
+**Postconditions**: No state change.
+**Side Effects**: None.
+**Idempotency**: Yes.
+**Thread Safety**: Safe (pure function).
+
+---
+
+### 3.23 resume_assembler.save_assembled_resume() (M4)
+
+**Purpose**: Save assembled PDF bytes to disk and record in resume_versions table with reuse_source="kb".
+**Category**: command (filesystem + DB write)
+
+**Signature**:
+
+Input Parameters:
+| Parameter | Type | Required | Constraints | Description |
+|-----------|------|----------|-------------|-------------|
+| pdf_bytes | bytes | yes | Non-empty | PDF content |
+| output_dir | Path | yes | Must exist or will be created | Directory for saved PDFs |
+| company | str | yes | Non-empty | Target company name (for filename) |
+| job_title | str | yes | Non-empty | Target job title (for filename) |
+
+Output:
+| Field | Type | Nullable | Description |
+|-------|------|----------|-------------|
+| (return) | Path | no | Absolute path to saved PDF file |
+
+**Filename Convention**: `{company}_{job_title}_{YYYYMMDD_HHMMSS}.pdf` (sanitized: spaces→underscores, special chars removed)
+
+**Preconditions**: pdf_bytes is valid PDF content.
+**Postconditions**: PDF file written to output_dir.
+**Side Effects**: Filesystem write; creates output_dir if missing.
+**Idempotency**: No (new file each call due to timestamp).
+**Thread Safety**: Safe (unique filenames via timestamp).
+
+---
+
+### 3.24 resume_assembler.ingest_llm_resume() (M4)
+
+**Purpose**: After a full LLM resume generation, parse the output markdown and ingest new entries back into the KB. This grows the KB over time so future assemblies have more material.
+**Category**: command (KB mutation)
+
+**Signature**:
+
+Input Parameters:
+| Parameter | Type | Required | Constraints | Description |
+|-----------|------|----------|-------------|-------------|
+| resume_md | str | yes | Non-empty markdown | LLM-generated resume in markdown format |
+| kb | KnowledgeBase | yes | Must have initialized DB | Knowledge base instance |
+| source_doc_id | int or None | no | default: None | Source document ID for provenance tracking |
+
+Output:
+| Field | Type | Nullable | Description |
+|-------|------|----------|-------------|
+| (return) | int | no | Count of new entries ingested (0 if all duplicates or parse failure) |
+
+**Pipeline**:
+1. Call `parse_resume_md(resume_md)` → list of entry dicts
+2. Call `kb.ingest_entries(entries, source_doc_id)` → count of inserted entries
+3. Return count
+
+**Preconditions**: KB initialized; resume_md is valid markdown.
+**Postconditions**: 0+ new entries in knowledge_base table.
+**Side Effects**: DB inserts (deduplicated via INSERT OR IGNORE).
+**Idempotency**: Yes (duplicates ignored).
+**Thread Safety**: Safe (SQLite WAL + Database locking).
+
+---
+
+## 7.5 ADR-032: KB-First Resume Generation
+
+**Status**: accepted
+**Context**: The bot's `_generate_docs()` function currently always calls the LLM to generate a fresh resume for each job application. With the Knowledge Base (M1), scoring engine (M2), and LaTeX templates (M3) in place, the system can assemble resumes from existing KB entries without an LLM call — faster, cheaper, and deterministic.
+
+**Decision**: Try KB assembly first; fall through to full LLM generation if KB has insufficient entries. After LLM generation, ingest the output back into the KB to grow the entry pool for future assemblies.
+
+**Flow**:
+```
+_generate_docs(job, profile, llm_config)
+    │
+    ├──▶ _try_kb_assembly(jd_text, profile, kb, reuse_config, latex_config)
+    │        │
+    │        ├── assemble_resume() returns dict → use KB-assembled PDF ✓
+    │        │     save_assembled_resume()
+    │        │     record resume_version with reuse_source="kb"
+    │        │
+    │        └── assemble_resume() returns None → insufficient KB entries
+    │
+    └──▶ (fallback) Full LLM generation via invoke_llm()
+              │
+              └── _ingest_llm_output(resume_md, kb)
+                    ingest_llm_resume() → grow KB for next time
+                    record resume_version with reuse_source=null
+```
+
+**Alternatives Considered**:
+
+| Option | Pros | Cons |
+|--------|------|------|
+| Always LLM | Best quality each time | Expensive ($0.05-0.20/resume), slow (3-8s), requires API key |
+| Always KB | Cheapest, fastest | Quality limited to existing entries; new roles not covered |
+| **KB-first with LLM fallback + ingestion** | **Fast when KB is rich; self-improving; graceful degradation** | **Two code paths; KB quality depends on ingested content** |
+
+**Consequences**:
+- Positive: Zero-cost resume generation once KB is rich enough; self-improving loop (LLM outputs feed KB); falls back gracefully when KB is sparse
+- Negative: First few applications always use LLM (cold KB); assembled resumes may lack the creative phrasing of LLM-generated ones
+- Risks: KB pollution from low-quality LLM outputs → mitigated by dedup on (category, text) and min_score threshold filtering during assembly
+
+---
+
+## 8. Design Traceability Matrix (continued — M4)
+
+| Requirement | Type | Design Component(s) | Interface(s) | ADR |
+|-------------|------|---------------------|---------------|-----|
+| FR-030-26 | FR | ResumeAssembler | assemble_resume() | ADR-032 |
+| FR-030-27 | FR | ResumeAssembler | _select_entries() | — |
+| FR-030-28 | FR | ResumeAssembler | _build_context() | — |
+| FR-030-29 | FR | ResumeAssembler | save_assembled_resume() | — |
+| FR-030-30 | FR | ResumeAssembler, ResumeParser, KnowledgeBase | ingest_llm_resume() | ADR-032 |
+| FR-030-31 | FR | Bot (_generate_docs) | _try_kb_assembly(), _ingest_llm_output() | ADR-032 |
+| FR-030-32 | FR | Database (resume_versions) | save_resume_version() +reuse_source, +source_entry_ids | — |
+| NFR-030-14 | NFR | ResumeAssembler | logging.getLogger(__name__) | — |
+| NFR-030-15 | NFR | Test suite (M4) | pytest | — |
+
+---
+
+### M4 Implementation Tasks
+
+| Order | Task ID | Description | Depends On | Size | Risk | FR Coverage |
+|-------|---------|------------|------------|------|------|-------------|
+| 15 | IMPL-015 | Resume assembler module | IMPL-006, IMPL-010, IMPL-012 | L | Medium | FR-030-26, FR-030-27, FR-030-28, FR-030-29, FR-030-30 |
+| 16 | IMPL-016 | Bot KB-first flow | IMPL-015 | M | Medium | FR-030-31 |
+| 17 | IMPL-017 | DB resume_versions extension | IMPL-001 | S | Low | FR-030-32 |
+
+#### IMPL-015: Resume Assembler Module
+- **Creates**: `core/resume_assembler.py`
+- **Contains**: `assemble_resume()`, `_select_entries()`, `_build_context()`, `save_assembled_resume()`, `ingest_llm_resume()`
+- **Dependencies**: `core/knowledge_base.py` (M1), `core/resume_scorer.py` (M2), `core/latex_compiler.py` (M3), `core/resume_parser.py` (M1), `core/resume_renderer.py` (existing ReportLab fallback)
+- **Pipeline**: score → select → build context → compile (LaTeX or ReportLab) → return
+- **Section limits**: experience(15), skill(20), education(5), certification(5), project(5), summary(1)
+- **Fallback chain**: LaTeX compile → ReportLab render → return None (logged ERROR)
+- **Tests**: `tests/test_resume_assembler.py` — assembly pipeline (mocked KB + scorer), entry selection (min_experience guard, section limits, grouping), context building (all section types), save (filename sanitization, dir creation), LLM ingestion (dedup, empty input), fallback to ReportLab
+- **Done when**: All 5 interface contracts (§3.20–§3.24) satisfied; selection enforces min_experience_bullets; context matches LaTeX template schema; save produces valid filenames; ingest_llm_resume grows KB
+
+#### IMPL-016: Bot KB-First Flow
+- **Modifies**: `bot/bot.py` — `_generate_docs()` method
+- **Adds**: `_try_kb_assembly(jd_text, profile, kb, reuse_config, latex_config)` — calls `assemble_resume()`, saves PDF, returns result or None
+- **Adds**: `_ingest_llm_output(resume_md, kb)` — calls `ingest_llm_resume()` after LLM fallback generation
+- **Flow**: `_generate_docs()` calls `_try_kb_assembly()` first; if None, falls through to existing LLM path; after LLM path, calls `_ingest_llm_output()` to grow KB
+- **Config gate**: Only attempts KB assembly if `reuse_config.enabled` is True (default: True)
+- **Logging**: INFO log when KB assembly succeeds ("Assembled resume from KB: {n} entries, {method} scoring"); INFO when falling back to LLM ("KB insufficient, falling back to LLM generation")
+- **Tests**: `tests/test_bot_kb_flow.py` — KB assembly success path (mocked assembler), KB insufficient fallback to LLM, LLM output ingestion, reuse disabled config, error handling
+- **Done when**: Bot tries KB first; falls back to LLM when KB insufficient; ingests LLM output; respects enabled flag; all paths logged
+
+#### IMPL-017: DB resume_versions Extension
+- **Modifies**: `db/database.py` — `save_resume_version()` method and SCHEMA_SQL
+- **Adds columns**: `reuse_source TEXT` (nullable, "kb" or null), `source_entry_ids TEXT` (nullable, JSON array of int)
+- **Migration**: ALTER TABLE ADD COLUMN for existing DBs (both columns nullable, no default needed)
+- **Backward compat**: Existing callers of `save_resume_version()` continue to work (new params optional with default None)
+- **Tests**: Covered by existing `test_resume_versions.py` + new tests for reuse_source/source_entry_ids columns
+- **Done when**: New columns present in schema; migration handles existing DBs; save_resume_version accepts optional reuse_source and source_entry_ids; query returns new fields
+
 ---
 
 ## System Architecture -- GATE 4 OUTPUT
 
 **Document**: SAD-TASK-030-smart-resume-reuse
-**Components**: 12 components defined (7 M1 + 2 M2 + 3 M3)
-**Interfaces**: 19 contracts specified (10 M1 + 4 M2 + 5 M3)
-**Entities**: 4 data entities modeled (3 new tables + 1 modified)
-**ADRs**: 5 decisions documented (ADR-027, ADR-028, ADR-029, ADR-030, ADR-031)
-**Impl Tasks**: 14 tasks in dependency order (8 M1 + 3 M2 + 3 M3)
-**Traceability**: 38/38 requirements mapped (100%)
+**Components**: 15 components defined (7 M1 + 2 M2 + 3 M3 + 3 M4)
+**Interfaces**: 24 contracts specified (10 M1 + 4 M2 + 5 M3 + 5 M4)
+**Entities**: 4 data entities modeled (3 new tables + 1 modified with 2 new columns)
+**ADRs**: 6 decisions documented (ADR-027, ADR-028, ADR-029, ADR-030, ADR-031, ADR-032)
+**Impl Tasks**: 17 tasks in dependency order (8 M1 + 3 M2 + 3 M3 + 3 M4)
+**Traceability**: 47/47 requirements mapped (100%)
 **Checklist**: 20/20 items passed
 
 ### Handoff Routing
