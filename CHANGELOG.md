@@ -73,9 +73,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - **FR-077**: LLM provider/model/key inputs, provider options, validate button
   - **Accessibility**: HTML lang, skip-to-content, main/nav landmarks, ARIA labels
   - **Traceability**: 6 items upgraded from ⚠️ to ✅ (FR-012, FR-014, FR-017, FR-039, FR-064, FR-077)
+- **Electron Module Tests (TASK-025, #12)**: 60 new tests validating Electron source code patterns for 7 previously untested requirements.
+  - **FR-019**: App launch — BrowserWindow, dimensions, single instance, context isolation, preload
+  - **FR-020**: Backend lifecycle — findPython, venv/bundled/system fallback, spawn, windowsHide
+  - **FR-021**: Health check — /api/health polling, 30s timeout, 500ms interval, status 200
+  - **FR-022**: Splash screen — logo, spinner, status, frameless, always-on-top, lifecycle ordering
+  - **FR-023**: Graceful shutdown — /api/shutdown POST, 3s timeout, taskkill/SIGKILL fallback, cleanup
+  - **FR-024**: System tray — icon, tooltip, context menu (Show/Quit), minimize-to-tray, click handler
+  - **FR-030**: Log capture — backend.log, 10MB rotation, stdout/stderr piping, append mode
+  - **Traceability**: 7 items upgraded from ⚠️ to ✅
 
 ### Changed
-- **Traceability matrix v8.0**: 6 items upgraded ⚠️→✅ (TASK-024), added rows for TASK-022 and TASK-023
+- **Traceability matrix v9.0**: 13 items upgraded ⚠️→✅ (TASK-024: 6 frontend, TASK-025: 7 Electron), added rows for TASK-022 and TASK-023
 - **CLAUDE.md v4.2**: Added principle #9 (GitHub Issues for every implementation), lesson 12.8 (issue lifecycle)
 
 ## [1.9.0] - 2026-03-11
