@@ -2,7 +2,7 @@
 
 **Date**: 2026-03-11
 **Auditor**: Claude (Security Engineer)
-**Scope**: TASK-030 M1+M2 — Knowledge Base foundation (4 M1 modules, 3 DB tables, 2 config models) + Scoring Engine (2 M2 modules)
+**Scope**: TASK-030 M1+M2+M3 — Knowledge Base foundation (4 M1 modules, 3 DB tables, 2 config models) + Scoring Engine (2 M2 modules) + LaTeX Engine (compile_latex, escape_latex, TinyTeX bundling)
 
 ---
 
@@ -22,20 +22,25 @@
 | 10 | Info | G5 | M2 adds zero new runtime dependencies. TF-IDF uses only stdlib (`collections.Counter`, `math`, `re`). ONNX is optional and not imported at module level. | PASS |
 | 11 | Info | B5 | `SYNONYM_MAP` and `TECH_TERMS` are frozen data structures (dict, frozenset). Not modifiable at runtime, no injection risk. | PASS |
 | 12 | Info | E4 | ONNX embedding interface (`_onnx_score_entries()`) is a stub in M2. When implemented in M8, it must validate that embedding vectors come from the local KB, not from external sources. | PASS (M2), TODO (M8) |
+| 13 | Info | B3 | Command injection in `compile_latex()` — pdflatex path validated, tex content written to file not passed as arg. Subprocess called with explicit arg list, no shell=True. | MITIGATED |
+| 14 | Info | H2 | Temp file cleanup — uses `tempfile.mkdtemp()` with try/finally cleanup. Temp directory and all contents removed even on compilation failure. | MITIGATED |
+| 15 | Medium | B1 | LaTeX injection via user content — `escape_latex()` escapes all special chars (`\`, `{`, `}`, `$`, `&`, `#`, `^`, `_`, `~`, `%`) before template rendering. Prevents arbitrary LaTeX command execution from user-supplied resume content. | MITIGATED |
+| 16 | Info | B7 | Subprocess timeout — 30s default timeout on pdflatex execution. Prevents hang if LaTeX enters infinite loop or waits for input. `subprocess.TimeoutExpired` caught and logged. | MITIGATED |
+| 17 | Info | I1 | TinyTeX bundling downloads from HTTPS — uses HTTPS URLs for all downloads, follows redirects safely. No HTTP fallback. | MITIGATED |
 
 ## Checklist Summary
 
 | Section | Pass | Fail | N/A | Notes |
 |---------|:----:|:----:|:---:|-------|
-| A. Input Validation | 5 | 0 | 1 | A5 N/A (no API endpoints in M1/M2). M2 input is pre-validated JD text from DB. |
-| B. Injection Prevention | 8 | 0 | 1 | B3 N/A (no HTML output). M2 pure computation, no injection vectors. |
-| C. Authentication | 0 | 0 | 6 | No new endpoints in M1 |
-| D. Authorization | 0 | 0 | 5 | No new endpoints in M1 |
+| A. Input Validation | 6 | 0 | 1 | A5 N/A (no API endpoints in M1/M2/M3). M2 input is pre-validated JD text from DB. M3 escape_latex() validates all user content. |
+| B. Injection Prevention | 11 | 0 | 0 | B3 now covered by M3 LaTeX escaping. M3 compile_latex() uses arg list (no shell=True), subprocess timeout. |
+| C. Authentication | 0 | 0 | 6 | No new endpoints in M1/M2/M3 |
+| D. Authorization | 0 | 0 | 5 | No new endpoints in M1/M2/M3 |
 | E. Secrets Management | 7 | 0 | 0 | No secrets in code, LLM keys not stored |
 | F. Data Protection | 1 | 0 | 3 | Raw text stored locally (acceptable for desktop app) |
-| G. Dependencies | 6 | 0 | 0 | All pinned, no known CVEs. M2 adds zero new deps. |
-| H. Error Handling | 5 | 0 | 0 | Errors logged, no stack trace leakage. M2 returns empty list on edge cases. |
-| I. Transport Security | 0 | 0 | 5 | No network endpoints in M1 |
+| G. Dependencies | 6 | 0 | 0 | All pinned, no known CVEs. M2 adds zero new deps. M3 uses Jinja2 (already added in M1). |
+| H. Error Handling | 7 | 0 | 0 | Errors logged, no stack trace leakage. M2 returns empty list on edge cases. M3 try/finally cleanup on temp files, TimeoutExpired caught. |
+| I. Transport Security | 1 | 0 | 4 | M3 TinyTeX download uses HTTPS only. No HTTP fallback. |
 | J. Logging & Monitoring | 3 | 0 | 0 | Structured logging, no sensitive data logged |
 | K. C/C++ Memory Safety | 0 | 0 | 7 | Python only |
 | L. Cloud/AWS | 0 | 0 | 5 | Desktop app, no cloud infra |
@@ -87,4 +92,4 @@
 
 ## Verdict
 
-**PASS** — No security vulnerabilities found in M1+M2 code. M1 is backend-only with no user-facing endpoints. M2 is pure computation (TF-IDF cosine similarity, keyword extraction) with zero external dependencies, zero I/O, and zero network calls — attack surface remains zero. Future milestones (especially M5 Upload API and M8 ONNX) must follow the recommendations above.
+**PASS** — No security vulnerabilities found in M1+M2+M3 code. M1 is backend-only with no user-facing endpoints. M2 is pure computation (TF-IDF cosine similarity, keyword extraction) with zero external dependencies, zero I/O, and zero network calls. M3 (LaTeX Engine) introduces subprocess execution (pdflatex) and temp file I/O, but all risks are mitigated: user content is escaped via `escape_latex()` before template rendering, subprocess uses explicit arg list (no shell=True) with 30s timeout, temp files are cleaned up in try/finally blocks, and TinyTeX downloads use HTTPS only. Attack surface remains minimal. Future milestones (especially M5 Upload API and M8 ONNX) must follow the recommendations above.

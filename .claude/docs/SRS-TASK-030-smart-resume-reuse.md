@@ -32,8 +32,16 @@ This SRS specifies the functional and non-functional requirements for Milestone 
 - ONNX embedding interface (optional, mocked in tests)
 - Score blending: 0.3 * TF-IDF + 0.7 * ONNX when available, TF-IDF only otherwise
 
-**Explicitly out of scope (M1/M2)**:
-- LaTeX compilation (M3)
+**In scope (M3)**:
+- LaTeX special character escaping for safe template rendering
+- pdflatex binary discovery (bundled TinyTeX, system PATH, common install locations)
+- Jinja2-based LaTeX template rendering with custom delimiters (`\VAR{}`, `\BLOCK{}`)
+- PDF compilation via pdflatex subprocess with configurable timeout
+- Four built-in resume templates (classic, modern, academic, minimal)
+- TinyTeX bundling script for cross-platform distribution (Windows, macOS, Linux)
+- `compile_resume()` convenience function combining template rendering and PDF compilation
+
+**Explicitly out of scope (M1/M2/M3)**:
 - Bot integration and resume assembly (M4)
 - Frontend UI, upload endpoints, KB viewer (M5)
 - ATS scoring (M6), manual builder (M7), performance (M8), intelligence (M9), migration (M10)
@@ -469,6 +477,142 @@ This feature extends the existing AutoApply bot. Currently, every job applicatio
 
 ---
 
+### FR-030-20: LaTeX Special Character Escaping
+
+**Description**: The system shall escape LaTeX special characters (`& % $ # _ { } ~ ^`) in user-provided text before template rendering, converting them to their safe LaTeX equivalents (e.g., `&` → `\&`, `~` → `\textasciitilde{}`).
+
+**Priority**: P0 (M3 ship-blocking)
+**Source**: Derived from M3 LaTeX compilation requirement
+**Dependencies**: None
+
+**Acceptance Criteria**:
+
+- **AC-030-20-1**: Given text containing `&`, `%`, `$`, `#`, `_`, `{`, `}`, When `escape_latex()` is called, Then each character is replaced with its backslash-escaped form.
+- **AC-030-20-2**: Given text containing `~`, When `escape_latex()` is called, Then it is replaced with `\textasciitilde{}`.
+- **AC-030-20-3**: Given text containing `^`, When `escape_latex()` is called, Then it is replaced with `\textasciicircum{}`.
+- **AC-030-20-4**: Given text containing `\`, When `escape_latex()` is called, Then it is replaced with `\textbackslash{}`.
+
+**Negative Cases**:
+- **AC-030-20-N1**: Given `None` input, When `escape_latex()` is called, Then an empty string is returned.
+- **AC-030-20-N2**: Given an empty string, When `escape_latex()` is called, Then an empty string is returned.
+
+---
+
+### FR-030-21: pdflatex Binary Discovery
+
+**Description**: The system shall discover the `pdflatex` binary by searching in order: (1) bundled TinyTeX directory, (2) system PATH, (3) common installation locations per OS (e.g., `/usr/local/texlive`, `C:\texlive`, `/Library/TeX`).
+
+**Priority**: P0 (M3 ship-blocking)
+**Source**: Derived from M3 LaTeX compilation requirement
+**Dependencies**: None
+
+**Acceptance Criteria**:
+
+- **AC-030-21-1**: Given a bundled TinyTeX installation exists at the expected location, When `find_pdflatex()` is called, Then the bundled binary path is returned.
+- **AC-030-21-2**: Given no bundled TinyTeX but pdflatex is on system PATH, When `find_pdflatex()` is called, Then the PATH binary is returned via `shutil.which()`.
+- **AC-030-21-3**: Given pdflatex is not bundled or on PATH but exists in a common location, When `find_pdflatex()` is called, Then the common location binary is returned.
+
+**Negative Cases**:
+- **AC-030-21-N1**: Given pdflatex is not found in any location, When `find_pdflatex()` is called, Then `None` is returned.
+
+---
+
+### FR-030-22: Jinja2 LaTeX Template Rendering
+
+**Description**: The system shall render LaTeX templates using Jinja2 with custom delimiters (`\VAR{...}` for variables, `\BLOCK{...}` for blocks) to avoid conflicts with LaTeX's native brace syntax. Templates receive a context dict with resume sections, contact info, and formatting options.
+
+**Priority**: P0 (M3 ship-blocking)
+**Source**: Derived from M3 LaTeX compilation requirement
+**Dependencies**: FR-030-20 (escaping)
+
+**Acceptance Criteria**:
+
+- **AC-030-22-1**: Given a valid LaTeX template file and a context dict, When `render_latex_template()` is called, Then Jinja2 renders the template with custom delimiters and returns the rendered LaTeX string.
+- **AC-030-22-2**: Given a context dict with values containing LaTeX special characters, When rendered, Then all values are auto-escaped via the `escape_latex` filter.
+- **AC-030-22-3**: Given a template name that exists in the templates directory, When `render_latex_template()` is called with that name, Then the corresponding `.tex` template file is loaded.
+
+**Negative Cases**:
+- **AC-030-22-N1**: Given a template name that does not exist, When `render_latex_template()` is called, Then `FileNotFoundError` is raised.
+- **AC-030-22-N2**: Given a template with a Jinja2 syntax error, When rendered, Then the Jinja2 exception propagates with a descriptive message.
+
+---
+
+### FR-030-23: PDF Compilation via pdflatex
+
+**Description**: The system shall compile rendered LaTeX source into a PDF by invoking `pdflatex` as a subprocess with `-interaction=nonstopmode`, a configurable timeout (default 30s), and a temporary working directory. The compiled PDF is returned as a file path.
+
+**Priority**: P0 (M3 ship-blocking)
+**Source**: Derived from M3 LaTeX compilation requirement
+**Dependencies**: FR-030-21 (binary discovery), FR-030-22 (template rendering)
+
+**Acceptance Criteria**:
+
+- **AC-030-23-1**: Given valid LaTeX source and pdflatex is available, When `compile_pdf()` is called, Then pdflatex is invoked in a temp directory and the output PDF path is returned.
+- **AC-030-23-2**: Given pdflatex completes successfully, When the PDF is generated, Then the output file exists and is non-empty.
+- **AC-030-23-3**: Given a compilation that exceeds the timeout, When `compile_pdf()` is called, Then `subprocess.TimeoutExpired` is caught and a `RuntimeError` is raised with a descriptive message.
+
+**Negative Cases**:
+- **AC-030-23-N1**: Given pdflatex is not available (not found), When `compile_pdf()` is called, Then `RuntimeError` is raised indicating pdflatex is not installed.
+- **AC-030-23-N2**: Given LaTeX source with compilation errors, When pdflatex fails (non-zero exit), Then `RuntimeError` is raised including the pdflatex log output.
+
+---
+
+### FR-030-24: Built-in Resume Templates
+
+**Description**: The system shall provide four built-in LaTeX resume templates: `classic` (traditional single-column), `modern` (two-column with accent colors), `academic` (CV-style with publications section), and `minimal` (clean whitespace-focused). Each template accepts the same context dict interface.
+
+**Priority**: P1
+**Source**: US-106 from PRD
+**Dependencies**: FR-030-22 (template rendering)
+
+**Acceptance Criteria**:
+
+- **AC-030-24-1**: Given the templates directory, Then it contains `classic.tex`, `modern.tex`, `academic.tex`, and `minimal.tex` files.
+- **AC-030-24-2**: Given any of the four templates and a standard context dict, When rendered, Then valid LaTeX source is produced without Jinja2 errors.
+- **AC-030-24-3**: Given the LatexConfig model with `template="classic"`, When compilation is requested, Then the classic template is selected.
+- **AC-030-24-4**: Given a template name not in the four built-in templates, When compilation is requested, Then the system falls back to `classic`.
+
+---
+
+### FR-030-25: TinyTeX Bundling Script
+
+**Description**: The system shall provide a bundling script that downloads and packages TinyTeX (minimal TeX Live distribution) for Windows, macOS, and Linux, including only the LaTeX packages required for resume compilation (e.g., `geometry`, `hyperref`, `enumitem`, `fontenc`, `inputenc`).
+
+**Priority**: P2
+**Source**: Derived from distribution requirement
+**Dependencies**: FR-030-21 (binary discovery expects bundled TinyTeX)
+
+**Acceptance Criteria**:
+
+- **AC-030-25-1**: Given Windows as the target platform, When the bundling script is run, Then TinyTeX is downloaded and extracted to `electron/resources/tinytex/`.
+- **AC-030-25-2**: Given macOS or Linux as the target platform, When the bundling script is run, Then the platform-appropriate TinyTeX archive is downloaded and extracted.
+- **AC-030-25-3**: Given the bundled TinyTeX, Then it includes `pdflatex` binary and the required LaTeX packages.
+
+**Negative Cases**:
+- **AC-030-25-N1**: Given network is unavailable during bundling, When the script is run, Then a clear error message is displayed and the script exits with non-zero code.
+
+---
+
+### FR-030-26: compile_resume Convenience Function
+
+**Description**: The system shall provide a `compile_resume()` convenience function that combines template rendering (FR-030-22) and PDF compilation (FR-030-23) into a single call, accepting a template name, context dict, and optional output path.
+
+**Priority**: P0 (M3 ship-blocking)
+**Source**: Derived from M3 integration requirement
+**Dependencies**: FR-030-22, FR-030-23
+
+**Acceptance Criteria**:
+
+- **AC-030-26-1**: Given a template name and context dict, When `compile_resume()` is called, Then the template is rendered and compiled to PDF, returning the output PDF path.
+- **AC-030-26-2**: Given an explicit output_path parameter, When `compile_resume()` is called, Then the compiled PDF is copied to the specified output path.
+- **AC-030-26-3**: Given no output_path parameter, When `compile_resume()` is called, Then the PDF is written to a temporary directory and its path is returned.
+
+**Negative Cases**:
+- **AC-030-26-N1**: Given pdflatex is not available, When `compile_resume()` is called, Then `RuntimeError` is raised with install instructions.
+- **AC-030-26-N2**: Given template rendering fails, When `compile_resume()` is called, Then the error propagates without leaving orphaned temp files.
+
+---
+
 ## 4. Non-Functional Requirements
 
 ### NFR-030-01: KB Assembly Latency (M1 Foundation)
@@ -540,6 +684,27 @@ This feature extends the existing AutoApply bot. Currently, every job applicatio
 **Metric**: Zero `print()` statements; all error paths logged
 **Priority**: P0
 **Validation Method**: Code review + grep for print() in new modules
+
+### NFR-030-11: Template Rendering Latency (M3)
+
+**Description**: Jinja2 LaTeX template rendering (excluding PDF compilation) shall complete within 50ms for any built-in template with a standard context dict.
+**Metric**: p95 latency < 50ms for template rendering
+**Priority**: P1
+**Validation Method**: Unit test measuring wall-clock time of `render_latex_template()` over 100 iterations
+
+### NFR-030-12: PDF Compilation Timeout (M3)
+
+**Description**: PDF compilation via pdflatex shall enforce a maximum timeout of 30 seconds (configurable via LatexConfig). If compilation exceeds the timeout, the subprocess is killed and a RuntimeError is raised.
+**Metric**: Compilation killed and error raised within 1s of timeout expiry
+**Priority**: P0
+**Validation Method**: Unit test with mock subprocess that simulates hang
+
+### NFR-030-13: LaTeX Escaping Robustness (M3)
+
+**Description**: The `escape_latex()` function shall handle `None`, empty strings, and non-string inputs gracefully, returning an empty string without raising exceptions.
+**Metric**: Zero exceptions for None, empty, int, float, or bool inputs
+**Priority**: P0
+**Validation Method**: Unit test with None, "", 0, 3.14, True inputs
 
 ---
 

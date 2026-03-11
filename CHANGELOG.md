@@ -103,9 +103,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - **ONNX interface**: Optional embedding blending (0.3*TF-IDF + 0.7*ONNX), TF-IDF fallback when unavailable
   - **38 new tests**: JD analysis (10), TF-IDF internals (13), scoring (8), ONNX blending (3), section detection (4)
   - **Zero new dependencies**: Stdlib only for M2
+- **Smart Resume Reuse M3: LaTeX Engine (TASK-030)**: LaTeX compiler, templates, and TinyTeX bundler. (FR-030-20 to FR-030-26, NFR-030-11 to NFR-030-13, ADR-031)
+  - **LaTeX compiler**: `core/latex_compiler.py` — pdflatex discovery (bundled TinyTeX → PATH → common locations), special character escaping, Jinja2 rendering, PDF compilation with timeout
+  - **4 resume templates**: classic (helvet, standard), modern (accent colors), academic (palatino, education-first), minimal (10pt compact)
+  - **Custom Jinja2 delimiters**: `\VAR{}`, `\BLOCK{}` to avoid LaTeX brace conflicts (ADR-031)
+  - **TinyTeX bundler**: `electron/scripts/bundle-tinytex.js` — platform-specific download, extraction, package installation
+  - **31 new tests**: Escaping (12), pdflatex discovery (4), template rendering (8), compilation (5), convenience API (2)
+  - **New dependency**: jinja2 (template rendering)
 
 ### Changed
-- **Traceability matrix v11.0**: 155 requirements, all ✅ (0 ⚠️). M2 adds 11 new requirements (7 FRs + 4 NFRs).
+- **Traceability matrix v12.0**: 165 requirements, all ✅ (0 ⚠️). M3 adds 10 new requirements (7 FRs + 3 NFRs).
 - **CLAUDE.md v5.0**: Gitflow-lite branching model (develop + master), shared-workflows.md as single source of truth
 - **CLAUDE.md v4.2**: Added principle #9 (GitHub Issues for every implementation), lesson 12.8 (issue lifecycle)
 

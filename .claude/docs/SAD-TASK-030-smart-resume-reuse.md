@@ -364,6 +364,177 @@ Output: `float` in [0.0, 1.0]
 
 ---
 
+### 3.15 latex_compiler.escape_latex() (M3)
+
+**Purpose**: Escape special LaTeX characters in user-supplied text to prevent compilation errors.
+**Category**: query (pure function)
+
+**Signature**:
+
+Input Parameters:
+| Parameter | Type | Required | Constraints | Description |
+|-----------|------|----------|-------------|-------------|
+| text | str or None | yes | May be None or empty | Raw text to escape |
+
+Output:
+| Field | Type | Nullable | Description |
+|-------|------|----------|-------------|
+| (return) | str | no | LaTeX-safe string with special chars escaped (& → \&, % → \%, $ → \$, # → \#, _ → \_, { → \{, } → \}, ~ → \textasciitilde{}, ^ → \textasciicircum{}, \ → \textbackslash{}). Returns "" if input is None or empty. |
+
+**Preconditions**: None.
+**Postconditions**: No state change.
+**Side Effects**: None.
+**Idempotency**: Yes.
+**Thread Safety**: Safe (pure function).
+
+---
+
+### 3.16 latex_compiler.find_pdflatex() (M3)
+
+**Purpose**: Discover pdflatex binary — first check bundled TinyTeX directory, then system PATH.
+**Category**: query (filesystem read)
+
+**Signature**:
+
+Input Parameters:
+| Parameter | Type | Required | Constraints | Description |
+|-----------|------|----------|-------------|-------------|
+| bundled_dir | Path or None | no | default: None | Path to bundled TinyTeX directory (e.g., electron/tinytex/) |
+
+Output:
+| Field | Type | Nullable | Description |
+|-------|------|----------|-------------|
+| (return) | str or None | yes | Absolute path to pdflatex binary if found, None if not available |
+
+**Discovery Order**:
+1. If `bundled_dir` provided and `bundled_dir/bin/<platform>/pdflatex(.exe)` exists → return it
+2. `shutil.which("pdflatex")` on system PATH → return if found
+3. Return None (caller falls back to ReportLab PDF renderer)
+
+**Preconditions**: None.
+**Postconditions**: No state change.
+**Side Effects**: None (filesystem stat only).
+**Idempotency**: Yes.
+**Thread Safety**: Safe (read-only filesystem checks).
+
+---
+
+### 3.17 latex_compiler.render_template() (M3)
+
+**Purpose**: Render a Jinja2 LaTeX template with the given context using custom delimiters.
+**Category**: query (filesystem read + string rendering)
+
+**Signature**:
+
+Input Parameters:
+| Parameter | Type | Required | Constraints | Description |
+|-----------|------|----------|-------------|-------------|
+| template_name | str | yes | Must match a .tex.j2 file in templates/latex/ | Template filename (e.g., "classic.tex.j2") |
+| context | dict | yes | Keys: name, email, phone, location, summary, experiences, education, skills, certifications, projects | Template variables |
+
+Output:
+| Field | Type | Nullable | Description |
+|-------|------|----------|-------------|
+| (return) | str | no | Rendered LaTeX source string |
+
+Errors:
+| Error Condition | Error Type | HTTP Status |
+|----------------|------------|-------------|
+| Template not found | jinja2.TemplateNotFound | N/A |
+| Render error | jinja2.TemplateSyntaxError | N/A |
+
+**Jinja2 Environment Configuration** (see ADR-031):
+- `block_start_string`: `\BLOCK{`
+- `block_end_string`: `}`
+- `variable_start_string`: `\VAR{`
+- `variable_end_string`: `}`
+- `comment_start_string`: `\#{`
+- `comment_end_string`: `}`
+- `autoescape`: False
+- `loader`: FileSystemLoader pointing to `templates/latex/`
+
+**Preconditions**: Template file exists in templates/latex/.
+**Postconditions**: No state change.
+**Side Effects**: None.
+**Idempotency**: Yes.
+**Thread Safety**: Safe (Jinja2 Environment is thread-safe after creation).
+
+---
+
+### 3.18 latex_compiler.compile_latex() (M3)
+
+**Purpose**: Compile raw LaTeX source into PDF bytes by invoking pdflatex in a temporary directory.
+**Category**: command (subprocess + filesystem I/O)
+
+**Signature**:
+
+Input Parameters:
+| Parameter | Type | Required | Constraints | Description |
+|-----------|------|----------|-------------|-------------|
+| tex_content | str | yes | Non-empty, valid LaTeX | LaTeX source to compile |
+| pdflatex_path | str or None | no | default: None (auto-discover via find_pdflatex()) | Path to pdflatex binary |
+| timeout | int | no | default: 30 | Subprocess timeout in seconds |
+
+Output:
+| Field | Type | Nullable | Description |
+|-------|------|----------|-------------|
+| (return) | bytes or None | yes | PDF file bytes if compilation succeeds, None if pdflatex unavailable or compilation fails |
+
+Errors:
+| Error Condition | Error Type | HTTP Status |
+|----------------|------------|-------------|
+| pdflatex not found | (no error) returns None | N/A |
+| Compilation failure | (no error) returns None, logs ERROR with stderr | N/A |
+| Timeout exceeded | (no error) returns None, logs ERROR | N/A |
+
+**Compilation Steps**:
+1. Create temp directory via `tempfile.mkdtemp()`
+2. Write `tex_content` to `resume.tex` in temp dir
+3. Run `pdflatex -interaction=nonstopmode -halt-on-error resume.tex` (twice for references)
+4. Read `resume.pdf` from temp dir → return bytes
+5. Clean up temp dir in `finally` block
+
+**Preconditions**: pdflatex binary available (bundled or system).
+**Postconditions**: No persistent state change (temp dir cleaned up).
+**Side Effects**: Subprocess execution, temp directory creation/deletion.
+**Idempotency**: Yes (same input → same PDF bytes).
+**Thread Safety**: Safe (uses isolated temp directories per call).
+
+---
+
+### 3.19 latex_compiler.compile_resume() (M3)
+
+**Purpose**: High-level convenience function: render a template with context and compile to PDF bytes.
+**Category**: command (combines render_template + compile_latex)
+
+**Signature**:
+
+Input Parameters:
+| Parameter | Type | Required | Constraints | Description |
+|-----------|------|----------|-------------|-------------|
+| template_name | str | yes | Must match a .tex.j2 file | Template name (e.g., "classic") — ".tex.j2" appended automatically |
+| context | dict | yes | Same keys as render_template() | Template variables |
+| pdflatex_path | str or None | no | default: None | Path to pdflatex binary |
+
+Output:
+| Field | Type | Nullable | Description |
+|-------|------|----------|-------------|
+| (return) | bytes or None | yes | PDF bytes if successful, None if pdflatex unavailable or compilation fails |
+
+**Pipeline**:
+1. Call `escape_latex()` on all string values in context (recursively for lists of dicts)
+2. Call `render_template(template_name + ".tex.j2", escaped_context)` → LaTeX source
+3. Call `compile_latex(tex_source, pdflatex_path)` → PDF bytes or None
+4. Return PDF bytes
+
+**Preconditions**: Template exists; pdflatex available for PDF output.
+**Postconditions**: No persistent state change.
+**Side Effects**: Subprocess execution via compile_latex().
+**Idempotency**: Yes.
+**Thread Safety**: Safe.
+
+---
+
 ## 4. Data Model
 
 ### 4.1 Entity Definitions
@@ -667,6 +838,44 @@ uploaded_documents ──1:N──▶ knowledge_base  (via knowledge_base.source
 #### IMPL-011: M2 Unit Tests
 - **Creates**: `tests/test_resume_scorer.py` — 38 tests across 5 test classes
 - **Done when**: All tests pass; ruff clean; coverage > 90% on new modules
+
+---
+
+### M3 Implementation Tasks
+
+| Order | Task ID | Description | Depends On | Size | Risk | FR Coverage |
+|-------|---------|------------|------------|------|------|-------------|
+| 12 | IMPL-012 | LaTeX compiler module | IMPL-003 | M | Medium | FR-030-20, FR-030-21, FR-030-22, FR-030-23 |
+| 13 | IMPL-013 | LaTeX resume templates | IMPL-012 | M | Low | FR-030-24 |
+| 14 | IMPL-014 | TinyTeX bundling script | — | S | Medium | FR-030-25 |
+
+#### IMPL-012: LaTeX Compiler Module
+- **Creates**: `core/latex_compiler.py`
+- **Contains**: `escape_latex()`, `find_pdflatex()`, `render_template()`, `compile_latex()`, `compile_resume()`
+- **Dependencies**: `jinja2` (already in project deps)
+- **Jinja2 Environment**: Custom delimiters per ADR-031 (`\VAR{}`, `\BLOCK{}`, `\#{}`)
+- **Tests**: `tests/test_latex_compiler.py` — escape special chars, pdflatex discovery (mocked), template rendering, compilation (mocked subprocess), full pipeline, error paths (missing pdflatex, compilation failure, timeout)
+- **Done when**: All 5 interface contracts (§3.15–§3.19) satisfied; escape handles all 10 LaTeX special chars; find_pdflatex checks bundled then system; compile_latex uses temp dir with cleanup; compile_resume escapes context recursively
+
+#### IMPL-013: LaTeX Resume Templates
+- **Creates**: `templates/latex/classic.tex.j2`, `templates/latex/modern.tex.j2`, `templates/latex/compact.tex.j2`, `templates/latex/academic.tex.j2`
+- **Template Structure**: Each template uses custom Jinja2 delimiters (ADR-031), includes sections for header (name, contact), summary, experience, education, skills, certifications, projects
+- **Delimiter Usage**: `\VAR{name}` for variables, `\BLOCK{for exp in experiences}...\BLOCK{endfor}` for loops, `\#{comment}` for comments
+- **Font Configuration**: Templates read `font_family`, `font_size`, `margin` from context (sourced from LatexConfig)
+- **Tests**: Verified via IMPL-012 render_template() tests with sample context dicts
+- **Done when**: All 4 templates render valid LaTeX source; each template produces distinct visual layout; all context variables used
+
+#### IMPL-014: TinyTeX Bundling Script
+- **Creates**: `electron/scripts/bundle-tinytex.js`
+- **Purpose**: Download and bundle platform-specific TinyTeX distribution for offline pdflatex support
+- **Platform Detection**: `process.platform` → downloads appropriate TinyTeX archive (Windows .zip, macOS .tar.gz, Linux .tar.gz)
+- **Download Sources**: TinyTeX GitHub releases (https://github.com/rstudio/tinytex-releases)
+- **Output Directory**: `electron/tinytex/` — contains `bin/<platform>/pdflatex(.exe)` and minimal TeX packages
+- **Required LaTeX Packages**: `latex-bin`, `collection-fontsrecommended`, `geometry`, `hyperref`, `enumitem`, `titlesec`, `fancyhdr`, `xcolor`, `parskip`
+- **Script Behavior**: Skip download if `electron/tinytex/` already exists and is populated; use `tlmgr` to install required packages after extraction
+- **Integration**: Called by `electron/scripts/bundle-python.js` (existing) or standalone via `node electron/scripts/bundle-tinytex.js`
+- **Tests**: Manual verification — run script, verify pdflatex binary exists, verify `pdflatex --version` succeeds
+- **Done when**: Script downloads TinyTeX for current platform; pdflatex binary is executable; required packages installed; idempotent (skip if already present)
 
 ---
 
