@@ -1,6 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════
    PLATFORM LOGIN BROWSER
    ═══════════════════════════════════════════════════════════════ */
+import { t } from './i18n.js';
 
 export async function openLoginBrowser(url) {
   try {
@@ -11,7 +12,7 @@ export async function openLoginBrowser(url) {
     });
     const data = await res.json();
     if (!res.ok) {
-      alert(data.error || 'Failed to open browser');
+      alert(data.error || t('login.open_error'));
       return;
     }
     // Show the close button, update login button states
@@ -19,7 +20,7 @@ export async function openLoginBrowser(url) {
     // Poll until browser is closed externally
     pollLoginStatus();
   } catch (e) {
-    alert('Could not connect to server.');
+    alert(t('login.connection_error'));
   }
 }
 
@@ -81,11 +82,11 @@ export async function checkLoginSessions() {
       const el = document.getElementById(id);
       if (!el) continue;
       if (connected) {
-        el.innerHTML = '<span class="dot dot-green"></span> Connected';
+        el.innerHTML = '<span class="dot dot-green"></span> ' + t('login.connected');
         el.className = 'status-badge ok';
         el.style.fontSize = '.8rem';
       } else {
-        el.innerHTML = '<span class="dot dot-gray"></span> Not connected';
+        el.innerHTML = '<span class="dot dot-gray"></span> ' + t('login.not_connected');
         el.className = 'status-badge';
         el.style.fontSize = '.8rem';
       }

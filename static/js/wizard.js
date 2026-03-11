@@ -5,6 +5,7 @@ import { state } from './state.js';
 import { escHtml } from './helpers.js';
 import { showApp } from './navigation.js';
 import { checkLoginSessions, closeLoginBrowser } from './login.js';
+import { t } from './i18n.js';
 
 export function showWizard(setupData) {
   document.getElementById('wizard-overlay').classList.remove('hidden');
@@ -15,10 +16,10 @@ export function showWizard(setupData) {
   const badge = document.getElementById('wizard-ai-status');
   if (setupData && setupData.ai_available) {
     badge.className = 'status-badge ok';
-    badge.innerHTML = '<span class="dot dot-green"></span> AI provider configured';
+    badge.innerHTML = '<span class="dot dot-green"></span> ' + t('wizard.ai_configured');
   } else {
     badge.className = 'status-badge warn';
-    badge.innerHTML = '<span class="dot dot-yellow"></span> No AI provider &mdash; configure in Settings after setup';
+    badge.innerHTML = '<span class="dot dot-yellow"></span> ' + t('wizard.ai_not_configured');
   }
 
   // Build progress dots
@@ -72,11 +73,11 @@ export async function wizardRefreshFiles() {
 function buildWizardSummary() {
   const first = document.getElementById('wiz-first-name').value;
   const last = document.getElementById('wiz-last-name').value;
-  const name = (first + ' ' + last).trim() || '(not set)';
-  const email = document.getElementById('wiz-email').value || '(not set)';
+  const name = (first + ' ' + last).trim() || t('wizard.not_set');
+  const email = document.getElementById('wiz-email').value || t('wizard.not_set');
   const city = document.getElementById('wiz-city').value;
   const st = document.getElementById('wiz-state').value;
-  const loc = [city, st].filter(Boolean).join(', ') || '(not set)';
+  const loc = [city, st].filter(Boolean).join(', ') || t('wizard.not_set');
   const titles = state.tagInputs['wiz-titles-tags'] || [];
   const locations = state.tagInputs['wiz-locations-tags'] || [];
   const remote = document.getElementById('wiz-remote').checked;
@@ -84,14 +85,14 @@ function buildWizardSummary() {
   const hasResume = !!state.wizardData.resume_file;
 
   document.getElementById('wizard-summary').innerHTML = `
-    <div><strong>Name:</strong> ${escHtml(name)}</div>
-    <div><strong>Email:</strong> ${escHtml(email)}</div>
-    <div><strong>Location:</strong> ${escHtml(loc)}</div>
-    <div><strong>Job Titles:</strong> ${titles.length ? escHtml(titles.join(', ')) : '(none)'}</div>
-    <div><strong>Locations:</strong> ${locations.length ? escHtml(locations.join(', ')) : '(none)'}</div>
-    <div><strong>Remote Only:</strong> ${remote ? 'Yes' : 'No'}</div>
-    <div><strong>Experience Levels:</strong> ${levels.length ? levels.join(', ') : '(none)'}</div>
-    <div><strong>Fallback Resume:</strong> ${hasResume ? 'Uploaded' : 'Skipped'}</div>
+    <div><strong>${t('wizard.summary_name')}</strong> ${escHtml(name)}</div>
+    <div><strong>${t('wizard.summary_email')}</strong> ${escHtml(email)}</div>
+    <div><strong>${t('wizard.summary_location')}</strong> ${escHtml(loc)}</div>
+    <div><strong>${t('wizard.summary_titles')}</strong> ${titles.length ? escHtml(titles.join(', ')) : t('wizard.none')}</div>
+    <div><strong>${t('wizard.summary_locations')}</strong> ${locations.length ? escHtml(locations.join(', ')) : t('wizard.none')}</div>
+    <div><strong>${t('wizard.summary_remote')}</strong> ${remote ? t('wizard.yes') : t('wizard.no')}</div>
+    <div><strong>${t('wizard.summary_experience')}</strong> ${levels.length ? levels.join(', ') : t('wizard.none')}</div>
+    <div><strong>${t('wizard.summary_resume')}</strong> ${hasResume ? t('wizard.uploaded') : t('wizard.skipped')}</div>
   `;
 }
 

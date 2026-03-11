@@ -50,6 +50,7 @@ export async function setLocale(locale) {
     _locale = locale;
     _ready = true;
     document.documentElement.lang = locale;
+    _applyDataI18n();
     _readyCallbacks.forEach(fn => fn());
     _readyCallbacks.length = 0;
   } catch (e) {
@@ -75,6 +76,26 @@ function detectLocale() {
   const htmlLang = document.documentElement.lang;
   if (htmlLang && htmlLang !== 'en') return htmlLang;
   return 'en';
+}
+
+/**
+ * Apply translations to all elements with data-i18n attributes.
+ * Supports: data-i18n="key" (textContent), data-i18n-placeholder="key",
+ * data-i18n-aria-label="key", data-i18n-title="key".
+ */
+function _applyDataI18n() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = t(el.getAttribute('data-i18n'));
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    el.placeholder = t(el.getAttribute('data-i18n-placeholder'));
+  });
+  document.querySelectorAll('[data-i18n-aria-label]').forEach(el => {
+    el.setAttribute('aria-label', t(el.getAttribute('data-i18n-aria-label')));
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    el.title = t(el.getAttribute('data-i18n-title'));
+  });
 }
 
 // Auto-initialize on import

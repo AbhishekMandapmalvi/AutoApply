@@ -109,7 +109,7 @@ AutoApply/
 ├── static/
 │   ├── css/main.css        # Extracted stylesheet
 │   ├── js/                 # 17 ES modules (app.js entry point)
-│   └── locales/en.json     # i18n string catalog (460+ strings)
+│   └── locales/en.json     # i18n string catalog (383 keys, 23 sections)
 ├── routes/                 # 7 Flask Blueprints (bot, applications, config, profile, login, analytics, lifecycle)
 ├── electron/               # Electron desktop shell
 │   ├── main.js             # App window, tray, lifecycle

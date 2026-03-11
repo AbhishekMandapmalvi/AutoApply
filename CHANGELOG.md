@@ -8,12 +8,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 *No unreleased changes.*
 
+## [1.9.0] - 2026-03-11
+
+Full Frontend i18n Migration — all user-facing strings externalized.
+
+### Added
+- **Frontend JS i18n migration (QOL-1)**: All 12 JS modules now use `t()` calls from `static/js/i18n.js` instead of hardcoded English strings. ~55 string occurrences migrated across bot-control, applications, settings, profile, login, wizard, feed, review, ai-status, analytics, file-upload, and tag-input modules. (LE-3)
+- **HTML template i18n migration (QOL-2)**: ~200 elements in `templates/index.html` tagged with `data-i18n`, `data-i18n-placeholder`, and `data-i18n-aria-label` attributes. Covers all wizard steps, navbar, dashboard, applications table, profile, analytics, settings (all sections), and modals. (LE-3)
+- **`data-i18n` attribute processor**: Added `_applyDataI18n()` to `static/js/i18n.js` — automatically translates HTML elements on locale load. Supports `data-i18n` (textContent), `data-i18n-placeholder`, `data-i18n-aria-label`, and `data-i18n-title`. (LE-3)
+- **Expanded string catalog**: `static/locales/en.json` grew from 166 to 383 keys across 23 sections. New sections: dashboard, eeo, modal, file_upload, experience_levels (short variants).
+
 ## [1.8.3] - 2026-03-11
 
 Production Readiness 10.0/10 — Accessibility, i18n, structured logging, resilience.
 
 ### Added
-- **Internationalization (i18n)**: JSON-based translation system with 460+ strings in `static/locales/en.json`. Backend `core/i18n.py` with `t()` function and `{placeholder}` interpolation. Frontend `static/js/i18n.js` ES module with locale auto-detection. All backend error strings migrated to `t()` calls. `/api/locales` endpoint. To add a new language: copy `en.json`, translate, done. (LE-3)
+- **Internationalization (i18n)**: JSON-based translation system with 383 strings in `static/locales/en.json`. Backend `core/i18n.py` with `t()` function and `{placeholder}` interpolation. Frontend `static/js/i18n.js` ES module with locale auto-detection. All backend error strings migrated to `t()` calls. `/api/locales` endpoint. To add a new language: copy `en.json`, translate, done. (LE-3)
 - **Structured JSON logging**: Set `AUTOAPPLY_LOG_FORMAT=json` for machine-parseable log output with ISO 8601 timestamps and exception serialization. (D-7)
 - **LLM retry with exponential backoff**: API calls retry up to 3 times on transient errors (429, 5xx, network failures) with 1s/2s/4s delays. Fails fast on non-retryable errors (400, 401, 403). (D-6)
 - **SQLite WAL mode**: `PRAGMA journal_mode=WAL` enables concurrent reads during writes. `PRAGMA busy_timeout=5000` handles lock contention gracefully. (D-5)

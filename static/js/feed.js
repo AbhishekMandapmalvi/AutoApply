@@ -2,6 +2,7 @@
    LIVE FEED
    ═══════════════════════════════════════════════════════════════ */
 import { escHtml } from './helpers.js';
+import { t } from './i18n.js';
 
 let feedStarted = false;
 let feedHistoryLoaded = false;
@@ -55,7 +56,7 @@ export function addFeedItem(evt) {
   let detailHtml = '';
   if (title) {
     detailHtml = `<strong>${escHtml(title)}</strong>`;
-    if (company) detailHtml += ` at <strong>${escHtml(company)}</strong>`;
+    if (company) detailHtml += ` ${t('review.at')} <strong>${escHtml(company)}</strong>`;
     if (platform) detailHtml += ` <span class="text-dim">(${escHtml(platform)})</span>`;
     // Show message as a secondary line if it adds info beyond the title
     if (message && !message.includes(title)) {
@@ -82,7 +83,7 @@ export function addFeedItem(evt) {
 
 export function clearFeed() {
   const list = document.getElementById('feed-list');
-  list.innerHTML = `<div class="text-center text-dim" id="feed-empty" style="padding:40px 0;">No activity yet. Start the bot to begin.</div>`;
+  list.innerHTML = `<div class="text-center text-dim" id="feed-empty" style="padding:40px 0;">${t('feed.empty')}</div>`;
   feedStarted = false;
   feedHistoryLoaded = false;
   updateFeedCount();

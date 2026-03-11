@@ -4,6 +4,7 @@
 import { state } from './state.js';
 import { setTags } from './tag-input.js';
 import { checkLoginSessions } from './login.js';
+import { t } from './i18n.js';
 
 const LLM_DEFAULT_MODELS = {
   anthropic: 'claude-sonnet-4-20250514',
@@ -160,7 +161,7 @@ export async function saveSettings() {
     msg.classList.remove('hidden');
     setTimeout(() => msg.classList.add('hidden'), 2500);
   } catch {
-    alert('Error saving settings.');
+    alert(t('settings.save_error'));
   }
 }
 
@@ -212,11 +213,11 @@ export async function validateLLMKey() {
   const status   = document.getElementById('llm-key-status');
   const btn      = document.getElementById('btn-validate-key');
 
-  if (!provider) { status.textContent = 'Select a provider first'; status.style.color = '#f87171'; return; }
-  if (!apiKey)   { status.textContent = 'Enter an API key'; status.style.color = '#f87171'; return; }
+  if (!provider) { status.textContent = t('settings.select_provider'); status.style.color = '#f87171'; return; }
+  if (!apiKey)   { status.textContent = t('settings.enter_api_key'); status.style.color = '#f87171'; return; }
 
   btn.disabled = true;
-  btn.textContent = 'Validating...';
+  btn.textContent = t('settings.validating');
   status.textContent = '';
 
   try {
@@ -227,17 +228,17 @@ export async function validateLLMKey() {
     });
     const data = await res.json();
     if (data.valid) {
-      status.textContent = 'API key is valid';
+      status.textContent = t('settings.key_valid');
       status.style.color = '#34d399';
     } else {
-      status.textContent = 'Invalid API key or provider error';
+      status.textContent = t('settings.key_invalid');
       status.style.color = '#f87171';
     }
   } catch {
-    status.textContent = 'Validation failed — check your connection';
+    status.textContent = t('settings.validation_failed');
     status.style.color = '#f87171';
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Validate';
+    btn.textContent = t('button.validate');
   }
 }

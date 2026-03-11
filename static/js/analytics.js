@@ -1,6 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════
    ANALYTICS CHARTS
    ═══════════════════════════════════════════════════════════════ */
+import { t } from './i18n.js';
 
 let chartInstances = {};
 
@@ -30,7 +31,7 @@ function renderDailyChart(data) {
     data: {
       labels: data.map(d => d.date),
       datasets: [{
-        label: 'Applications',
+        label: t('analytics.applications_label'),
         data: data.map(d => d.count),
         borderColor: '#4da6ff',
         backgroundColor: 'rgba(77,166,255,.1)',
@@ -67,7 +68,7 @@ function renderStatusChart(byStatus) {
   chartInstances.status = new Chart(ctx, {
     type: 'doughnut',
     data: {
-      labels: labels.map(s => s.charAt(0).toUpperCase() + s.slice(1)),
+      labels: labels.map(s => { const tr = t('status.' + s); return tr !== 'status.' + s ? tr : s.charAt(0).toUpperCase() + s.slice(1); }),
       datasets: [{ data: values, backgroundColor: colors, borderWidth: 0 }],
     },
     options: {
@@ -89,7 +90,7 @@ function renderPlatformChart(byPlatform) {
     data: {
       labels: Object.keys(byPlatform).map(s => s.charAt(0).toUpperCase() + s.slice(1)),
       datasets: [{
-        label: 'Applications',
+        label: t('analytics.applications_label'),
         data: Object.values(byPlatform),
         backgroundColor: '#4da6ff',
         borderRadius: 6,

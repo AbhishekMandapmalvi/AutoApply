@@ -2,6 +2,7 @@
    BOT CONTROL
    ═══════════════════════════════════════════════════════════════ */
 import { state } from './state.js';
+import { t } from './i18n.js';
 
 export async function botControl(action) {
   try {
@@ -23,7 +24,7 @@ export function updateBotUI(status) {
   dot.className = 'dot dot-pulse';
   if (status === 'running') {
     dot.classList.add('dot-green');
-    label.textContent = 'Running';
+    label.textContent = t('bot.running');
     btnStart.disabled = true;
     btnPause.disabled = false;
     btnStop.disabled  = false;
@@ -31,7 +32,7 @@ export function updateBotUI(status) {
     startUptimeTimer();
   } else if (status === 'paused') {
     dot.classList.add('dot-yellow');
-    label.textContent = 'Paused';
+    label.textContent = t('bot.paused');
     btnStart.disabled = false;
     btnPause.disabled = true;
     btnStop.disabled  = false;
@@ -39,13 +40,13 @@ export function updateBotUI(status) {
   } else {
     dot.classList.add('dot-red');
     dot.classList.remove('dot-pulse');
-    label.textContent = 'Stopped';
+    label.textContent = t('bot.stopped');
     btnStart.disabled = false;
     btnPause.disabled = true;
     btnStop.disabled  = true;
     state.botStartTime = null;
     stopUptimeTimer();
-    document.getElementById('stat-uptime').textContent = '--:--';
+    document.getElementById('stat-uptime').textContent = t('bot.uptime_default');
   }
 }
 

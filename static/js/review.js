@@ -1,11 +1,12 @@
 /* ═══════════════════════════════════════════════════════════════
    REVIEW CARD
    ═══════════════════════════════════════════════════════════════ */
+import { t } from './i18n.js';
 
 export function showReviewCard(evt) {
   const card = document.getElementById('review-card');
   document.getElementById('review-job-title').textContent =
-    (evt.job_title || 'Unknown') + ' at ' + (evt.company || 'Unknown');
+    (evt.job_title || t('review.unknown')) + ' ' + t('review.at') + ' ' + (evt.company || t('review.unknown'));
   document.getElementById('review-platform').textContent = evt.platform || '';
   document.getElementById('review-score').textContent = evt.match_score || '--';
   document.getElementById('review-cover-letter').value = evt.cover_letter || '';

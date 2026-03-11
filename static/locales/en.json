@@ -1,6 +1,7 @@
 {
   "app": {
     "title": "AutoApply — Smart Job Application Dashboard",
+    "page_title": "AutoApply — Smart Job Application Dashboard",
     "skip_to_content": "Skip to main content"
   },
 
@@ -28,7 +29,7 @@
     "profile_title": "Your Profile",
     "profile_subtitle": "Basic information used across your applications.",
     "preferences_title": "Job Preferences",
-    "preferences_subtitle": "Define your ideal job search criteria.",
+    "preferences_subtitle": "Tell us what you're looking for.",
     "resume_title": "Fallback Resume",
     "resume_subtitle": "Upload a fallback resume for platforms that require a file. If an AI provider is configured, AutoApply generates tailored resumes automatically — this is only used as a backup.",
     "login_title": "Platform Login",
@@ -36,7 +37,7 @@
     "summary_title": "Summary",
     "back": "Back",
     "next": "Next",
-    "finish": "Finish Setup",
+    "finish": "Go to Dashboard",
     "summary_name": "Name:",
     "summary_email": "Email:",
     "summary_location": "Location:",
@@ -50,7 +51,25 @@
     "not_set": "(not set)",
     "none": "(none)",
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "done_title": "You're All Set!",
+    "done_subtitle": "AutoApply is configured and ready to help you land your next role. Here's a summary:",
+    "app_answers_summary": "Application Answers (recommended)",
+    "app_answers_hint": "Pre-fill answers for common screening questions on Workday, Ashby, and other portals.",
+    "upload_cta": "Click to upload or drag & drop",
+    "upload_hint": "PDF or DOCX, max 5MB",
+    "open_linkedin_login": "Open LinkedIn Login",
+    "open_indeed_login": "Open Indeed Login",
+    "job_titles_hint": "Add each title you'd like to search for. The bot searches all of them.",
+    "locations_hint": "Add cities or \"Remote\". The bot searches all locations.",
+    "keywords_include_hint": "Jobs must mention these keywords to pass the filter.",
+    "keywords_exclude_hint": "Jobs with these keywords are automatically skipped.",
+    "open_folder_alert": "Open this path in your file explorer:\n\n~/.autoapply/profile/experiences/",
+    "close_browser": "Close Browser",
+    "skip": "Skip",
+    "experience_level": "Experience Level",
+    "resume_upload_aria": "Upload resume file. Click or drag and drop. PDF or DOCX, max 5MB",
+    "platform_login_subtitle": "AutoApply opens a browser window where you can log into your accounts. Your sessions are saved so you only need to do this once."
   },
 
   "form": {
@@ -84,7 +103,28 @@
     "keywords_include": "Keywords to Include",
     "keywords_exclude": "Keywords to Exclude",
     "experience_levels": "Experience Levels",
-    "required": "required"
+    "required": "required",
+    "select_placeholder": "— Select —",
+    "optional": "(optional)",
+    "prefer_not_to_say": "— Prefer not to say —",
+    "work_auth_yes": "Yes — authorized to work",
+    "work_auth_no": "No — not authorized",
+    "visa_yes": "Yes — need sponsorship",
+    "visa_no": "No — don't need sponsorship",
+    "first_name_required": "First Name *",
+    "last_name_required": "Last Name *",
+    "email_required": "Email *",
+    "city_required": "City *",
+    "state_required": "State *",
+    "experience_level": "Experience Level",
+    "yes": "Yes",
+    "no": "No",
+    "hint_titles": "Add each title you'd like to search for. The bot searches all of them.",
+    "hint_locations": "Add cities or \"Remote\". The bot searches all locations.",
+    "hint_include": "Jobs must mention these keywords to pass the filter.",
+    "hint_exclude": "Jobs with these keywords are automatically skipped.",
+    "filename": "Filename",
+    "content": "Content"
   },
 
   "placeholder": {
@@ -108,7 +148,17 @@
     "tag_input": "Type and press Enter...",
     "search": "Search jobs...",
     "notes": "Add notes...",
-    "upload_resume": "Upload resume file. Drag & drop or click to browse."
+    "upload_resume": "Upload resume file. Drag & drop or click to browse.",
+    "job_title": "e.g. Software Engineer",
+    "location": "e.g. New York, NY",
+    "keyword": "e.g. Python, AWS",
+    "exclude_keyword": "e.g. Intern, Unpaid",
+    "salary_input": "e.g. 100000",
+    "api_key": "sk-...",
+    "model": "e.g. claude-sonnet-4-20250514",
+    "filename": "e.g. work_experience.txt",
+    "file_content": "Enter your experience details...",
+    "years_exp": "e.g. 5"
   },
 
   "button": {
@@ -132,7 +182,9 @@
     "view": "View",
     "download": "Download",
     "clear_feed": "Clear",
-    "close_browser": "Close Browser"
+    "close_browser": "Close Browser",
+    "add_tag": "Add",
+    "approve_and_apply": "Approve & Apply"
   },
 
   "bot": {
@@ -146,7 +198,8 @@
     "connected": "AI Connected",
     "not_configured": "AI (not configured)",
     "warning_title": "No AI Provider Configured",
-    "warning_body": "The bot will use basic templates instead of AI-generated resumes. Configure in"
+    "warning_body": "The bot will use basic templates instead of AI-generated resumes. Configure in",
+    "warning_link": "Settings → AI Provider"
   },
 
   "applications": {
@@ -171,7 +224,22 @@
     "download_resume": "Download Resume",
     "view_cover_letter": "View Cover Letter",
     "previous_page": "Previous page",
-    "next_page": "Next page"
+    "next_page": "Next page",
+    "filter_all_statuses": "All Statuses",
+    "filter_all_platforms": "All Platforms",
+    "platform_linkedin": "LinkedIn",
+    "platform_indeed": "Indeed",
+    "loading_applications": "Loading applications...",
+    "col_company": "Company",
+    "col_job_title": "Job Title",
+    "col_platform": "Platform",
+    "col_match": "Match",
+    "col_status": "Status",
+    "col_applied": "Applied",
+    "col_resume": "Resume",
+    "col_cover_letter": "Cover Letter",
+    "col_notes": "Notes",
+    "notes_placeholder": "Add notes about this application..."
   },
 
   "profile": {
@@ -181,8 +249,10 @@
     "save_error": "Error saving file.",
     "no_files": "No experience files yet. Click \"+ New File\" to create one.",
     "load_error": "Could not load files.",
-    "confirm_delete_title": "Confirm Delete",
-    "words": "words"
+    "confirm_delete_title": "Delete File?",
+    "words": "words",
+    "screen_title": "Experience Files",
+    "loading": "Loading files..."
   },
 
   "settings": {
@@ -193,7 +263,37 @@
     "key_invalid": "Invalid API key or provider error",
     "validation_failed": "Validation failed — check your connection",
     "save_error": "Error saving settings.",
-    "saved": "Settings saved!"
+    "saved": "Saved!",
+    "screen_title": "Settings",
+    "section_profile": "Profile",
+    "section_ai_provider": "AI Provider",
+    "ai_provider_hint": "Configure an LLM API to generate tailored resumes and cover letters for each application.",
+    "label_provider": "Provider",
+    "provider_placeholder": "-- Select --",
+    "label_model": "Model",
+    "model_hint": "(optional, uses default if blank)",
+    "model_placeholder": "e.g. claude-sonnet-4-20250514",
+    "label_api_key": "API Key",
+    "api_key_placeholder": "sk-...",
+    "section_job_preferences": "Job Preferences",
+    "section_app_answers": "Application Answers",
+    "app_answers_hint": "Pre-fill answers for common application questions. Used by Workday, Ashby, and other ATS portals.",
+    "section_platform_login": "Platform Login",
+    "platform_login_hint": "Open a browser to log into your job platforms. Sessions are saved across restarts.",
+    "open_linkedin_login": "Open LinkedIn Login",
+    "open_indeed_login": "Open Indeed Login",
+    "section_schedule": "Schedule",
+    "schedule_hint": "Auto-start and stop the bot on a time schedule. The bot only runs during the configured window.",
+    "schedule_active": "Active",
+    "provider_anthropic": "Anthropic (Claude)",
+    "provider_openai": "OpenAI (GPT)",
+    "provider_google": "Google (Gemini)",
+    "provider_deepseek": "DeepSeek",
+    "section_eeo": "EEO / Voluntary Disclosures (optional)",
+    "ai_description": "Configure an LLM API to generate tailored resumes and cover letters. Your API key is stored locally and never shared.",
+    "login_description": "Open a browser to log into your job platforms. Your login session is saved so the bot can apply on your behalf.",
+    "schedule_description": "Auto-start and stop the bot on a time schedule. When enabled, the bot runs only during the configured days and time window.",
+    "answers_description": "Pre-fill answers for common application questions (Workday, Ashby, etc.). These are used automatically when the bot encounters matching questions."
   },
 
   "login": {
@@ -205,7 +305,10 @@
 
   "review": {
     "unknown": "Unknown",
-    "at": "at"
+    "at": "at",
+    "match_score_label": "Match score:",
+    "cover_letter_heading": "Cover Letter",
+    "edit_and_apply": "Edit & Apply"
   },
 
   "feed": {
@@ -213,7 +316,11 @@
   },
 
   "analytics": {
-    "applications_label": "Applications"
+    "applications_label": "Applications",
+    "screen_title": "Analytics",
+    "chart_daily_title": "Applications Over Time",
+    "chart_status_title": "Status Breakdown",
+    "chart_platform_title": "By Platform"
   },
 
   "status": {
@@ -237,7 +344,9 @@
     "thu": "Thu",
     "fri": "Fri",
     "sat": "Sat",
-    "sun": "Sun"
+    "sun": "Sun",
+    "enable_schedule": "Enable Schedule",
+    "active": "Active"
   },
 
   "experience_levels": {
@@ -246,7 +355,10 @@
     "senior": "Senior",
     "lead": "Lead / Staff",
     "director": "Director+",
-    "intern": "Intern"
+    "intern": "Intern",
+    "entry_short": "Entry",
+    "mid_short": "Mid",
+    "lead_short": "Lead"
   },
 
   "errors": {
@@ -284,5 +396,58 @@
     "invalid_filename_detail": "Invalid filename. Use only letters, numbers, hyphens, underscores, spaces, and .txt extension",
     "content_required": "content is required",
     "file_not_found": "File not found"
+  },
+
+  "dashboard": {
+    "stat_found": "Found",
+    "stat_applied": "Applied",
+    "stat_errors": "Errors",
+    "stat_uptime": "Uptime",
+    "mode_label": "Mode:",
+    "mode_full_auto": "Full Auto",
+    "mode_review": "Review",
+    "mode_watch": "Watch",
+    "activity_feed": "Activity Feed",
+    "ai_warning": "No AI provider configured — using fallback templates. Add an API key in",
+    "ai_warning_link": "Settings → AI Provider",
+    "ai_warning_suffix": "for tailored resumes and cover letters."
+  },
+
+  "eeo": {
+    "gender_male": "Male",
+    "gender_female": "Female",
+    "gender_non_binary": "Non-Binary",
+    "decline": "Decline to Self Identify",
+    "ethnicity_hispanic": "Hispanic or Latino",
+    "ethnicity_white": "White",
+    "ethnicity_black": "Black or African American",
+    "ethnicity_asian": "Asian",
+    "ethnicity_pacific_islander": "Native Hawaiian or Pacific Islander",
+    "ethnicity_american_indian": "American Indian or Alaska Native",
+    "ethnicity_two_or_more": "Two or More Races",
+    "veteran_yes": "I am a veteran",
+    "veteran_no": "I am not a veteran",
+    "disability_yes": "Yes, I have a disability",
+    "disability_no": "No, I don't have a disability",
+    "disability_decline": "I don't wish to answer"
+  },
+
+  "modal": {
+    "close_aria": "Close dialog",
+    "cover_letter_title": "Cover Letter",
+    "label_filename": "Filename",
+    "filename_placeholder": "e.g. work_experience.txt",
+    "label_content": "Content",
+    "content_placeholder": "Enter your experience details...",
+    "delete_undone": "This action cannot be undone.",
+    "app_details_aria": "Application details",
+    "loading": "Loading...",
+    "new_file_title": "New Experience File",
+    "confirm_delete_title": "Delete File?",
+    "confirm_delete_desc": "This action cannot be undone."
+  },
+
+  "file_upload": {
+    "click_to_change": "Click to change"
   }
 }

@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════════════════════════ */
 import { state } from './state.js';
 import { escHtml } from './helpers.js';
+import { t } from './i18n.js';
 
 export function initTagInputs() {
   document.querySelectorAll('.tag-input-wrap').forEach(wrap => {
@@ -10,8 +11,8 @@ export function initTagInputs() {
     state.tagInputs[id] = [];
     const input = document.createElement('input');
     input.type = 'text';
-    input.placeholder = wrap.dataset.placeholder || 'Type and press Enter...';
-    input.setAttribute('aria-label', wrap.dataset.placeholder || 'Add tag');
+    input.placeholder = wrap.dataset.placeholder || t('placeholder.tag_input');
+    input.setAttribute('aria-label', wrap.dataset.placeholder || t('placeholder.tag_input'));
     wrap.appendChild(input);
     wrap.addEventListener('click', () => input.focus());
 
