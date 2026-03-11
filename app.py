@@ -273,6 +273,7 @@ def create_app() -> tuple[Flask, SocketIO]:
     from routes.applications import applications_bp
     from routes.bot import bot_bp, init_scheduler
     from routes.config import config_bp
+    from routes.knowledge_base import kb_bp
     from routes.lifecycle import lifecycle_bp, register_socketio_handlers
     from routes.login import login_bp
     from routes.profile import profile_bp
@@ -285,6 +286,7 @@ def create_app() -> tuple[Flask, SocketIO]:
     flask_app.register_blueprint(login_bp)
     flask_app.register_blueprint(analytics_bp)
     flask_app.register_blueprint(resumes_bp)
+    flask_app.register_blueprint(kb_bp)
     flask_app.register_blueprint(lifecycle_bp)
 
     # Register SocketIO handlers

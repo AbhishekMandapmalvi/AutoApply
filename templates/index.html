@@ -345,6 +345,7 @@
     <li role="presentation"><a role="tab" data-screen="profile" aria-selected="false" tabindex="-1" data-i18n="nav.profile">Profile</a></li>
     <li role="presentation"><a role="tab" data-screen="analytics" aria-selected="false" tabindex="-1" data-i18n="nav.analytics">Analytics</a></li>
     <li role="presentation"><a role="tab" data-screen="resumes" aria-selected="false" tabindex="-1" data-i18n="nav.resumes">Resume Library</a></li>
+    <li role="presentation"><a role="tab" data-screen="knowledge-base" aria-selected="false" tabindex="-1" data-i18n="nav.knowledge_base">Knowledge Base</a></li>
     <li role="presentation"><a role="tab" data-screen="settings" aria-selected="false" tabindex="-1" data-i18n="nav.settings">Settings</a></li>
   </ul>
   <div class="nav-right">
@@ -632,6 +633,94 @@
       </div>
       <div id="resume-detail-content" class="resume-detail-body">
       </div>
+    </div>
+  </div>
+
+  <!-- KNOWLEDGE BASE -->
+  <div class="screen hidden" id="screen-knowledge-base" role="tabpanel" aria-label="Knowledge Base">
+    <h2 data-i18n="kb.title">Knowledge Base</h2>
+
+    <!-- Stats cards -->
+    <div id="kb-stats" class="kb-stats-grid" role="region" aria-label="Knowledge Base statistics" aria-live="polite"></div>
+
+    <!-- Upload section -->
+    <div class="card" style="margin:16px 0;">
+      <h3 data-i18n="kb.upload_title">Upload Documents</h3>
+      <p class="text-muted" data-i18n="kb.upload_desc">Upload resumes, project descriptions, LinkedIn exports — the more, the better!</p>
+      <div class="flex-row gap-md" style="align-items:center;">
+        <input type="file" id="kb-upload-input" accept=".pdf,.docx,.txt,.md"
+               aria-label="Choose document to upload" class="form-input" style="max-width:300px;">
+        <button type="button" class="btn btn-primary" onclick="uploadKBDocument()"
+                data-i18n="kb.upload_title">Upload</button>
+      </div>
+      <p class="text-muted" style="margin-top:8px;" data-i18n="kb.upload_formats">Supported: PDF, DOCX, TXT, MD</p>
+      <div id="kb-upload-status" class="kb-upload-status" aria-live="polite"></div>
+    </div>
+
+    <!-- Filter & search controls -->
+    <div class="flex-row gap-md" style="margin-bottom:12px; align-items:center;">
+      <select id="kb-filter-category" class="form-input" style="max-width:200px;"
+              onchange="filterKBCategory(this.value)"
+              aria-label="Filter by category">
+        <option value="all" data-i18n="kb.filter_all">All Categories</option>
+        <option value="experience" data-i18n="kb.category_experience">Experience</option>
+        <option value="skill" data-i18n="kb.category_skill">Skills</option>
+        <option value="education" data-i18n="kb.category_education">Education</option>
+        <option value="project" data-i18n="kb.category_project">Projects</option>
+        <option value="certification" data-i18n="kb.category_certification">Certifications</option>
+        <option value="summary" data-i18n="kb.category_summary">Summary</option>
+      </select>
+      <input type="text" id="kb-search-input" class="form-input" style="max-width:300px;"
+             placeholder="Search entries..." aria-label="Search KB entries"
+             oninput="searchKB(this.value)">
+    </div>
+
+    <!-- Entries table -->
+    <div id="kb-entries-list" role="region" aria-label="Knowledge Base entries" aria-live="polite">
+    </div>
+
+    <!-- Pagination -->
+    <div id="kb-pagination" class="resume-pagination" role="navigation" aria-label="KB entries pagination">
+    </div>
+
+    <!-- Edit overlay -->
+    <div id="kb-edit-overlay" class="resume-detail-overlay hidden" role="dialog" aria-label="Edit KB entry">
+      <div class="kb-edit-content resume-detail-body"></div>
+    </div>
+
+    <!-- Resume Preview section -->
+    <div class="card" style="margin:16px 0;">
+      <h3 data-i18n="reuse.settings_title">Smart Resume Assembly</h3>
+      <div class="flex-col gap-md">
+        <label>Template
+          <select id="kb-preview-template" class="form-input" aria-label="Resume template">
+            <option value="classic">Classic</option>
+            <option value="modern">Modern</option>
+            <option value="academic">Academic</option>
+            <option value="minimal">Minimal</option>
+          </select>
+        </label>
+        <label>Job Description
+          <textarea id="kb-preview-jd" class="form-input" rows="4"
+                    placeholder="Paste a job description to auto-select KB entries..."
+                    aria-label="Job description for resume preview"></textarea>
+        </label>
+        <div>
+          <button type="button" class="btn btn-primary" onclick="previewKBResume()">Preview Resume</button>
+          <span id="kb-preview-status" aria-live="polite"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Preview overlay -->
+    <div id="kb-preview-overlay" class="resume-detail-overlay hidden" role="dialog" aria-label="Resume preview">
+      <div class="kb-preview-content resume-detail-body"></div>
+    </div>
+
+    <!-- Documents list -->
+    <div class="card" style="margin:16px 0;">
+      <h3>Uploaded Documents</h3>
+      <div id="kb-documents-list" role="region" aria-label="Uploaded documents list"></div>
     </div>
   </div>
 

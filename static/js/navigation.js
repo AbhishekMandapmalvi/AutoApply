@@ -7,6 +7,7 @@ import { loadApplications } from './applications.js';
 import { loadProfileFiles } from './profile.js';
 import { loadAnalytics } from './analytics.js';
 import { loadResumes } from './resumes.js';
+import { loadKnowledgeBase } from './knowledge-base.js';
 import { loadSettings, loadApplyMode } from './settings.js';
 
 export function initNavTabs() {
@@ -48,6 +49,7 @@ export function switchScreen(name) {
   if (name === 'profile') loadProfileFiles();
   if (name === 'analytics') loadAnalytics();
   if (name === 'resumes') loadResumes();
+  if (name === 'knowledge-base') loadKnowledgeBase();
   if (name === 'settings') loadSettings();
 }
 

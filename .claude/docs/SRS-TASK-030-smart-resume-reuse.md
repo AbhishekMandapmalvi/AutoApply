@@ -973,16 +973,152 @@ Existing databases auto-migrated via `_migrate()` — adds new tables and column
 | FR-030-30 | US-105 | Design: BotIntegration → Code: bot/bot.py, core/knowledge_base.py → Test: test_bot_loop.py |
 | FR-030-31 | Derived | Design: Database → Code: db/database.py → Test: test_resume_versions.py |
 | FR-030-32 | Derived | Design: Database → Code: db/database.py → Test: test_resume_versions.py |
+| FR-030-33 | US-107 | Design: KBRoutes → Code: routes/knowledge_base.py → Test: test_knowledge_base_routes.py |
+| FR-030-34 | US-107 | Design: KBRoutes → Code: routes/knowledge_base.py → Test: test_knowledge_base_routes.py |
+| FR-030-35 | US-108 | Design: KBRoutes → Code: routes/knowledge_base.py → Test: test_knowledge_base_routes.py |
+| FR-030-36 | US-108 | Design: KBRoutes → Code: routes/knowledge_base.py → Test: test_knowledge_base_routes.py |
+| FR-030-37 | US-109 | Design: KBRoutes → Code: routes/knowledge_base.py → Test: test_knowledge_base_routes.py |
+| FR-030-38 | US-110 | Design: KBUI → Code: static/js/knowledge-base.js → Test: manual |
+| FR-030-39 | US-110 | Design: KBUI → Code: static/js/knowledge-base.js → Test: manual |
+| FR-030-40 | US-111 | Design: PreviewUI → Code: static/js/resume-preview.js → Test: manual |
+| FR-030-41 | US-111 | Design: PreviewUI → Code: routes/knowledge_base.py → Test: test_knowledge_base_routes.py |
+| FR-030-42 | US-112 | Design: Navigation → Code: templates/index.html, static/js/navigation.js → Test: manual |
+
+---
+
+## 9. Milestone 5 — Upload UI + KB Viewer + Preview
+
+### 9.1 User Stories
+
+| ID | Story | Priority |
+|----|-------|----------|
+| US-107 | As a user, I want to upload career documents (PDF/DOCX/TXT/MD) so that the system extracts KB entries automatically | Must |
+| US-108 | As a user, I want to browse, search, filter, edit, and delete my KB entries | Must |
+| US-109 | As a user, I want to see KB statistics (entry counts by category) | Should |
+| US-110 | As a user, I want a KB viewer UI with upload zone, stats cards, entries table, pagination | Must |
+| US-111 | As a user, I want to preview assembled resumes from my KB entries against a job description | Should |
+| US-112 | As a user, I want a Knowledge Base tab in the navigation bar | Must |
+
+### 9.2 Functional Requirements
+
+#### FR-030-33: Upload API Endpoint
+**Priority**: Must | **Source**: US-107
+
+The system SHALL provide `POST /api/kb/upload` accepting multipart file uploads.
+
+**Acceptance Criteria**:
+- AC-030-33-1: Given a valid PDF/DOCX/TXT/MD file under 10 MB, When uploaded, Then entries are extracted and count returned with HTTP 201
+- AC-030-33-2: Given no file in request, When POST /api/kb/upload called, Then HTTP 400 returned
+- AC-030-33-3: Given an unsupported file type (.exe), When uploaded, Then HTTP 400 returned
+- AC-030-33-4: Given a file exceeding 10 MB, When uploaded, Then HTTP 413 returned
+
+#### FR-030-34: KB Stats Endpoint
+**Priority**: Should | **Source**: US-109
+
+The system SHALL provide `GET /api/kb/stats` returning entry counts by category.
+
+**Acceptance Criteria**:
+- AC-030-34-1: Given an empty KB, When GET /api/kb/stats called, Then 200 returned with zero counts
+- AC-030-34-2: Given entries exist, When GET /api/kb/stats called, Then counts per category returned
+
+#### FR-030-35: KB List Entries Endpoint
+**Priority**: Must | **Source**: US-108
+
+The system SHALL provide `GET /api/kb` with optional category, search, limit, offset params.
+
+**Acceptance Criteria**:
+- AC-030-35-1: Given entries exist, When GET /api/kb called, Then entries array returned with count
+- AC-030-35-2: Given category=experience filter, When GET /api/kb?category=experience called, Then only experience entries returned
+- AC-030-35-3: Given limit=2, When GET /api/kb?limit=2 called, Then at most 2 entries returned
+
+#### FR-030-36: KB Entry CRUD Endpoints
+**Priority**: Must | **Source**: US-108
+
+The system SHALL provide GET/PUT/DELETE on `/api/kb/<id>`.
+
+**Acceptance Criteria**:
+- AC-030-36-1: Given an existing entry, When GET /api/kb/<id> called, Then entry details returned
+- AC-030-36-2: Given a non-existent entry, When GET /api/kb/<id> called, Then HTTP 404 returned
+- AC-030-36-3: Given valid JSON body, When PUT /api/kb/<id> called, Then entry updated and 200 returned
+- AC-030-36-4: Given no JSON body, When PUT /api/kb/<id> called, Then HTTP 400 returned
+- AC-030-36-5: Given an existing entry, When DELETE /api/kb/<id> called, Then soft-deleted and 200 returned
+
+#### FR-030-37: Documents List Endpoint
+**Priority**: Should | **Source**: US-109
+
+The system SHALL provide `GET /api/kb/documents` listing all uploaded documents.
+
+**Acceptance Criteria**:
+- AC-030-37-1: Given no documents uploaded, When GET /api/kb/documents called, Then empty list returned
+
+#### FR-030-38: KB Viewer Frontend Module
+**Priority**: Must | **Source**: US-110
+
+The system SHALL provide `static/js/knowledge-base.js` implementing KB viewer with stats, entries table, category filter, search, pagination, edit/delete overlays.
+
+**Acceptance Criteria**:
+- AC-030-38-1: Given KB entries exist, When KB screen loaded, Then stats cards and entries table rendered
+- AC-030-38-2: Given category filter selected, When changed, Then table filters to that category
+- AC-030-38-3: Given search text entered, When 300ms debounce elapsed, Then filtered results displayed
+- AC-030-38-4: Given edit button clicked, When overlay opens, Then entry fields pre-populated for editing
+
+#### FR-030-39: File Upload UI
+**Priority**: Must | **Source**: US-110
+
+The system SHALL provide file upload input in the KB screen with format validation and status feedback.
+
+**Acceptance Criteria**:
+- AC-030-39-1: Given a file selected, When upload button clicked, Then processing status shown and entries refreshed on success
+- AC-030-39-2: Given upload fails, When error returned, Then error message displayed
+
+#### FR-030-40: Resume Preview Frontend
+**Priority**: Should | **Source**: US-111
+
+The system SHALL provide `static/js/resume-preview.js` with template picker, JD textarea, and PDF iframe display.
+
+**Acceptance Criteria**:
+- AC-030-40-1: Given template and JD text provided, When preview clicked, Then PDF rendered in iframe
+- AC-030-40-2: Given no JD text, When preview clicked, Then error message shown
+- AC-030-40-3: Given preview overlay open, When Escape pressed, Then overlay closes
+
+#### FR-030-41: Resume Preview API
+**Priority**: Should | **Source**: US-111
+
+The system SHALL provide `POST /api/kb/preview` accepting template, entry_ids or jd_text, returning PDF.
+
+**Acceptance Criteria**:
+- AC-030-41-1: Given no request body, When POST /api/kb/preview called, Then HTTP 400 returned
+- AC-030-41-2: Given template only (no entry_ids or jd_text), When called, Then HTTP 400 returned
+
+#### FR-030-42: KB Navigation Tab
+**Priority**: Must | **Source**: US-112
+
+The system SHALL add a "Knowledge Base" tab to the navigation bar linking to the KB screen.
+
+**Acceptance Criteria**:
+- AC-030-42-1: Given the nav bar, When rendered, Then "Knowledge Base" tab visible between "Resume Library" and "Settings"
+- AC-030-42-2: Given KB tab clicked, When screen switches, Then loadKnowledgeBase() called
+
+### 9.3 Non-Functional Requirements
+
+#### NFR-030-16: i18n Coverage
+All user-facing strings in KB routes and frontend SHALL use `t()` or `data-i18n` attributes. All keys SHALL exist in en.json and es.json.
+
+#### NFR-030-17: Accessibility (WCAG 2.1 AA)
+All KB UI elements SHALL have ARIA labels, roles, aria-live regions, keyboard navigation, and semantic HTML.
+
+#### NFR-030-18: Input Validation
+File uploads SHALL validate extension (allowlist), filename (sanitize), and size (10 MB max). All route params SHALL be validated.
 
 ---
 
 ## Software Requirements Specification -- GATE 3 OUTPUT
 
 **Document**: SRS-TASK-030-smart-resume-reuse
-**FRs**: 32 functional requirements (12 M1 + 7 M2 + 7 M3 + 6 M4)
-**NFRs**: 15 non-functional requirements (6 M1 + 4 M2 + 3 M3 + 2 M4)
-**ACs**: 123 total acceptance criteria (90 positive + 33 negative)
-**Quality Checklist**: 32/32 items passed (100%)
+**FRs**: 42 functional requirements (12 M1 + 7 M2 + 7 M3 + 6 M4 + 10 M5)
+**NFRs**: 18 non-functional requirements (6 M1 + 4 M2 + 3 M3 + 2 M4 + 3 M5)
+**ACs**: 152 total acceptance criteria (119 positive + 33 negative)
+**Quality Checklist**: 42/42 items passed (100%)
 
 ### Handoff Routing
 | Recipient | What They Receive |
