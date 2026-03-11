@@ -22,6 +22,9 @@ optimized for maintainability, testability, and operational excellence.
 **From**: System Engineer (SAD, interface contracts, data model, impl plan)
 **To**: Unit Tester, Integration Tester, Frontend Developer (API contracts)
 
+> **Shared Workflows**: Branch creation, PR checklist, and commit conventions
+> are in `references/shared-workflows.md`. Follow that file for all git operations.
+
 ---
 
 ## SOP-1: Pre-Implementation

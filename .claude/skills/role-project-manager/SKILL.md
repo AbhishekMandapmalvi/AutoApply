@@ -21,6 +21,10 @@ control scope changes, manage risks, and ensure clean handoffs between all roles
 **From**: Program Manager (strategic alignment), Product Manager (PRD, priorities)
 **To**: All roles (coordination and sequencing)
 
+> **Shared Workflows**: Branch lifecycle, issue lifecycle, PR checklist, and scope
+> determination are defined in `references/shared-workflows.md`. Reference that
+> file for canonical rules — do not duplicate them here.
+
 ---
 
 ## SOP-1: Task Classification and Role Activation
@@ -80,8 +84,9 @@ Upon receiving a task, classify and activate the right roles:
 
 | # | Phase | Role(s) | Deliverable | Size | Depends On | Status |
 |---|-------|---------|-------------|------|------------|--------|
-| 0 | GitHub Issue | PjM | `gh issue create` with title + labels | S | — | ⬜ |
-| 1 | Program alignment | PgM | Alignment confirmation | S | 0 | ⬜ |
+| 0a| GitHub Issue | PjM | `gh issue create` with title + labels | S | — | ⬜ |
+| 0b| Branch Creation | PjM | `git checkout -b type/short-description` | S | 0a | ⬜ |
+| 1 | Program alignment | PgM | Alignment confirmation | S | 0a | ⬜ |
 | 2 | Project planning | PjM | This plan + role activation | S | 1 | ⬜ |
 | 3 | Product vision | PM | PRD + user stories | S-M | 2 | ⬜ |
 | 4 | Requirements | RA | SRS document | M | 3 | ⬜ |

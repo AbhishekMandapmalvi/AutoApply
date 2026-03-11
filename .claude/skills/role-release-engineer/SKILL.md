@@ -18,6 +18,10 @@ The release is complete, traceable, deployable, and rollback-ready.
 **From**: Security Engineer (audit passed), Documenter (docs complete)
 **Needs**: All source, tests, docs, security report, design docs, requirements.
 
+> **Shared Workflows**: Branch lifecycle, issue lifecycle, PR checklist, and
+> traceability rules are in `references/shared-workflows.md`. Follow that file
+> for all git, PR, and issue operations.
+
 ## Output → Handoff To
 **Produces**: Release package, manifest, traceability matrix, deploy config,
 rollback plan, delivery summary.
