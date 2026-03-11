@@ -80,8 +80,9 @@ Upon receiving a task, classify and activate the right roles:
 
 | # | Phase | Role(s) | Deliverable | Size | Depends On | Status |
 |---|-------|---------|-------------|------|------------|--------|
-| 0 | GitHub Issue | PjM | `gh issue create` with title + labels | S | — | ⬜ |
-| 1 | Program alignment | PgM | Alignment confirmation | S | 0 | ⬜ |
+| 0a| GitHub Issue | PjM | `gh issue create` with title + labels | S | — | ⬜ |
+| 0b| **Create branch** | PjM | `git checkout -b type/task-id-short-name` from master | S | 0a | ⬜ |
+| 1 | Program alignment | PgM | Alignment confirmation | S | 0b | ⬜ |
 | 2 | Project planning | PjM | This plan + role activation | S | 1 | ⬜ |
 | 3 | Product vision | PM | PRD + user stories | S-M | 2 | ⬜ |
 | 4 | Requirements | RA | SRS document | M | 3 | ⬜ |
@@ -92,7 +93,12 @@ Upon receiving a task, classify and activate the right roles:
 | 9 | Integration test | IT | E2E + perf tests | M | 8 | ⬜ |
 | 10| Security audit | SecE | Audit report | S-M | 8 | ⬜ |
 | 11| Documentation | Doc | All docs | S-M | 6,7,8 | ⬜ |
-| 12| Release | RE | Release package | S | 9,10,11 | ⬜ |
+| 12| Release | RE | Push, PR, merge, delete branch | S | 9,10,11 | ⬜ |
+
+**Branch naming** (Phase 0b):
+- Features: `feature/task-{NNN}-{short-name}` (e.g., `feature/task-030-smart-resume-reuse-m1`)
+- Bugfixes: `fix/{issue-or-description}` (e.g., `fix/mypy-type-error-experience-calc`)
+- Refactors: `refactor/{short-name}` | Docs: `docs/{short-name}` | Tests: `test/{short-name}` | Chores: `chore/{short-name}`
 ```
 
 ---

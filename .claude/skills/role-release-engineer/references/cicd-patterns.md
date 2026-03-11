@@ -59,24 +59,35 @@ ENTRYPOINT ["node", "/app/index.js"]
 ### Branch Strategy
 ```
 master (protected) ← PR only, squash-merge
-  ├── feature/locale-switcher
-  ├── fix/login-timeout
-  ├── refactor/split-bot-loop
-  ├── docs/update-api-reference
-  ├── test/applier-edge-cases
-  └── chore/upgrade-playwright
+  ├── feature/task-030-smart-resume-reuse-m1   ← new feature (with TASK-ID)
+  ├── feature/task-031-tfidf-scoring           ← new feature (with TASK-ID)
+  ├── fix/mypy-type-error-experience-calc      ← bugfix (descriptive name)
+  ├── fix/ci-lint-failure                      ← bugfix
+  ├── refactor/split-bot-loop                  ← code refactor
+  ├── docs/update-api-reference                ← documentation only
+  ├── test/applier-edge-cases                  ← test additions
+  └── chore/upgrade-playwright                 ← maintenance
+
+Branch naming rules:
+  - MUST start with type prefix: feature/, fix/, refactor/, docs/, test/, chore/
+  - feature/ branches MUST include TASK-ID for traceability
+  - fix/ branches should reference the issue or describe the bug
+  - Use kebab-case (lowercase, hyphens)
+  - Keep names short but descriptive (3-6 words after prefix)
 ```
 
-### PR Lifecycle
+### PR Lifecycle (MANDATORY — every code change follows this)
 ```
-1. Create branch: git checkout -b type/short-description
-2. Develop + test locally: ruff check . && python -m pytest tests/ -v
+1. Create branch FIRST (before any code changes):
+   git checkout master && git pull origin master
+   git checkout -b type/short-description
+2. Develop + test locally: ruff check . && mypy && python -m pytest tests/ -v
 3. Push: git push -u origin type/short-description
 4. Open PR: gh pr create --title "..." --body "..."
 5. CI runs: lint → test → security (all 3 must pass)
 6. Review: address feedback with new commits (no force-push)
 7. Merge: squash-merge to master
-8. Cleanup: delete remote branch
+8. Cleanup: delete remote branch (gh pr merge --delete-branch)
 ```
 
 ### PR Template Sections

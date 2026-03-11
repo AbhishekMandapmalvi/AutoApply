@@ -283,6 +283,16 @@ building it in from the start.
 - **Never force-push to `master`** — branch protection blocks this
 - **Branch naming**: `type/short-description` (e.g., `feature/locale-switcher`, `fix/login-timeout`)
   - Types: `feature/`, `fix/`, `refactor/`, `docs/`, `test/`, `chore/`
+- **Mandatory branch creation**: Before ANY code change (feature, bugfix, refactor, etc.), Claude
+  MUST create a new branch from `master` using the naming convention above. No work on `master`.
+  - Features: `feature/{task-id}-{short-name}` (e.g., `feature/task-030-smart-resume-reuse-m1`)
+  - Bugfixes: `fix/{issue-or-description}` (e.g., `fix/mypy-type-error-experience-calc`)
+  - Refactors: `refactor/{short-name}` (e.g., `refactor/extract-db-helpers`)
+  - Docs: `docs/{short-name}` (e.g., `docs/update-readme-test-count`)
+  - Tests: `test/{short-name}` (e.g., `test/add-kb-integration-tests`)
+  - Chores: `chore/{short-name}` (e.g., `chore/update-dependencies`)
+- **Branch lifecycle**: Create branch → commit changes → push → open PR → CI green → squash-merge → delete branch
+- **One branch per task**: Each TASK-NNN or bugfix gets its own branch. Never reuse branches across unrelated tasks.
 
 ### 9.2 Commit Messages
 ```
@@ -315,8 +325,10 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 | Large  | 300+        | Break into smaller PRs when possible |
 
 ### 9.5 Before Opening a PR
-1. Create branch from `master` using naming convention
-2. Run locally: `ruff check .` (lint) + `python -m pytest tests/ -v` (tests)
+1. **Branch** (must be done FIRST, before any code changes):
+   - `git checkout master && git pull origin master`
+   - `git checkout -b type/short-description` (see §9.1 naming convention)
+2. Run locally: `ruff check .` (lint) + `mypy` (type check) + `python -m pytest tests/ -v` (tests)
 3. Update `CHANGELOG.md` under `[Unreleased]` if user-facing
 4. Update `docs/` and `README.md` if features/test count changed
 
@@ -411,3 +423,13 @@ Patterns confirmed during delivery. Apply to all future work.
 - Close the issue with `gh issue close N --comment "Completed in commit <hash>."` when pushed.
 - If an existing open issue matches the task being implemented, use that issue instead of creating a duplicate.
 - **Rule**: The Release Engineer checklist includes "GitHub Issue closed" — a task is NOT done until the issue is closed.
+
+### 12.9 Branch-First Workflow
+- Always create a new branch from `master` BEFORE writing any code. Never start work on `master`
+  or on an existing branch belonging to a different task.
+- Branch names MUST indicate the type of work: `feature/`, `fix/`, `refactor/`, `docs/`, `test/`, `chore/`.
+  This makes it immediately clear from the branch name what kind of change to expect.
+- Include the TASK-ID in feature branch names (e.g., `feature/task-030-smart-resume-reuse-m1`)
+  so branches are traceable to their GitHub issue and planning artifacts.
+- One branch = one PR = one logical change. Don't pile unrelated changes into one branch.
+- After PR is merged, delete the remote branch to keep the repo clean.

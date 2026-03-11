@@ -151,11 +151,15 @@ Requirements ✅ | Design ✅ | Review ✅ | Security ✅ | Docs ✅ | Traceabil
 
 When creating PRs for releases or feature delivery:
 
-1. **Branch**: Create from `master` using `type/short-description` convention
+1. **Branch** (MANDATORY — before any code changes):
+   - `git checkout master && git pull origin master`
+   - `git checkout -b type/short-description` (e.g., `feature/task-030-kb-foundation`, `fix/mypy-type-error`)
+   - Types: `feature/`, `fix/`, `refactor/`, `docs/`, `test/`, `chore/`
+   - Include TASK-ID in feature branches for traceability
 2. **Commits**: Use conventional format (`feat:`, `fix:`, `chore:`, etc.)
 3. **PR**: Use `gh pr create` with Summary, Changes, Test plan sections
 4. **CI**: Ensure all 3 checks pass (lint, test, security) before merge
-5. **Merge**: Squash-merge to `master`, delete branch after merge
+5. **Merge**: Squash-merge to `master`, delete remote branch after merge
 6. **Tag**: For releases, create `v{semver}` tag to trigger release workflow
 7. **Release notes**: Use `gh release create` with changelog summary
 

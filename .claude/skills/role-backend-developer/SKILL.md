@@ -34,7 +34,12 @@ Before writing any code:
 - [ ] Examine existing codebase — match conventions, patterns, naming.
 - [ ] Verify project structure and build configuration work.
 - [ ] Pin all new dependency versions explicitly.
-- [ ] Create branch following git conventions: `feature/{task-id}-{short-name}`.
+- [ ] **Create branch FIRST** (before any code changes):
+  - `git checkout master && git pull origin master`
+  - Features: `git checkout -b feature/{task-id}-{short-name}`
+  - Bugfixes: `git checkout -b fix/{issue-or-description}`
+  - Refactors: `git checkout -b refactor/{short-name}`
+  - Never work directly on `master`. One branch per task.
 
 ---
 
