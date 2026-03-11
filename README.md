@@ -5,7 +5,7 @@
 AutoApply searches LinkedIn and Indeed, scores each job against your preferences, generates tailored resumes and cover letters using AI, and submits applications — all running locally on your machine. Your data never leaves your computer.
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/tests-563%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-738%20passing-brightgreen.svg)](#testing)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
@@ -22,7 +22,7 @@ AutoApply searches LinkedIn and Indeed, scores each job against your preferences
 - **Login session persistence** — Log in once, sessions are saved across restarts
 - **Scheduling** — Set days and hours for the bot to run automatically
 - **Accessible** — WCAG 2.1 AA compliant: keyboard navigation, screen reader support, focus management, reduced motion
-- **Internationalization** — All strings externalized to JSON locale files; add new languages by copying `en.json`
+- **Internationalization** — Full i18n with JSON locale files, `data-i18n` HTML attributes, and backend `t()` function. Add new languages by copying `static/locales/en.json`
 - **Fully local** — No cloud, no accounts, no telemetry. Everything at `~/.autoapply/`
 
 ## Quick Start
@@ -48,6 +48,22 @@ npm start
 ```
 
 A native app window opens with the dashboard. A setup wizard walks you through configuration on first launch.
+
+## Building Installers
+
+To create standalone installers (no Python/Node.js required on the target machine):
+
+```bash
+cd electron
+npm install
+npm run dist:win          # Windows NSIS installer (.exe)
+npm run dist:mac          # macOS disk image (.dmg)
+npm run dist:linux        # Linux portable (.AppImage)
+```
+
+The build process automatically syncs the version from `pyproject.toml`, generates app icons, downloads an embedded Python runtime, and bundles all dependencies. Output goes to `electron/build/`.
+
+For CI-based releases, push a `v*` tag (e.g., `v1.9.0`) to trigger the GitHub Actions workflow that builds all three platforms and creates a GitHub Release.
 
 ## How It Works
 
@@ -113,8 +129,10 @@ AutoApply/
 ├── routes/                 # 7 Flask Blueprints (bot, applications, config, profile, login, analytics, lifecycle)
 ├── electron/               # Electron desktop shell
 │   ├── main.js             # App window, tray, lifecycle
-│   └── python-backend.js   # Python process management
-├── tests/                  # 563+ tests (pytest)
+│   ├── python-backend.js   # Python process management
+│   ├── icons/              # Generated app icons (PNG, ICO, ICNS)
+│   └── scripts/            # Build scripts (version sync, icon gen, Python bundling)
+├── tests/                  # 738 tests (pytest)
 └── docs/                   # User and developer documentation
 ```
 
@@ -155,7 +173,7 @@ Everything stays on your machine at `~/.autoapply/`:
 python -m pytest tests/ -v
 ```
 
-563+ tests covering settings, database, API endpoints, bot logic, AI engine, scoring/filtering, resume rendering, scheduling, login flow, applier modules, i18n, accessibility, security hardening, and resilience.
+738 tests covering settings, database, API endpoints, bot logic, AI engine, scoring/filtering, resume rendering, scheduling, login flow, applier modules, i18n, accessibility, security hardening, and resilience.
 
 ## Tech Stack
 
@@ -171,7 +189,7 @@ python -m pytest tests/ -v
 | Frontend | Vanilla JS SPA (17 ES modules, no build step) |
 | i18n | JSON locale files (`static/locales/`) with `t()` translation function |
 | Accessibility | WCAG 2.1 AA (ARIA, keyboard nav, focus management, reduced motion) |
-| Tests | pytest (563+ tests, 97% coverage on core modules) |
+| Tests | pytest (738 tests, 97% coverage on core modules) |
 
 ## Disclaimer
 
