@@ -10,7 +10,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [1.9.0] - 2026-03-11
 
-Distribution Build System + Frontend i18n Migration.
+Distribution Build System + Frontend i18n Migration + CI/CD Pipeline.
 
 ### Added
 - **Frontend JS i18n migration (QOL-1)**: All 12 JS modules now use `t()` calls from `static/js/i18n.js` instead of hardcoded English strings. ~55 string occurrences migrated across bot-control, applications, settings, profile, login, wizard, feed, review, ai-status, analytics, file-upload, and tag-input modules. (LE-3)
@@ -27,6 +27,12 @@ Distribution Build System + Frontend i18n Migration.
   - **macOS DMG installer**: `npm run dist:mac` builds `.dmg` disk image.
   - **Linux AppImage**: `npm run dist:linux` builds portable `.AppImage`.
   - **CI release workflow** (`.github/workflows/release.yml`): Push a `v*` tag to trigger parallel Windows/macOS/Linux builds, uploading all installers to a GitHub Release. (ADR-020)
+- **GitHub repository governance**: CODEOWNERS, CONTRIBUTING.md, PR template, issue templates (bug report, feature request), branch protection rules (required status checks, conversation resolution).
+
+### Fixed
+- **CI pipeline hardening**: Upgraded all GitHub Actions to Node.js 24-compatible versions (checkout v6, setup-python v6, setup-node v6, upload-artifact v7, download-artifact v8). Fixed gevent exit code handling (SIGTERM codes 143/15 treated as success). Fixed pip-audit for local packages via `pip freeze --exclude`. Fixed mypy return type in `core/i18n.py`.
+- **Python bundling**: Fixed `bundle-python.js` quote stripping regex and pip install shell quoting on Windows (uses temp requirements file instead of inline args).
+- **Setuptools discovery**: Added explicit package include list in `pyproject.toml` to prevent flat-layout auto-discovery of non-Python directories. Renamed `setup.py` → `setup_env.py` to avoid pip conflict.
 
 ## [1.8.3] - 2026-03-11
 
