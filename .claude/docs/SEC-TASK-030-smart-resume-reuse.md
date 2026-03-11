@@ -2,7 +2,7 @@
 
 **Date**: 2026-03-11
 **Auditor**: Claude (Security Engineer)
-**Scope**: TASK-030 M1 — Knowledge Base foundation (4 new modules, 3 new DB tables, 2 config models)
+**Scope**: TASK-030 M1+M2 — Knowledge Base foundation (4 M1 modules, 3 DB tables, 2 config models) + Scoring Engine (2 M2 modules)
 
 ---
 
@@ -17,19 +17,24 @@
 | 5 | Info | E6 | LLM API keys flow through `llm_config` object, never logged or stored in KB tables. `llm_provider` and `llm_model` (not keys) stored in uploaded_documents. | PASS |
 | 6 | Info | B5 | JSON parsing in `_extract_via_llm()` uses `json.loads()` (safe). LLM response is validated: must be array, entries must have valid category + non-empty text. | PASS |
 | 7 | Low | G5 | Three new dependencies added (PyPDF2, python-docx, Jinja2). All are well-known, from PyPI, pinned to exact versions. Jinja2 is needed for M3 LaTeX templates but added in M1 for dependency completeness. | Accepted |
+| 8 | Info | B6 | M2 `resume_scorer.py` and `jd_analyzer.py` use `logging.getLogger(__name__)` with `%s` formatting. No user input processed — JD text comes from DB (already stored in M1). | PASS |
+| 9 | Info | A1 | M2 scoring is pure computation (TF-IDF cosine similarity). No SQL, no file I/O, no network calls. Zero attack surface. | PASS |
+| 10 | Info | G5 | M2 adds zero new runtime dependencies. TF-IDF uses only stdlib (`collections.Counter`, `math`, `re`). ONNX is optional and not imported at module level. | PASS |
+| 11 | Info | B5 | `SYNONYM_MAP` and `TECH_TERMS` are frozen data structures (dict, frozenset). Not modifiable at runtime, no injection risk. | PASS |
+| 12 | Info | E4 | ONNX embedding interface (`_onnx_score_entries()`) is a stub in M2. When implemented in M8, it must validate that embedding vectors come from the local KB, not from external sources. | PASS (M2), TODO (M8) |
 
 ## Checklist Summary
 
 | Section | Pass | Fail | N/A | Notes |
 |---------|:----:|:----:|:---:|-------|
-| A. Input Validation | 4 | 0 | 1 | A5 N/A (no API endpoints in M1) |
-| B. Injection Prevention | 6 | 0 | 1 | B3 N/A (no HTML output) |
+| A. Input Validation | 5 | 0 | 1 | A5 N/A (no API endpoints in M1/M2). M2 input is pre-validated JD text from DB. |
+| B. Injection Prevention | 8 | 0 | 1 | B3 N/A (no HTML output). M2 pure computation, no injection vectors. |
 | C. Authentication | 0 | 0 | 6 | No new endpoints in M1 |
 | D. Authorization | 0 | 0 | 5 | No new endpoints in M1 |
 | E. Secrets Management | 7 | 0 | 0 | No secrets in code, LLM keys not stored |
 | F. Data Protection | 1 | 0 | 3 | Raw text stored locally (acceptable for desktop app) |
-| G. Dependencies | 5 | 0 | 0 | All pinned, no known CVEs |
-| H. Error Handling | 4 | 0 | 0 | Errors logged, no stack trace leakage |
+| G. Dependencies | 6 | 0 | 0 | All pinned, no known CVEs. M2 adds zero new deps. |
+| H. Error Handling | 5 | 0 | 0 | Errors logged, no stack trace leakage. M2 returns empty list on edge cases. |
 | I. Transport Security | 0 | 0 | 5 | No network endpoints in M1 |
 | J. Logging & Monitoring | 3 | 0 | 0 | Structured logging, no sensitive data logged |
 | K. C/C++ Memory Safety | 0 | 0 | 7 | Python only |
@@ -78,7 +83,8 @@
 | M5 (Upload API) | Add path traversal protection on upload endpoint. Validate filename against `[a-zA-Z0-9._-]+` regex. Add file size limit (10MB). Rate-limit upload endpoint. |
 | M5 (KB CRUD API) | All endpoints must check Bearer token auth (existing middleware). Add input validation on entry_id (positive integer). |
 | M3 (LaTeX) | Jinja2 templates must use `autoescape=True` or manual escaping for LaTeX special chars to prevent command injection. |
+| M8 (ONNX) | Validate that embedding vectors come from local KB. Do not accept embeddings from external sources without integrity check. |
 
 ## Verdict
 
-**PASS** — No security vulnerabilities found in M1 foundation code. All M1 code is backend-only with no user-facing endpoints, reducing attack surface to zero for this milestone. Future milestones (especially M5 Upload API) must follow the recommendations above.
+**PASS** — No security vulnerabilities found in M1+M2 code. M1 is backend-only with no user-facing endpoints. M2 is pure computation (TF-IDF cosine similarity, keyword extraction) with zero external dependencies, zero I/O, and zero network calls — attack surface remains zero. Future milestones (especially M5 Upload API and M8 ONNX) must follow the recommendations above.

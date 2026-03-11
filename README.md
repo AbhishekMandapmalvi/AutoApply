@@ -5,7 +5,7 @@
 AutoApply searches LinkedIn and Indeed, scores each job against your preferences, generates tailored resumes and cover letters using AI, and submits applications — all running locally on your machine. Your data never leaves your computer.
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/tests-738%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-1181%20passing-brightgreen.svg)](#testing)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
@@ -15,9 +15,10 @@ AutoApply searches LinkedIn and Indeed, scores each job against your preferences
 - **Multi-platform search** — LinkedIn and Indeed, with configurable job titles, locations, and keywords
 - **Smart scoring** — Each job scored 0–100 based on title match, salary, location, experience level, and keyword relevance
 - **AI-powered documents** — Generates tailored resumes (PDF) and cover letters per job using your choice of AI provider (Anthropic, OpenAI, Google, or DeepSeek)
+- **Knowledge Base** — Upload career documents (PDF, DOCX, TXT, MD) once, reuse categorized entries across applications. TF-IDF scoring ranks entries by job relevance
 - **Automated applications** — Fills forms, uploads documents, and submits on LinkedIn Easy Apply, Indeed Quick Apply, Greenhouse, Lever, Workday, and Ashby
 - **Review mode** — Optionally review each application before it's submitted
-- **Dashboard** — Real-time live feed, application history, analytics, CSV export
+- **Dashboard** — Real-time live feed, application history, analytics, resume library, CSV export
 - **Desktop app** — Electron shell with system tray support (minimize to tray, runs in background)
 - **Login session persistence** — Log in once, sessions are saved across restarts
 - **Scheduling** — Set days and hours for the bot to run automatically
@@ -115,7 +116,13 @@ AutoApply/
 │   ├── ai_engine.py        # Multi-provider LLM API for document generation
 │   ├── filter.py           # Job scoring and ATS detection
 │   ├── resume_renderer.py  # PDF resume generation (ReportLab)
-│   └── scheduler.py        # Time-based bot scheduling
+│   ├── scheduler.py        # Time-based bot scheduling
+│   ├── knowledge_base.py   # KB CRUD, LLM extraction, resume ingestion
+│   ├── document_parser.py  # PDF/DOCX/TXT/MD text extraction
+│   ├── resume_parser.py    # Markdown resume → KB entries
+│   ├── resume_scorer.py    # TF-IDF cosine similarity scoring
+│   ├── jd_analyzer.py      # JD keyword extraction, section detection
+│   └── experience_calculator.py  # Domain-specific years from roles
 ├── bot/
 │   ├── bot.py              # Main bot loop (search → filter → generate → apply)
 │   ├── browser.py          # Playwright browser manager
@@ -125,14 +132,14 @@ AutoApply/
 ├── static/
 │   ├── css/main.css        # Extracted stylesheet
 │   ├── js/                 # 17 ES modules (app.js entry point)
-│   └── locales/en.json     # i18n string catalog (383 keys, 23 sections)
+│   └── locales/en.json     # i18n string catalog (430+ keys, 25 sections)
 ├── routes/                 # 7 Flask Blueprints (bot, applications, config, profile, login, analytics, lifecycle)
 ├── electron/               # Electron desktop shell
 │   ├── main.js             # App window, tray, lifecycle
 │   ├── python-backend.js   # Python process management
 │   ├── icons/              # Generated app icons (PNG, ICO, ICNS)
 │   └── scripts/            # Build scripts (version sync, icon gen, Python bundling)
-├── tests/                  # 738 tests (pytest)
+├── tests/                  # 1181 tests (pytest)
 └── docs/                   # User and developer documentation
 ```
 
@@ -157,9 +164,10 @@ Everything stays on your machine at `~/.autoapply/`:
 ```
 ~/.autoapply/
 ├── config.json              # Your settings
-├── autoapply.db             # Application history (SQLite)
+├── autoapply.db             # Application history + Knowledge Base (SQLite)
 ├── profile/
 │   ├── experiences/         # Your background (.txt files fed to AI)
+│   ├── uploads/             # Uploaded career documents (PDF, DOCX, TXT, MD)
 │   ├── resumes/             # Generated resumes (PDF)
 │   ├── cover_letters/       # Generated cover letters
 │   └── job_descriptions/    # Saved job postings (HTML)
@@ -173,7 +181,7 @@ Everything stays on your machine at `~/.autoapply/`:
 python -m pytest tests/ -v
 ```
 
-738 tests covering settings, database, API endpoints, bot logic, AI engine, scoring/filtering, resume rendering, scheduling, login flow, applier modules, i18n, accessibility, security hardening, and resilience.
+1181 tests covering settings, database, API endpoints, bot logic, AI engine, scoring/filtering, resume rendering, scheduling, login flow, applier modules, i18n, accessibility, security hardening, resilience, analytics, resume versioning, knowledge base, and TF-IDF scoring.
 
 ## Tech Stack
 
@@ -189,7 +197,7 @@ python -m pytest tests/ -v
 | Frontend | Vanilla JS SPA (17 ES modules, no build step) |
 | i18n | JSON locale files (`static/locales/`) with `t()` translation function |
 | Accessibility | WCAG 2.1 AA (ARIA, keyboard nav, focus management, reduced motion) |
-| Tests | pytest (738 tests, 97% coverage on core modules) |
+| Tests | pytest (1181 tests, 97% coverage on core modules) |
 
 ## Disclaimer
 

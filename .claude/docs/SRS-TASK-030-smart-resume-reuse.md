@@ -25,8 +25,14 @@ This SRS specifies the functional and non-functional requirements for Milestone 
 - Pydantic config models (ResumeReuseConfig, LatexConfig)
 - i18n keys for KB and reuse settings UI (pre-populated for M5)
 
-**Explicitly out of scope (M1)**:
-- TF-IDF scoring engine (M2)
+**In scope (M2)**:
+- TF-IDF cosine similarity scoring engine (stdlib only)
+- Job description analyzer: keyword extraction, section detection, tech term recognition
+- Synonym normalization for common technology aliases
+- ONNX embedding interface (optional, mocked in tests)
+- Score blending: 0.3 * TF-IDF + 0.7 * ONNX when available, TF-IDF only otherwise
+
+**Explicitly out of scope (M1/M2)**:
 - LaTeX compilation (M3)
 - Bot integration and resume assembly (M4)
 - Frontend UI, upload endpoints, KB viewer (M5)
@@ -336,6 +342,133 @@ This feature extends the existing AutoApply bot. Currently, every job applicatio
 
 ---
 
+### FR-030-13: TF-IDF Cosine Similarity Scoring
+
+**Description**: The system shall score KB entries against job description text using hand-rolled TF-IDF cosine similarity (stdlib only: `collections.Counter`, `math`, `re`). Scores range from 0.0 to 1.0.
+
+**Priority**: P0 (M2 ship-blocking)
+**Source**: US-102 from PRD
+**Dependencies**: FR-030-04 (KB entries must exist)
+
+**Acceptance Criteria**:
+
+- **AC-030-13-1**: Given a JD and a list of KB entries, When `score_kb_entries()` is called, Then each entry receives a cosine similarity score in [0.0, 1.0].
+- **AC-030-13-2**: Given entries with scores below `min_score`, When scoring completes, Then those entries are excluded from results.
+- **AC-030-13-3**: Given scored results, When returned, Then they are sorted by score descending.
+- **AC-030-13-4**: Given a backend JD and backend + frontend KB entries, When scored, Then backend entries rank higher than unrelated frontend entries.
+
+**Negative Cases**:
+- **AC-030-13-N1**: Given an empty JD or empty entries list, When `score_kb_entries()` is called, Then an empty list is returned.
+- **AC-030-13-N2**: Given entries with empty text fields, When scored, Then those entries receive a score of 0.0.
+
+---
+
+### FR-030-14: Job Description Keyword Extraction
+
+**Description**: The system shall analyze job description text to extract required keywords, preferred keywords, recognized tech terms, and n-gram phrases.
+
+**Priority**: P0 (M2 ship-blocking)
+**Source**: US-102 from PRD
+**Dependencies**: None
+
+**Acceptance Criteria**:
+
+- **AC-030-14-1**: Given a JD with a "Requirements" section, When `analyze_jd()` is called, Then required keywords are extracted from that section.
+- **AC-030-14-2**: Given a JD with a "Nice to Have" section, When `analyze_jd()` is called, Then preferred keywords are extracted from that section.
+- **AC-030-14-3**: Given a JD mentioning Python, Flask, Docker, When analyzed, Then those terms appear in `tech_terms`.
+- **AC-030-14-4**: Given a JD, When analyzed, Then 2-3 word n-gram phrases are extracted.
+
+**Negative Cases**:
+- **AC-030-14-N1**: Given empty or None text, When `analyze_jd()` is called, Then empty result dict is returned with all fields as empty lists/dicts.
+
+---
+
+### FR-030-15: JD Section Detection
+
+**Description**: The system shall detect structural sections in job descriptions (requirements, preferred, responsibilities, benefits, about) by matching header patterns.
+
+**Priority**: P1
+**Source**: Derived from FR-030-14
+**Dependencies**: None
+
+**Acceptance Criteria**:
+
+- **AC-030-15-1**: Given a JD with "Requirements:" header, When sections are detected, Then a "requirements" section is returned with its content.
+- **AC-030-15-2**: Given a JD with "Nice to Have:" header, When sections are detected, Then a "preferred" section is returned.
+- **AC-030-15-3**: Given a JD with "Responsibilities:" header, When sections are detected, Then a "responsibilities" section is returned.
+
+**Negative Cases**:
+- **AC-030-15-N1**: Given plain text without section headers, When analyzed, Then sections dict is empty.
+
+---
+
+### FR-030-16: Synonym Normalization
+
+**Description**: The system shall normalize technology term aliases to canonical forms (e.g., "JS" → "javascript", "k8s" → "kubernetes", "postgres" → "postgresql") using a built-in synonym map of 40+ aliases.
+
+**Priority**: P1
+**Source**: Derived from FR-030-14
+**Dependencies**: None
+
+**Acceptance Criteria**:
+
+- **AC-030-16-1**: Given the term "JS", When `normalize_term()` is called, Then "javascript" is returned.
+- **AC-030-16-2**: Given the term "k8s", When `normalize_term()` is called, Then "kubernetes" is returned.
+- **AC-030-16-3**: Given an unknown term, When `normalize_term()` is called, Then the term is returned lowercased.
+
+---
+
+### FR-030-17: Keyword Match Boosting
+
+**Description**: The system shall boost TF-IDF scores with additive bonuses for matching required keywords (+0.03/match, max +0.15), preferred keywords (+0.02/match, max +0.05), and tech terms (+0.01/match, max +0.05). Final score is capped at 1.0.
+
+**Priority**: P1
+**Source**: Derived from FR-030-13
+**Dependencies**: FR-030-14 (JD analysis), FR-030-13 (TF-IDF base score)
+
+**Acceptance Criteria**:
+
+- **AC-030-17-1**: Given an entry matching 5 required keywords, When scored, Then the boost is +0.15 (5 × 0.03, capped).
+- **AC-030-17-2**: Given an entry matching 3 preferred keywords, When scored, Then the boost is +0.05 (3 × 0.02, capped at 0.05).
+- **AC-030-17-3**: Given boosts that would push the score above 1.0, When applied, Then the final score is capped at 1.0.
+
+---
+
+### FR-030-18: ONNX Embedding Score Blending
+
+**Description**: The system shall support optional ONNX embedding scores. When available, final score = 0.3 × TF-IDF + 0.7 × ONNX. When unavailable (no onnxruntime), the system falls back to TF-IDF only.
+
+**Priority**: P2 (interface only in M2, full implementation in M8)
+**Source**: US-102 from PRD
+**Dependencies**: FR-030-13 (TF-IDF scores)
+
+**Acceptance Criteria**:
+
+- **AC-030-18-1**: Given ONNX runtime is not installed, When scoring with method="auto", Then TF-IDF only is used and scoring_method="tfidf".
+- **AC-030-18-2**: Given ONNX scores are available, When blending, Then final = 0.3 × TF-IDF + 0.7 × ONNX.
+- **AC-030-18-3**: Given scoring_method="tfidf" in config, When scoring, Then ONNX is never called regardless of availability.
+
+**Negative Cases**:
+- **AC-030-18-N1**: Given entries without precomputed embeddings, When ONNX scoring is attempted, Then it returns None and TF-IDF fallback is used.
+
+---
+
+### FR-030-19: Tech Term Dictionary
+
+**Description**: The system shall maintain a built-in dictionary of 100+ recognized technology terms across categories (languages, frameworks, databases, cloud, data/ML) for extraction from job descriptions.
+
+**Priority**: P1
+**Source**: Derived from FR-030-14
+**Dependencies**: None
+
+**Acceptance Criteria**:
+
+- **AC-030-19-1**: Given a JD mentioning "PostgreSQL", When tech terms are extracted, Then "postgresql" appears in results.
+- **AC-030-19-2**: Given a JD mentioning "GitHub Actions", When tech terms are extracted (multi-word), Then "github actions" appears in results.
+- **AC-030-19-3**: Given the TECH_TERMS dictionary, Then it contains at least 100 entries.
+
+---
+
 ## 4. Non-Functional Requirements
 
 ### NFR-030-01: KB Assembly Latency (M1 Foundation)
@@ -380,11 +513,39 @@ This feature extends the existing AutoApply bot. Currently, every job applicatio
 **Priority**: P1
 **Validation Method**: Code review of all new modules
 
+### NFR-030-07: TF-IDF Scoring Latency
+
+**Description**: TF-IDF scoring of 200 KB entries against a single JD shall complete within 30ms.
+**Metric**: p95 latency < 30ms for 200 entries
+**Priority**: P1
+**Validation Method**: Unit test with 200 entries, measure wall-clock time
+
+### NFR-030-08: Scoring Module Test Coverage
+
+**Description**: All new M2 modules (resume_scorer, jd_analyzer) shall have unit test coverage of at least 90% of lines, covering happy paths, error paths, and edge cases.
+**Metric**: >= 90% line coverage per new module
+**Priority**: P0
+**Validation Method**: `pytest --cov` on new modules
+
+### NFR-030-09: No New Runtime Dependencies (M2)
+
+**Description**: The M2 scoring engine shall use only Python stdlib. ONNX is optional and not required at runtime.
+**Metric**: Zero new entries in pyproject.toml [dependencies] for M2
+**Priority**: P0
+**Validation Method**: Inspect pyproject.toml diff
+
+### NFR-030-10: Structured Logging (M2)
+
+**Description**: Both new M2 modules shall use `logging.getLogger(__name__)` and log scoring operations at INFO level and errors at ERROR level.
+**Metric**: Zero `print()` statements; all error paths logged
+**Priority**: P0
+**Validation Method**: Code review + grep for print() in new modules
+
 ---
 
 ## 5. Interface Requirements
 
-### 5.1 Internal Interfaces (M1 — no external/UI interfaces)
+### 5.1 Internal Interfaces (M1 — no external/UI interfaces, M2 — internal scoring APIs)
 
 | Module | Function | Direction | Consumers |
 |--------|----------|-----------|-----------|
@@ -395,6 +556,10 @@ This feature extends the existing AutoApply bot. Currently, every job applicatio
 | core/experience_calculator | `calculate_experience(db)` | Called by assembler (M4) | core/resume_assembler (M4) |
 | core/ai_engine | `invoke_llm(prompt, config)` | Called by KnowledgeBase | core/knowledge_base |
 | db/database | KB CRUD methods | Called by KnowledgeBase | core/knowledge_base |
+| core/resume_scorer | `score_kb_entries(jd_text, entries, config)` | Called by assembler (M4) | core/resume_assembler (M4) |
+| core/resume_scorer | `compute_tfidf_score(jd_text, entry_text)` | Utility | Any module |
+| core/jd_analyzer | `analyze_jd(text)` | Called by ResumeScorer | core/resume_scorer |
+| core/jd_analyzer | `normalize_term(term)` | Called by ResumeScorer | core/resume_scorer |
 
 ---
 
@@ -420,7 +585,6 @@ Existing databases auto-migrated via `_migrate()` — adds new tables and column
 
 ## 7. Out of Scope
 
-- **TF-IDF scoring engine**: Deferred to M2 — requires JD analyzer dependency.
 - **LaTeX compilation**: Deferred to M3 — requires pdflatex/TinyTeX bundling.
 - **Bot integration**: Deferred to M4 — requires scoring + compilation from M2/M3.
 - **Frontend UI and API endpoints**: Deferred to M5 — M1 is backend foundation only.
@@ -477,15 +641,22 @@ Existing databases auto-migrated via `_migrate()` — adds new tables and column
 | FR-030-10 | US-106 | Design: Config → Code: config/settings.py → Test: test_kb_config.py |
 | FR-030-11 | Derived | Design: Database → Code: db/database.py → Test: test_kb_database.py |
 | FR-030-12 | US-103, US-106 | Design: i18n → Code: static/locales/en.json, es.json → Test: manual |
+| FR-030-13 | US-102 | Design: ResumeScorer → Code: core/resume_scorer.py → Test: test_resume_scorer.py |
+| FR-030-14 | US-102 | Design: JDAnalyzer → Code: core/jd_analyzer.py → Test: test_resume_scorer.py |
+| FR-030-15 | Derived | Design: JDAnalyzer → Code: core/jd_analyzer.py → Test: test_resume_scorer.py |
+| FR-030-16 | Derived | Design: JDAnalyzer → Code: core/jd_analyzer.py → Test: test_resume_scorer.py |
+| FR-030-17 | Derived | Design: ResumeScorer → Code: core/resume_scorer.py → Test: test_resume_scorer.py |
+| FR-030-18 | US-102 | Design: ResumeScorer → Code: core/resume_scorer.py → Test: test_resume_scorer.py |
+| FR-030-19 | Derived | Design: JDAnalyzer → Code: core/jd_analyzer.py → Test: test_resume_scorer.py |
 
 ---
 
 ## Software Requirements Specification -- GATE 3 OUTPUT
 
 **Document**: SRS-TASK-030-smart-resume-reuse
-**FRs**: 12 functional requirements
-**NFRs**: 6 non-functional requirements
-**ACs**: 42 total acceptance criteria (31 positive + 11 negative)
+**FRs**: 19 functional requirements (12 M1 + 7 M2)
+**NFRs**: 10 non-functional requirements (6 M1 + 4 M2)
+**ACs**: 66 total acceptance criteria (49 positive + 17 negative)
 **Quality Checklist**: 20/20 items passed (100%)
 
 ### Handoff Routing
