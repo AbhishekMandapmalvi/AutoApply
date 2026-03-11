@@ -39,6 +39,11 @@ profile/cover_letters/
 .coverage
 htmlcov/
 .pytest_cache/
+cov_*.txt
+test_*.txt
+*_results.txt
+*_output.txt
+*_stderr.txt
 
 # Playwright
 playwright-report/
