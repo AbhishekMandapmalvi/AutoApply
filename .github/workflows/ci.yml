@@ -70,4 +70,7 @@ jobs:
           pip install ".[dev]"
 
       - name: Audit dependencies for known vulnerabilities
-        run: pip-audit --strict --desc on --ignore-vuln PYSEC-0
+        run: |
+          # Audit only third-party deps (exclude local autoapply package)
+          pip freeze --exclude autoapply > /tmp/audit-reqs.txt
+          pip-audit --strict --desc on --ignore-vuln PYSEC-0 -r /tmp/audit-reqs.txt
