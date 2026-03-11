@@ -1,0 +1,26 @@
+# CODEOWNERS — defines code review ownership
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for everything
+* @AbhishekMandapmalvi
+
+# Core backend
+/app.py @AbhishekMandapmalvi
+/app_state.py @AbhishekMandapmalvi
+/run.py @AbhishekMandapmalvi
+/config/ @AbhishekMandapmalvi
+/core/ @AbhishekMandapmalvi
+/db/ @AbhishekMandapmalvi
+/bot/ @AbhishekMandapmalvi
+/routes/ @AbhishekMandapmalvi
+
+# Frontend
+/templates/ @AbhishekMandapmalvi
+/static/ @AbhishekMandapmalvi
+
+# Electron
+/electron/ @AbhishekMandapmalvi
+
+# CI/CD and config
+/.github/ @AbhishekMandapmalvi
+/pyproject.toml @AbhishekMandapmalvi
