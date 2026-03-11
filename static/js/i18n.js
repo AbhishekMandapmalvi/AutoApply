@@ -50,6 +50,14 @@ export async function setLocale(locale) {
     _locale = locale;
     _ready = true;
     document.documentElement.lang = locale;
+    // Persist to localStorage (FR-132)
+    try { localStorage.setItem('autoapply_locale', locale); } catch { /* private browsing */ }
+    // Sync backend locale (FR-133)
+    fetch('/api/locale', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locale }),
+    }).catch(() => { /* best-effort sync */ });
     _applyDataI18n();
     _readyCallbacks.forEach(fn => fn());
     _readyCallbacks.length = 0;
@@ -68,8 +76,13 @@ export function onReady(fn) {
   _readyCallbacks.push(fn);
 }
 
-/** Detect locale from <html lang>, query param ?lang=, or default 'en'. */
+/** Detect locale from localStorage, query param ?lang=, <html lang>, or default 'en'. */
 function detectLocale() {
+  // localStorage takes priority (FR-132)
+  try {
+    const stored = localStorage.getItem('autoapply_locale');
+    if (stored) return stored;
+  } catch { /* private browsing */ }
   const params = new URLSearchParams(window.location.search);
   const qLang = params.get('lang');
   if (qLang) return qLang;

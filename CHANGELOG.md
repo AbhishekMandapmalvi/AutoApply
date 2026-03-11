@@ -51,9 +51,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - **CI integration**: Release workflow passes 7 signing secrets as env vars (opt-in, graceful skip)
   - **Setup guide**: `docs/guides/code-signing.md` with step-by-step instructions for both platforms
   - **No breaking changes**: Unsigned builds continue to work when secrets are not configured
+- **Locale Switcher UI (TASK-022, QOL-3)**: Language dropdown in Settings to switch UI locale. (FR-131 to FR-134)
+  - **Settings dropdown**: Language section at top of Settings screen with all available locales
+  - **Human-readable names**: Dropdown shows "English", "Español", "Français", etc. instead of codes
+  - **localStorage persistence**: Selected locale survives page reloads (FR-132)
+  - **Backend sync**: `PUT /api/locale` endpoint updates backend `set_locale()` for translated error messages (FR-133)
+  - **12 new tests**: 5 endpoint tests + 7 frontend code tests — total 33 i18n tests
+  - **WCAG 2.1 AA accessible**: Proper `<label>` and `aria-label` on dropdown
 
 ### Changed
-- **Traceability matrix v6.0**: FR-027 and FR-029 marked N/A (deprecated), 8 new rows for TASK-021
+- **Traceability matrix v7.0**: Added 7 rows for TASK-022 (FR-131 to FR-134, NFR-022-01 to NFR-022-03)
 - **CLAUDE.md v4.2**: Added principle #9 (GitHub Issues for every implementation), lesson 12.8 (issue lifecycle)
 
 ## [1.9.0] - 2026-03-11

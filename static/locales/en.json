@@ -266,6 +266,8 @@
     "save_error": "Error saving settings.",
     "saved": "Saved!",
     "screen_title": "Settings",
+    "section_language": "Language",
+    "label_language": "Language",
     "section_profile": "Profile",
     "section_ai_provider": "AI Provider",
     "ai_provider_hint": "Configure an LLM API to generate tailored resumes and cover letters for each application.",

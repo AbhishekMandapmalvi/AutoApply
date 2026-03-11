@@ -244,3 +244,107 @@ class TestFrontendI18nModule:
         content = Path("static/js/app.js").read_text(encoding="utf-8")
         assert "from './i18n.js'" in content
         assert "window.t = t" in content
+
+
+# ===================================================================
+# TASK-022 — Locale Switcher UI
+# ===================================================================
+
+
+class TestSetLocaleEndpoint:
+    """TASK-022: PUT /api/locale endpoint (FR-133)."""
+
+    @pytest.fixture()
+    def client(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("config.settings.get_data_dir", lambda: tmp_path)
+        monkeypatch.setattr("routes.profile.get_data_dir", lambda: tmp_path)
+        (tmp_path / "profile" / "experiences").mkdir(parents=True, exist_ok=True)
+        monkeypatch.setenv("AUTOAPPLY_DEV", "1")
+        from app import create_app
+        app, _ = create_app()
+        app.config["TESTING"] = True
+        with app.test_client() as c:
+            yield c
+
+    def test_set_locale_valid(self, client):
+        """PUT /api/locale with valid locale returns 200.  # AC-133-1"""
+        rv = client.put(
+            "/api/locale",
+            json={"locale": "en"},
+        )
+        assert rv.status_code == 200
+        data = rv.get_json()
+        assert data["locale"] == "en"
+
+    def test_set_locale_invalid(self, client):
+        """PUT /api/locale with invalid locale returns 400.  # AC-133-2"""
+        rv = client.put(
+            "/api/locale",
+            json={"locale": "xx_invalid"},
+        )
+        assert rv.status_code == 400
+
+    def test_set_locale_empty_body(self, client):
+        """PUT /api/locale with no locale field returns 400."""
+        rv = client.put(
+            "/api/locale",
+            json={},
+        )
+        assert rv.status_code == 400
+
+    def test_set_locale_no_json(self, client):
+        """PUT /api/locale with no JSON body returns 400."""
+        rv = client.put("/api/locale")
+        assert rv.status_code == 400
+
+    def test_set_locale_changes_backend(self, client):
+        """PUT /api/locale updates backend locale returned by GET /api/locales."""
+        client.put("/api/locale", json={"locale": "en"})
+        rv = client.get("/api/locales")
+        data = rv.get_json()
+        assert data["current"] == "en"
+
+
+class TestLocaleSwitcherFrontend:
+    """TASK-022: Frontend locale switcher code (FR-131, FR-132, FR-134)."""
+
+    def test_i18n_js_has_localstorage(self):
+        """i18n.js uses localStorage for persistence.  # AC-132-1"""
+        content = Path("static/js/i18n.js").read_text(encoding="utf-8")
+        assert "localStorage.getItem('autoapply_locale')" in content
+        assert "localStorage.setItem('autoapply_locale'" in content
+
+    def test_i18n_js_syncs_backend(self):
+        """i18n.js calls PUT /api/locale for backend sync.  # AC-133-1"""
+        content = Path("static/js/i18n.js").read_text(encoding="utf-8")
+        assert "/api/locale" in content
+        assert "PUT" in content
+
+    def test_settings_js_has_locale_names(self):
+        """settings.js has LOCALE_NAMES map.  # AC-134-1"""
+        content = Path("static/js/settings.js").read_text(encoding="utf-8")
+        assert "LOCALE_NAMES" in content
+        assert "'English'" in content
+        assert "'Español'" in content
+
+    def test_settings_js_exports_onLocaleChange(self):
+        """settings.js exports onLocaleChange.  # FR-131"""
+        content = Path("static/js/settings.js").read_text(encoding="utf-8")
+        assert "export async function onLocaleChange" in content
+
+    def test_app_js_exports_onLocaleChange(self):
+        """app.js exports onLocaleChange to window.  # FR-131"""
+        content = Path("static/js/app.js").read_text(encoding="utf-8")
+        assert "window.onLocaleChange = onLocaleChange" in content
+
+    def test_html_has_locale_dropdown(self):
+        """index.html has locale select dropdown.  # AC-131-1"""
+        content = Path("templates/index.html").read_text(encoding="utf-8")
+        assert 'id="set-locale"' in content
+        assert 'onchange="onLocaleChange()"' in content
+
+    def test_en_json_has_language_keys(self):
+        """en.json has settings.section_language and settings.label_language."""
+        data = json.loads(Path("static/locales/en.json").read_text(encoding="utf-8"))
+        assert data["settings"]["section_language"] == "Language"
+        assert data["settings"]["label_language"] == "Language"

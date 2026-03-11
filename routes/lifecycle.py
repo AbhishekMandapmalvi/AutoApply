@@ -8,11 +8,11 @@ from __future__ import annotations
 import os
 import signal
 
-from flask import Blueprint, jsonify, render_template
+from flask import Blueprint, abort, jsonify, render_template, request
 from flask_socketio import emit
 
 import app_state
-from core.i18n import get_available_locales, get_locale, t
+from core.i18n import get_available_locales, get_locale, set_locale, t
 
 lifecycle_bp = Blueprint("lifecycle", __name__)
 
@@ -36,10 +36,20 @@ def list_locales():
     })
 
 
+@lifecycle_bp.route("/api/locale", methods=["PUT"])
+def set_locale_endpoint():
+    """Set the active locale for backend responses (FR-133)."""
+    data = request.get_json(silent=True) or {}
+    locale = data.get("locale", "")
+    available = get_available_locales()
+    if locale not in available:
+        abort(400, description=t("errors.bad_request"))
+    set_locale(locale)
+    return jsonify({"locale": locale})
+
+
 @lifecycle_bp.route("/api/shutdown", methods=["POST"])
 def shutdown():
-    from flask import request
-
     if request.remote_addr not in ("127.0.0.1", "::1"):
         return jsonify({"error": t("errors.forbidden")}), 403
     pid = os.getpid()

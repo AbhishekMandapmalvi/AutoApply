@@ -4,13 +4,25 @@
 import { state } from './state.js';
 import { setTags } from './tag-input.js';
 import { checkLoginSessions } from './login.js';
-import { t } from './i18n.js';
+import { t, getLocale, setLocale } from './i18n.js';
 
 const LLM_DEFAULT_MODELS = {
   anthropic: 'claude-sonnet-4-20250514',
   openai: 'gpt-4o',
   google: 'gemini-2.0-flash',
   deepseek: 'deepseek-chat',
+};
+
+/** Human-readable names for locale codes (FR-134). */
+const LOCALE_NAMES = {
+  en: 'English',
+  es: 'Español',
+  fr: 'Français',
+  de: 'Deutsch',
+  pt: 'Português',
+  ja: '日本語',
+  zh: '中文',
+  ko: '한국어',
 };
 
 export async function loadSettings() {
@@ -77,7 +89,36 @@ export async function loadSettings() {
     document.getElementById('set-schedule-end').value = sched.end_time || '17:00';
     updateScheduleUI();
     checkLoginSessions();
+    _loadLocaleDropdown();
   } catch { }
+}
+
+/** Populate locale dropdown from GET /api/locales (FR-131). */
+async function _loadLocaleDropdown() {
+  const sel = document.getElementById('set-locale');
+  if (!sel) return;
+  try {
+    const res = await fetch('/api/locales');
+    const data = await res.json();
+    sel.innerHTML = '';
+    for (const code of data.available || []) {
+      const opt = document.createElement('option');
+      opt.value = code;
+      opt.textContent = LOCALE_NAMES[code] || code;
+      sel.appendChild(opt);
+    }
+    sel.value = getLocale();
+  } catch {
+    // If endpoint unavailable, show current locale only
+    sel.innerHTML = `<option value="${getLocale()}">${LOCALE_NAMES[getLocale()] || getLocale()}</option>`;
+  }
+}
+
+/** Handle locale dropdown change (FR-131, FR-132, FR-133). */
+export async function onLocaleChange() {
+  const sel = document.getElementById('set-locale');
+  if (!sel) return;
+  await setLocale(sel.value);
 }
 
 function _collectScreeningAnswers() {

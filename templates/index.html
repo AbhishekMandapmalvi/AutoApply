@@ -640,6 +640,15 @@
     <h2 style="color:var(--text-bright); margin-bottom:20px;" data-i18n="settings.screen_title">Settings</h2>
     <div class="card">
       <div class="flex-col gap-lg">
+        <h3 data-i18n="settings.section_language">Language</h3>
+        <div class="settings-grid">
+          <div class="form-group">
+            <label for="set-locale" data-i18n="settings.label_language">Language</label>
+            <select class="form-control" id="set-locale" onchange="onLocaleChange()"
+                    aria-label="Select language"></select>
+          </div>
+        </div>
+        <hr>
         <h3 data-i18n="settings.section_profile">Profile</h3>
         <div class="settings-grid">
           <div class="form-group">
