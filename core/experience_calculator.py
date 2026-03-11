@@ -60,11 +60,10 @@ def _role_duration_months(start_str: str | None, end_str: str | None) -> float:
         return 0.0
 
     if not end_str or end_str.lower().strip() in ("present", "current", "now", ""):
-        end = date.today()
+        end: date = date.today()
     else:
-        end = _parse_date(end_str)
-        if end is None:
-            end = date.today()
+        parsed_end = _parse_date(end_str)
+        end = parsed_end if parsed_end is not None else date.today()
 
     if end < start:
         return 0.0
