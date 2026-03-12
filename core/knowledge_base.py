@@ -39,7 +39,7 @@ Rules:
 - Make bullet points professional and ATS-optimized: "Verb + What + Metric + Context"
 - Do NOT invent metrics or facts not present in the source
 - DO improve grammar, tense consistency, and professional tone
-- Group related skills (e.g., "Python, Flask, Django" as one skill entry for "backend")
+- Extract EACH skill as its OWN separate entry (e.g., "Python" is one entry, "Flask" is another, "Django" is another). Do NOT group multiple skills into a single entry.
 - For experience bullets, preserve the original company/role as subsection context
 - Create 2-3 summary sentences that capture the person's overall profile, tagged by job type
 
