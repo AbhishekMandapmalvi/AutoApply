@@ -18,6 +18,7 @@ from pathlib import Path
 from flask import Blueprint, abort, jsonify, request
 
 import app_state
+from config.settings import load_config
 from core.i18n import t
 
 logger = logging.getLogger(__name__)
@@ -128,9 +129,9 @@ def upload_document():
             file.save(tmp)
             tmp_path = Path(tmp.name)
 
-        # Get LLM config from app state
-        llm_config = getattr(app_state, "config", None)
-        llm_cfg = getattr(llm_config, "llm", None) if llm_config else None
+        # Get LLM config from saved config file
+        app_config = load_config()
+        llm_cfg = app_config.llm if app_config else None
 
         from core.knowledge_base import KnowledgeBase
 
@@ -197,8 +198,8 @@ def upload_document_async():
         logger.error("Failed to save upload: %s", e)
         abort(500, description=t("kb.upload_error", error=str(e)))
 
-    llm_config = getattr(app_state, "config", None)
-    llm_cfg = getattr(llm_config, "llm", None) if llm_config else None
+    app_config = load_config()
+    llm_cfg = app_config.llm if app_config else None
 
     upload_dir = Path.home() / ".autoapply" / "uploads"
     upload_dir.mkdir(parents=True, exist_ok=True)
@@ -537,8 +538,8 @@ def preview_resume():
     kb = KnowledgeBase(db)
 
     # Get profile from config
-    config = getattr(app_state, "config", None)
-    profile_cfg = getattr(config, "profile", None) if config else None
+    app_config = load_config()
+    profile_cfg = app_config.profile if app_config else None
     profile = {
         "name": getattr(profile_cfg, "full_name", "") or "",
         "email": getattr(profile_cfg, "email", "") or "",
@@ -559,7 +560,7 @@ def preview_resume():
         all_entries = kb.get_all_entries(active_only=True, limit=2000)
         if not all_entries:
             abort(400, description=t("kb.entries_empty"))
-        reuse_cfg = getattr(config, "resume_reuse", None) if config else None
+        reuse_cfg = app_config.resume_reuse if app_config else None
         scored = score_kb_entries(jd_text, all_entries, reuse_cfg)
         if not scored:
             abort(400, description=t("kb.entries_empty"))
