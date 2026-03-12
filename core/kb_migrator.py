@@ -137,7 +137,7 @@ def migrate_resume_files(
     return total_inserted
 
 
-def run_migration(data_dir: Path, kb: object) -> dict:
+def run_migration(data_dir: Path, kb: KnowledgeBase) -> dict:
     """Run full KB migration if not already done.
 
     Args:
