@@ -173,7 +173,7 @@ export async function uploadKBDocument() {
       input.value = '';
       loadKnowledgeBase();
     } else {
-      const msg = data.description || data.message || 'Upload failed';
+      const msg = data.error || data.description || data.message || 'Upload failed';
       if (statusEl) {
         statusEl.textContent = t('kb.upload_error').replace('{error}', msg);
         statusEl.className = 'kb-upload-status text-danger';
