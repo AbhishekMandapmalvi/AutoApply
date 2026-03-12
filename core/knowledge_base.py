@@ -31,7 +31,10 @@ You are an expert career consultant. Parse this document into structured resume 
 For EACH item you extract, output it as a JSON object with these fields:
 - "category": one of "experience", "skill", "education", "project", "summary", "certification", "award", "volunteer"
 - "text": the polished, professional bullet point or entry. Use strong action verbs, quantify with metrics where present. Keep concise (1-2 lines max).
-- "subsection": the role/company/institution context (e.g., "Senior Engineer — Acme Corp (2020-2023)"). Null for skills/certs.
+- "subsection": the role/company/institution name only (e.g., "Senior Engineer — Acme Corp", "University of Washington"). Do NOT include dates or location here.
+- "start_date": start date if applicable (e.g., "September 2022", "2020", "Jan 2019"). Null if not time-bound.
+- "end_date": end date if applicable (e.g., "June 2024", "Present", "2023"). Null if not time-bound.
+- "location": city/state/country if mentioned (e.g., "Seattle, WA", "Remote"). Null if not specified.
 - "job_types": array of job categories this entry is relevant to. Choose from: ["backend", "frontend", "fullstack", "data_engineer", "data_scientist", "devops", "cloud", "ml_engineer", "mobile", "security", "management", "product", "qa", "embedded", "general"]
 
 Rules:
@@ -41,6 +44,7 @@ Rules:
 - DO improve grammar, tense consistency, and professional tone
 - Extract EACH skill as its OWN separate entry (e.g., "Python" is one entry, "Flask" is another, "Django" is another). Do NOT group multiple skills into a single entry.
 - For experience bullets, preserve the original company/role as subsection context
+- ALWAYS separate dates and location into their own fields — never embed them in "subsection" or "text"
 - Create 2-3 summary sentences that capture the person's overall profile, tagged by job type
 
 Output ONLY a JSON array of objects. No preamble, no explanation.
@@ -170,6 +174,9 @@ class KnowledgeBase:
                 category=entry["category"],
                 text=entry["text"],
                 subsection=entry.get("subsection"),
+                start_date=entry.get("start_date"),
+                end_date=entry.get("end_date"),
+                location=entry.get("location"),
                 job_types=entry.get("job_types"),
                 tags=entry.get("tags"),
                 source_doc_id=doc_id,
@@ -198,6 +205,9 @@ class KnowledgeBase:
                 category=category,
                 text=text,
                 subsection=entry.get("subsection"),
+                start_date=entry.get("start_date"),
+                end_date=entry.get("end_date"),
+                location=entry.get("location"),
                 job_types=entry.get("job_types"),
                 tags=entry.get("tags"),
                 source_doc_id=doc_id,

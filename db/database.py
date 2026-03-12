@@ -82,6 +82,9 @@ CREATE TABLE IF NOT EXISTS knowledge_base (
     category TEXT NOT NULL,
     text TEXT NOT NULL,
     subsection TEXT,
+    start_date TEXT,
+    end_date TEXT,
+    location TEXT,
     job_types TEXT,
     tags TEXT,
     source_doc_id INTEGER REFERENCES uploaded_documents(id),
@@ -183,6 +186,18 @@ class Database:
         if "last_used_at" not in kb_columns:
             conn.execute(
                 "ALTER TABLE knowledge_base ADD COLUMN last_used_at DATETIME"
+            )
+        if "start_date" not in kb_columns:
+            conn.execute(
+                "ALTER TABLE knowledge_base ADD COLUMN start_date TEXT"
+            )
+        if "end_date" not in kb_columns:
+            conn.execute(
+                "ALTER TABLE knowledge_base ADD COLUMN end_date TEXT"
+            )
+        if "location" not in kb_columns:
+            conn.execute(
+                "ALTER TABLE knowledge_base ADD COLUMN location TEXT"
             )
 
     def save_application(
@@ -609,6 +624,9 @@ class Database:
         category: str,
         text: str,
         subsection: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        location: str | None = None,
         job_types: str | None = None,
         tags: str | None = None,
         source_doc_id: int | None = None,
@@ -620,12 +638,12 @@ class Database:
                 cursor = conn.execute(
                     """
                     INSERT INTO knowledge_base (
-                        category, text, subsection, job_types, tags,
-                        source_doc_id, embedding
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                        category, text, subsection, start_date, end_date,
+                        location, job_types, tags, source_doc_id, embedding
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (category, text, subsection, job_types, tags,
-                     source_doc_id, embedding),
+                    (category, text, subsection, start_date, end_date,
+                     location, job_types, tags, source_doc_id, embedding),
                 )
                 return cursor.lastrowid  # type: ignore[return-value]
             except sqlite3.IntegrityError:
@@ -683,6 +701,9 @@ class Database:
         entry_id: int,
         text: str | None = None,
         subsection: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        location: str | None = None,
         job_types: str | None = None,
         tags: str | None = None,
     ) -> bool:
@@ -695,6 +716,15 @@ class Database:
         if subsection is not None:
             sets.append("subsection = ?")
             params.append(subsection)
+        if start_date is not None:
+            sets.append("start_date = ?")
+            params.append(start_date)
+        if end_date is not None:
+            sets.append("end_date = ?")
+            params.append(end_date)
+        if location is not None:
+            sets.append("location = ?")
+            params.append(location)
         if job_types is not None:
             sets.append("job_types = ?")
             params.append(job_types)

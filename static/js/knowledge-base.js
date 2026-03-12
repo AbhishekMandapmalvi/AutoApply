@@ -68,6 +68,8 @@ export async function loadKBEntries() {
         <th data-i18n="kb.col_category">${escHtml(t('kb.col_category'))}</th>
         <th data-i18n="kb.col_subsection">${escHtml(t('kb.col_subsection'))}</th>
         <th data-i18n="kb.col_text">${escHtml(t('kb.col_text'))}</th>
+        <th>${escHtml(t('kb.col_dates') || 'Dates')}</th>
+        <th>${escHtml(t('kb.col_location') || 'Location')}</th>
         <th data-i18n="kb.col_tags">${escHtml(t('kb.col_tags'))}</th>
         <th data-i18n="kb.col_actions">${escHtml(t('kb.col_actions'))}</th>
       </tr></thead><tbody>`;
@@ -76,10 +78,13 @@ export async function loadKBEntries() {
       const catLabel = t(`kb.category_${e.category}`) || e.category || '';
       const text = (e.text || '').length > 120 ? e.text.slice(0, 120) + '…' : (e.text || '');
       const tags = e.tags ? (typeof e.tags === 'string' ? e.tags : JSON.stringify(e.tags)) : '';
+      const dates = [e.start_date, e.end_date].filter(Boolean).join(' – ');
       html += `<tr>
         <td><span class="badge badge-${escAttr(e.category || 'info')}">${escHtml(catLabel)}</span></td>
         <td>${escHtml(e.subsection || '')}</td>
         <td class="kb-text-cell" title="${escAttr(e.text || '')}">${escHtml(text)}</td>
+        <td>${escHtml(dates)}</td>
+        <td>${escHtml(e.location || '')}</td>
         <td>${escHtml(tags)}</td>
         <td class="kb-actions no-row-click">
           <button type="button" class="btn btn-sm btn-secondary" data-kb-edit="${e.id}"
@@ -215,6 +220,20 @@ export async function editKBEntry(id) {
           <input id="kb-edit-subsection" class="form-input" value="${escAttr(entry.subsection || '')}"
                  aria-label="${escAttr(t('kb.col_subsection'))}">
         </label>
+        <div class="flex-row gap-md">
+          <label style="flex:1">${escHtml(t('kb.col_start_date') || 'Start Date')}
+            <input id="kb-edit-start-date" class="form-input" value="${escAttr(entry.start_date || '')}"
+                   placeholder="e.g. September 2022" aria-label="Start Date">
+          </label>
+          <label style="flex:1">${escHtml(t('kb.col_end_date') || 'End Date')}
+            <input id="kb-edit-end-date" class="form-input" value="${escAttr(entry.end_date || '')}"
+                   placeholder="e.g. June 2024 or Present" aria-label="End Date">
+          </label>
+          <label style="flex:1">${escHtml(t('kb.col_location') || 'Location')}
+            <input id="kb-edit-location" class="form-input" value="${escAttr(entry.location || '')}"
+                   placeholder="e.g. Seattle, WA" aria-label="Location">
+          </label>
+        </div>
         <label>${escHtml(t('kb.col_text'))}
           <textarea id="kb-edit-text" class="form-input" rows="5"
                     aria-label="${escAttr(t('kb.col_text'))}">${escHtml(entry.text || '')}</textarea>
@@ -240,13 +259,16 @@ export async function editKBEntry(id) {
 export async function saveKBEntry(id) {
   const text = document.getElementById('kb-edit-text')?.value;
   const subsection = document.getElementById('kb-edit-subsection')?.value;
+  const start_date = document.getElementById('kb-edit-start-date')?.value;
+  const end_date = document.getElementById('kb-edit-end-date')?.value;
+  const location = document.getElementById('kb-edit-location')?.value;
   const tags = document.getElementById('kb-edit-tags')?.value;
 
   try {
     const res = await fetch(`/api/kb/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, subsection, tags }),
+      body: JSON.stringify({ text, subsection, start_date, end_date, location, tags }),
     });
     if (res.ok) {
       closeKBEdit();
