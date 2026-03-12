@@ -1,5 +1,7 @@
 # Writing Experience Files
 
+> **Recommended**: The [Knowledge Base](knowledge-base.md) is now the preferred way to manage your career content. Upload PDF, DOCX, TXT, or MD files once, and the system extracts categorized entries that are reused across applications with zero API calls. Existing experience files are automatically migrated to the KB on first startup.
+
 Experience files are plain `.txt` files that describe your work history, skills, and achievements. AutoApply reads these to generate tailored resumes and cover letters for each job application.
 
 ## Where They Live
