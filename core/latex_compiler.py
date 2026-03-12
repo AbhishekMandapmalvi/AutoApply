@@ -41,14 +41,18 @@ _LATEX_ESCAPE_RE = re.compile(
 
 
 def escape_latex(text: str) -> str:
-    """Escape LaTeX special characters in text.
+    r"""Escape LaTeX special characters in text.
 
-    Handles: & % $ # _ { } ~ ^
-    Backslash is NOT escaped (used in LaTeX commands).
+    Handles: \ & % $ # _ { } ~ ^
+    Backslash is escaped FIRST using a placeholder, other chars are escaped,
+    then the placeholder is replaced with \textbackslash{}.
     """
     if not text:
         return ""
-    return _LATEX_ESCAPE_RE.sub(lambda m: _LATEX_ESCAPE_MAP[m.group()], text)
+    # Replace backslash with placeholder before escaping braces
+    text = text.replace("\\", "\x00BACKSLASH\x00")
+    text = _LATEX_ESCAPE_RE.sub(lambda m: _LATEX_ESCAPE_MAP[m.group()], text)
+    return text.replace("\x00BACKSLASH\x00", r"\textbackslash{}")
 
 
 # ---------------------------------------------------------------------------

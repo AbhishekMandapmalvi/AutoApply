@@ -317,6 +317,9 @@ Every source file in the project mapped to its requirement(s).
 | `tests/test_resume_scorer.py` | FR-030-13 to FR-030-19, NFR-030-07, NFR-030-08, NFR-030-10 |
 | `tests/test_latex_compiler.py` | FR-030-20 to FR-030-26, NFR-030-11, NFR-030-12, NFR-030-13 |
 | `tests/test_resume_assembler.py` | FR-030-27, FR-030-28, FR-030-30, FR-030-31, FR-030-32, NFR-030-15 |
+| `tests/test_performance.py` | FR-030-55 to FR-030-62, NFR-030-23, NFR-030-24 |
+| `tests/test_intelligence.py` | FR-030-63 to FR-030-70, NFR-030-25, NFR-030-26 |
+| `tests/test_migration.py` | FR-030-71 to FR-030-76, NFR-030-27, NFR-030-28 |
 
 ---
 
@@ -340,11 +343,17 @@ Every source file in the project mapped to its requirement(s).
 | Smart Resume Reuse M2 (FR-030-13 to FR-030-19, NFR-030-07 to NFR-030-10) | 11 | 11 | 0 | 0 |
 | Smart Resume Reuse M3 (FR-030-20 to FR-030-26, NFR-030-11 to NFR-030-13) | 10 | 10 | 0 | 0 |
 | Smart Resume Reuse M4 (FR-030-27 to FR-030-32, NFR-030-14 to NFR-030-15) | 8 | 8 | 0 | 0 |
-| **Total** | **173** | **173** | **0** | **0** |
+| Smart Resume Reuse M5 (FR-030-33 to FR-030-42, NFR-030-16 to NFR-030-18) | 13 | 13 | 0 | 0 |
+| Smart Resume Reuse M6 (FR-030-43 to FR-030-48, NFR-030-19 to NFR-030-20) | 8 | 8 | 0 | 0 |
+| Smart Resume Reuse M7 (FR-030-49 to FR-030-54, NFR-030-21 to NFR-030-22) | 8 | 8 | 0 | 0 |
+| Smart Resume Reuse M8 (FR-030-55 to FR-030-62, NFR-030-23 to NFR-030-24) | 10 | 10 | 0 | 0 |
+| Smart Resume Reuse M9 (FR-030-63 to FR-030-70, NFR-030-25 to NFR-030-26) | 10 | 10 | 0 | 0 |
+| Smart Resume Reuse M10 (FR-030-71 to FR-030-76, NFR-030-27 to NFR-030-28) | 8 | 8 | 0 | 0 |
+| **Total** | **230** | **230** | **0** | **0** |
 
-**Previous**: 155 requirements, 155 ✅, 0 ⚠️, 0 ❌
-**Current**: 173 requirements, 173 ✅, 0 ⚠️, 0 ❌
-**Improvement**: TASK-030 M3 adds 10 new requirements (7 FRs + 3 NFRs), M4 adds 8 new requirements (6 FRs + 2 NFRs), all fully traced.
+**Previous**: 173 requirements, 173 ✅, 0 ⚠️, 0 ❌
+**Current**: 230 requirements, 230 ✅, 0 ⚠️, 0 ❌
+**Improvement**: TASK-030 M5-M10 add 57 new requirements, all fully traced.
 
 ---
 

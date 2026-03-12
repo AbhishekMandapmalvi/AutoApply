@@ -1656,16 +1656,68 @@ ALTER TABLE knowledge_base ADD COLUMN last_used_at DATETIME;
 
 ---
 
+### §3.46 KB Migrator (M10)
+
+**Module**: `core/kb_migrator.py`
+**Purpose**: Auto-migrate legacy `.txt` experience files and `.md` resumes into KB entries on first startup.
+
+**Components**:
+- `needs_migration(data_dir)` → bool — checks for `.kb_migrated` marker file
+- `mark_migrated(data_dir)` → None — writes marker file
+- `migrate_experience_files(experience_dir, kb)` → int — parses .txt line-by-line
+- `migrate_resume_files(resumes_dir, kb)` → int — uses `parse_resume_md`, tags as "migrated"
+- `run_migration(data_dir, kb)` → dict — full pipeline (check → migrate → mark)
+- `_parse_txt_to_entries(content, filename)` → list[dict] — splits lines, strips bullets, skips <5 chars
+- `_guess_category(text)` → str — keyword heuristics for skill/education/certification/experience
+
+**Pipeline**:
+```
+run_migration(data_dir, kb)
+    ├── needs_migration? → False → return {migrated: false, skipped_reason: "already_migrated"}
+    ├── migrate_experience_files(data_dir/profile/experiences, kb)
+    │     ├── glob *.txt (skip README.txt)
+    │     ├── _parse_txt_to_entries() per file
+    │     └── kb.ingest_entries() per file
+    ├── migrate_resume_files(data_dir/resumes, kb)
+    │     ├── glob *.md
+    │     ├── parse_resume_md() per file
+    │     ├── tag entries with "migrated"
+    │     └── kb.ingest_entries() per file
+    └── mark_migrated(data_dir) → always, even if 0 entries
+```
+
+### §3.47 LaTeX Escaping Hardening (M10)
+
+**Module**: `core/latex_compiler.py` (modification)
+**Purpose**: Fix backslash escaping to prevent double-escaping of braces.
+
+**Technique**: Placeholder-based escaping
+1. Replace `\` with `\x00BACKSLASH\x00` (null-byte delimited placeholder)
+2. Run regex escaping for 9 special chars (`& % $ # _ { } ~ ^`)
+3. Replace placeholder with `\textbackslash{}`
+
+This prevents the `{` and `}` in `\textbackslash{}` from being re-escaped by the regex pass.
+
+### §3.48 Implementation Tasks — M10
+
+| Task | Name | Depends On | Files |
+|------|------|------------|-------|
+| IMPL-048 | KB Migrator Module | M1 KB, M1 ResumeParser | `core/kb_migrator.py` |
+| IMPL-049 | LaTeX Backslash Escaping | M3 LaTeX | `core/latex_compiler.py` |
+| IMPL-050 | M10 Tests | IMPL-048, IMPL-049 | `tests/test_migration.py` |
+
+---
+
 ## System Architecture -- GATE 4 OUTPUT
 
 **Document**: SAD-TASK-030-smart-resume-reuse
-**Components**: 30 components defined (7 M1 + 2 M2 + 3 M3 + 3 M4 + 4 M5 + 2 M6 + 2 M7 + 3 M8 + 4 M9)
-**Interfaces**: 37 contracts specified (10 M1 + 4 M2 + 5 M3 + 5 M4 + 3 M5 + 2 M6 + 3 M7 + 2 M8 + 3 M9)
+**Components**: 32 components defined (7 M1 + 2 M2 + 3 M3 + 3 M4 + 4 M5 + 2 M6 + 2 M7 + 3 M8 + 4 M9 + 2 M10)
+**Interfaces**: 37 contracts specified (10 M1 + 4 M2 + 5 M3 + 5 M4 + 3 M5 + 2 M6 + 3 M7 + 2 M8 + 3 M9 + 0 M10)
 **Entities**: 6 data entities modeled (5 new tables + 1 modified with 5 new columns)
 **ADRs**: 7 decisions documented (ADR-027 to ADR-033)
-**Impl Tasks**: 47 tasks in dependency order (8 M1 + 3 M2 + 3 M3 + 3 M4 + 8 M5 + 3 M6 + 6 M7 + 5 M8 + 8 M9)
-**Traceability**: 96/96 requirements mapped (100%)
-**Checklist**: 47/47 items passed
+**Impl Tasks**: 50 tasks in dependency order (8 M1 + 3 M2 + 3 M3 + 3 M4 + 8 M5 + 3 M6 + 6 M7 + 5 M8 + 8 M9 + 3 M10)
+**Traceability**: 104/104 requirements mapped (100%)
+**Checklist**: 50/50 items passed
 
 ### Handoff Routing
 | Recipient | What They Receive |

@@ -2,7 +2,7 @@
 
 **Date**: 2026-03-11
 **Auditor**: Claude (Security Engineer)
-**Scope**: TASK-030 M1–M9 — KB foundation (M1) + Scoring (M2) + LaTeX (M3) + Assembly (M4) + Upload UI + KB Viewer (M5) + ATS Scoring + Profiles (M6) + Manual Resume Builder + Presets (M7) + Performance (M8) + Intelligence (M9)
+**Scope**: TASK-030 M1–M10 — KB foundation (M1) + Scoring (M2) + LaTeX (M3) + Assembly (M4) + Upload UI + KB Viewer (M5) + ATS Scoring + Profiles (M6) + Manual Resume Builder + Presets (M7) + Performance (M8) + Intelligence (M9) + Migration + Polish (M10)
 
 ---
 
@@ -157,6 +157,26 @@ All new DB methods (`log_kb_usage`, `update_kb_outcome`, `get_kb_effectiveness`,
 ### Finding #51: Schema Migration Safety — PASS
 Migration uses `PRAGMA table_info` to check column existence before `ALTER TABLE`. Safe against duplicate migration runs. No data loss risk.
 
+## M10 Findings — Migration + Polish (KB Migrator, LaTeX Hardening)
+
+### Finding #52: KB Migrator File Access — PASS
+`kb_migrator.py` reads files from `data_dir/profile/experiences/` and `data_dir/resumes/` only. Paths are hardcoded, not user-supplied. Files are read via `Path.read_text()` with `encoding="utf-8"`. `UnicodeDecodeError` and `OSError` caught and logged (not silently swallowed).
+
+### Finding #53: Migration Marker — PASS
+Marker file `.kb_migrated` is written to the data directory only. Filename is a module-level constant, not user-controlled. No path traversal risk.
+
+### Finding #54: Category Guessing — PASS
+`_guess_category()` performs case-insensitive substring matching against static keyword sets. No regex, no SQL, no file I/O. Zero attack surface.
+
+### Finding #55: Migrated Entry Tagging — PASS
+Tags are serialized via `json.dumps()` (safe). Existing tags are parsed via `json.loads()` with `JSONDecodeError` handling. No injection vector.
+
+### Finding #56: LaTeX Backslash Escaping — PASS
+Placeholder technique (`\x00BACKSLASH\x00`) prevents double-escaping. Null bytes in the placeholder cannot appear in normal text input. Replacement is deterministic — no regex involved for the backslash substitution.
+
+### Finding #57: Migrator Error Handling — PASS
+All file read operations wrapped in try/except. Unreadable files logged with WARNING and skipped. Migration always completes (marks migrated even with 0 entries) — no partial state.
+
 ## Verdict
 
-**PASS** — No security vulnerabilities found in M1–M9 code. M1 is backend-only with no user-facing endpoints. M2 is pure computation with zero I/O. M3 mitigates subprocess/temp file risks via escape_latex(), explicit arg lists, timeouts, and try/finally cleanup. M4 is pure Python orchestration with filename sanitization and parameterized SQL. M5 adds upload validation (extension allowlist, filename sanitization, size cap), parameterized SQL in all CRUD, XSS prevention via escHtml/escAttr, and Bearer token auth on all 8 endpoints. M6 (ATS Scoring) is pure in-memory computation. M7 (Resume Builder) uses existing KB API with input validation. M8 (Performance) uses content-hash cache keys, thread-safe task tracking. M9 (Intelligence) uses parameterized SQL for all new queries, validates feedback input against allowlist, and derives effectiveness_score from actual data (not user-settable). Attack surface remains minimal.
+**PASS** — No security vulnerabilities found in M1–M10 code. M1 is backend-only with no user-facing endpoints. M2 is pure computation with zero I/O. M3 mitigates subprocess/temp file risks via escape_latex(), explicit arg lists, timeouts, and try/finally cleanup. M4 is pure Python orchestration with filename sanitization and parameterized SQL. M5 adds upload validation (extension allowlist, filename sanitization, size cap), parameterized SQL in all CRUD, XSS prevention via escHtml/escAttr, and Bearer token auth on all 8 endpoints. M6 (ATS Scoring) is pure in-memory computation. M7 (Resume Builder) uses existing KB API with input validation. M8 (Performance) uses content-hash cache keys, thread-safe task tracking. M9 (Intelligence) uses parameterized SQL for all new queries, validates feedback input against allowlist, and derives effectiveness_score from actual data (not user-settable). M10 (Migration) reads from hardcoded local paths only, uses json.dumps/loads safely, and handles all file errors gracefully. Attack surface remains minimal.
