@@ -2,6 +2,7 @@
 
 Implements: TASK-030 M5 — Upload API, KB entry management, resume preview.
 Implements: TASK-030 M7 — Resume presets CRUD.
+Implements: TASK-030 M8 — Async document processing with status polling.
 """
 
 from __future__ import annotations
@@ -10,6 +11,8 @@ import json
 import logging
 import re
 import tempfile
+import threading
+import uuid
 from pathlib import Path
 
 from flask import Blueprint, abort, jsonify, request
@@ -40,6 +43,53 @@ def _allowed_file(filename: str) -> bool:
 def _safe_filename(filename: str) -> str:
     """Sanitize filename — allow only alphanumeric, dash, underscore, dot."""
     return re.sub(r"[^a-zA-Z0-9._-]", "_", filename)[:100]
+
+
+# ---------------------------------------------------------------------------
+# Async upload tracking (TASK-030 M8)
+# ---------------------------------------------------------------------------
+
+_upload_tasks: dict[str, dict] = {}
+_upload_lock = threading.Lock()
+
+
+def _run_upload_async(
+    task_id: str,
+    tmp_path: Path,
+    llm_cfg: object | None,
+    upload_dir: Path,
+) -> None:
+    """Background thread: process uploaded document and update task status."""
+    try:
+        from core.knowledge_base import KnowledgeBase
+
+        db = app_state.db
+        if db is None:
+            with _upload_lock:
+                _upload_tasks[task_id]["status"] = "failed"
+                _upload_tasks[task_id]["error"] = "Database not initialized"
+            return
+
+        kb = KnowledgeBase(db)
+        count = kb.process_upload(tmp_path, llm_config=llm_cfg, upload_dir=upload_dir)
+
+        with _upload_lock:
+            _upload_tasks[task_id]["status"] = "completed"
+            _upload_tasks[task_id]["entries_created"] = count
+            _upload_tasks[task_id]["message"] = t(
+                "kb.upload_success", count=count,
+            )
+
+    except Exception as e:
+        logger.error("Async upload failed (task %s): %s", task_id, e)
+        with _upload_lock:
+            _upload_tasks[task_id]["status"] = "failed"
+            _upload_tasks[task_id]["error"] = str(e)
+    finally:
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except Exception:
+            pass
 
 
 # ---------------------------------------------------------------------------
@@ -107,6 +157,89 @@ def upload_document():
             tmp_path.unlink(missing_ok=True)
         except Exception:
             pass
+
+
+# ---------------------------------------------------------------------------
+# Async upload endpoint (TASK-030 M8)
+# ---------------------------------------------------------------------------
+
+
+@kb_bp.route("/api/kb/upload/async", methods=["POST"])
+def upload_document_async():
+    """Upload a document for async background processing.
+
+    Returns immediately with a task_id. Poll /api/kb/upload/status/<task_id>.
+    """
+    if "file" not in request.files:
+        abort(400, description=t("kb.upload_error", error="No file provided"))
+
+    file = request.files["file"]
+    if not file.filename:
+        abort(400, description=t("kb.upload_error", error="Empty filename"))
+
+    if not _allowed_file(file.filename):
+        abort(400, description=t("kb.upload_error", error="Unsupported file type"))
+
+    file.seek(0, 2)
+    size = file.tell()
+    file.seek(0)
+    if size > _MAX_UPLOAD_SIZE:
+        abort(413, description=t("kb.upload_error", error="File exceeds 10 MB limit"))
+
+    safe_name = _safe_filename(file.filename)
+    suffix = Path(safe_name).suffix
+
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            file.save(tmp)
+            tmp_path = Path(tmp.name)
+    except Exception as e:
+        logger.error("Failed to save upload: %s", e)
+        abort(500, description=t("kb.upload_error", error=str(e)))
+
+    llm_config = getattr(app_state, "config", None)
+    llm_cfg = getattr(llm_config, "llm", None) if llm_config else None
+
+    upload_dir = Path.home() / ".autoapply" / "uploads"
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
+    task_id = uuid.uuid4().hex[:12]
+    with _upload_lock:
+        _upload_tasks[task_id] = {
+            "status": "processing",
+            "filename": safe_name,
+            "entries_created": 0,
+            "error": None,
+            "message": None,
+        }
+
+    thread = threading.Thread(
+        target=_run_upload_async,
+        args=(task_id, tmp_path, llm_cfg, upload_dir),
+        daemon=True,
+        name=f"upload-{task_id}",
+    )
+    thread.start()
+
+    return jsonify({
+        "task_id": task_id,
+        "status": "processing",
+    }), 202
+
+
+@kb_bp.route("/api/kb/upload/status/<task_id>", methods=["GET"])
+def upload_status(task_id: str):
+    """Poll async upload task status."""
+    with _upload_lock:
+        task = _upload_tasks.get(task_id)
+
+    if task is None:
+        abort(404, description=t("errors.not_found"))
+
+    return jsonify({
+        "task_id": task_id,
+        **task,
+    })
 
 
 # ---------------------------------------------------------------------------

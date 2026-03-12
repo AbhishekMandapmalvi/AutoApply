@@ -1491,16 +1491,102 @@ Response 400: { description: str }
 
 ---
 
+### §3.38 PDF Compilation Cache (M8)
+
+**Module**: `core/pdf_cache.py`
+**Purpose**: Content-hash LRU cache to avoid redundant pdflatex compilations.
+
+**Data Flow**:
+```
+compile_latex(tex) → content_hash(tex) → SHA256[:16] → cache_dir/{hash}.pdf
+  ├─ HIT  → return cached bytes, touch file (LRU update)
+  └─ MISS → compile → store result → return bytes
+```
+
+**Key Functions**:
+- `content_hash(tex_content: str) → str` — SHA256[:16] of LaTeX content
+- `get_cached(tex_content: str) → bytes | None` — cache lookup
+- `store(tex_content: str, pdf_bytes: bytes) → None` — cache write
+- `evict_lru() → int` — remove oldest when > MAX_CACHE_SIZE (200)
+- `clear_cache() → int` — remove all cached PDFs
+- `cache_stats() → dict` — count, size_bytes, size_mb, max_size, cache_dir
+
+**Cache Directory**: `~/.autoapply/cache/pdf/`
+
+**Integration**: `core/latex_compiler.py:compile_latex()` checks cache before compilation, stores result after compilation. Controlled by `use_cache` parameter (default True).
+
+### §3.39 JD Classifier (M8)
+
+**Module**: `core/jd_classifier.py`
+**Purpose**: Lightweight keyword-based job type detection for pre-filtering KB entries before scoring.
+
+**Job Types** (9): backend, frontend, fullstack, data_engineer, data_scientist, ml_engineer, devops, mobile, security
+
+**Algorithm**: Case-insensitive substring matching against keyword dictionaries. Scores = count of matching keywords per type. Returns types sorted by score descending. Falls back to ["general"] when no matches.
+
+**Key Functions**:
+- `classify_jd(jd_text: str) → list[str]` — classify JD into job types
+- `get_relevant_types(primary_types: list[str]) → list[str]` — expand with related types
+- `filter_entries_by_type(entries, job_types, min_entries=5) → list[dict]` — filter KB entries, fallback to all if < min_entries match
+
+**Data Structures**:
+- `JOB_TYPE_KEYWORDS: dict[str, set[str]]` — keyword sets per job type
+- `RELATED_TYPES: dict[str, list[str]]` — related type mappings
+
+### §3.40 Async Document Upload (M8)
+
+**Module**: `routes/knowledge_base.py` (additions)
+**Purpose**: Non-blocking document upload with background processing and status polling.
+
+**Architecture**:
+```
+POST /api/kb/upload/async → validate file → save to temp → spawn daemon thread → return 202 {task_id}
+                                                              ↓
+                                           _run_upload_async(task_id, tmp_path, ...)
+                                                              ↓
+                                           KnowledgeBase.process_upload() → update _upload_tasks[task_id]
+
+GET /api/kb/upload/status/<task_id> → read _upload_tasks[task_id] → return status
+```
+
+**Thread Safety**: `_upload_tasks: dict[str, dict]` protected by `_upload_lock: threading.Lock`
+
+**Task States**: `processing` → `completed` | `failed`
+
+### Interface Contracts — M8
+
+#### IC-033: `POST /api/kb/upload/async`
+**Request**: multipart/form-data with `file` field (PDF/DOCX/TXT/MD, max 10MB)
+**Response 202**: `{ task_id: string, status: "processing" }`
+**Response 400**: No file, empty filename, or unsupported type
+**Response 413**: File exceeds 10MB
+
+#### IC-034: `GET /api/kb/upload/status/<task_id>`
+**Response 200**: `{ task_id, status, filename, entries_created, error, message }`
+**Response 404**: Unknown task_id
+
+### §3.41 Implementation Tasks — M8
+
+| Task | Name | Depends On | Files |
+|------|------|------------|-------|
+| IMPL-035 | PDF Cache Module | — | `core/pdf_cache.py` |
+| IMPL-036 | LaTeX Compiler Cache Integration | IMPL-035, M3 | `core/latex_compiler.py` |
+| IMPL-037 | JD Classifier Module | — | `core/jd_classifier.py` |
+| IMPL-038 | Async Upload Endpoints | M5 Upload | `routes/knowledge_base.py` |
+| IMPL-039 | M8 Tests | IMPL-035–038 | `tests/test_performance.py` |
+
+---
+
 ## System Architecture -- GATE 4 OUTPUT
 
 **Document**: SAD-TASK-030-smart-resume-reuse
-**Components**: 23 components defined (7 M1 + 2 M2 + 3 M3 + 3 M4 + 4 M5 + 2 M6 + 2 M7)
-**Interfaces**: 32 contracts specified (10 M1 + 4 M2 + 5 M3 + 5 M4 + 3 M5 + 2 M6 + 3 M7)
+**Components**: 26 components defined (7 M1 + 2 M2 + 3 M3 + 3 M4 + 4 M5 + 2 M6 + 2 M7 + 3 M8)
+**Interfaces**: 34 contracts specified (10 M1 + 4 M2 + 5 M3 + 5 M4 + 3 M5 + 2 M6 + 3 M7 + 2 M8)
 **Entities**: 5 data entities modeled (4 new tables + 1 modified with 2 new columns)
 **ADRs**: 7 decisions documented (ADR-027 to ADR-033)
-**Impl Tasks**: 34 tasks in dependency order (8 M1 + 3 M2 + 3 M3 + 3 M4 + 8 M5 + 3 M6 + 6 M7)
-**Traceability**: 76/76 requirements mapped (100%)
-**Checklist**: 34/34 items passed
+**Impl Tasks**: 39 tasks in dependency order (8 M1 + 3 M2 + 3 M3 + 3 M4 + 8 M5 + 3 M6 + 6 M7 + 5 M8)
+**Traceability**: 86/86 requirements mapped (100%)
+**Checklist**: 39/39 items passed
 
 ### Handoff Routing
 | Recipient | What They Receive |

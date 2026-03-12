@@ -147,6 +147,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - **i18n**: 27 new keys in `builder` section (en.json + es.json)
   - **15 new tests**: Preset DB methods (7) + preset API endpoints (8)
   - **WCAG 2.1 AA**: ARIA labels on panels/zones/buttons, aria-live regions, keyboard-accessible controls, reduced motion
+- **Smart Resume Reuse M8: Performance (TASK-030)**: PDF cache, JD classifier, async upload. (FR-030-55 to FR-030-62, NFR-030-23 to NFR-030-24)
+  - **PDF compilation cache**: Content-hash LRU cache (`core/pdf_cache.py`) — SHA256[:16] keys, max 200 files, lazy eviction
+  - **LaTeX compiler integration**: `compile_latex()` checks cache before compilation, stores result after (controlled by `use_cache` param)
+  - **JD classifier**: Keyword-based job type detection (`core/jd_classifier.py`) — 9 job types, related type expansion, KB entry pre-filtering
+  - **Async document upload**: `POST /api/kb/upload/async` returns 202 with task_id, background thread processes file
+  - **Upload status polling**: `GET /api/kb/upload/status/<task_id>` — returns processing/completed/failed with entry count
+  - **Thread safety**: `threading.Lock` protects shared upload task dict, daemon threads for clean shutdown
+  - **30 new tests**: PDF cache (9), JD classifier (14), async upload (5), LaTeX cache integration (2)
+  - **Security**: 6 findings all PASS — content-hash keys prevent path traversal, UUID4 task IDs prevent enumeration
 
 ### Changed
 - **Traceability matrix v14.0**: 186 requirements, all ✅ (0 ⚠️). M5 adds 13 new requirements (10 FRs + 3 NFRs).
