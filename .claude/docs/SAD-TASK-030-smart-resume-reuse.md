@@ -1434,16 +1434,73 @@ Response 400: { description: str }
 
 ---
 
+## 11. Design — M7: Manual Resume Builder
+
+### §3.35 Component: Preset CRUD (`db/database.py` + `routes/knowledge_base.py`)
+
+**Purpose**: Store and manage named resume entry combinations.
+
+**Database Table**: `resume_presets` (id, name, entry_ids JSON, template, created_at, updated_at)
+
+**DB Methods**: `save_preset()`, `get_presets()`, `get_preset()`, `update_preset()`, `delete_preset()`
+
+**Endpoints**:
+- `GET /api/kb/presets` → list all presets
+- `POST /api/kb/presets` → create preset (name, entry_ids, template)
+- `PUT /api/kb/presets/<id>` → update preset
+- `DELETE /api/kb/presets/<id>` → delete preset
+
+### §3.36 Component: Resume Builder Frontend (`static/js/resume-builder.js`)
+
+**Purpose**: Drag-and-drop resume building UI with presets and one-page estimation.
+
+**Key Functions**:
+- `openResumeBuilder()` / `closeResumeBuilder()` — overlay lifecycle
+- `addToResume(entryId)` / `removeFromResume(section, index)` — entry management
+- `moveEntryUp()` / `moveEntryDown()` — reorder within section
+- `estimateLines()` / `updatePageIndicator()` — one-page mode
+- `savePreset()` / `loadPreset()` / `deletePreset()` — preset management
+- `previewBuilderResume()` — PDF preview via existing `/api/kb/preview`
+- `autoFillFromJD()` — keyword-based auto-selection via ATS scoring
+
+### Interface Contracts — M7
+
+#### IC-030: `GET /api/kb/presets`
+**Response 200**: `{ presets: [{id, name, entry_ids, template, created_at, updated_at}] }`
+
+#### IC-031: `POST /api/kb/presets`
+**Request**: `{ name: string, entry_ids: int[], template?: string }`
+**Response 201**: `{id, name, entry_ids, template, created_at}`
+**Response 400**: Missing name or invalid entry_ids
+
+#### IC-032: `PUT /api/kb/presets/<id>`
+**Request**: `{ name?: string, entry_ids?: int[], template?: string }`
+**Response 200**: `{ success: true }`
+**Response 404**: Preset not found
+
+### §3.37 Implementation Tasks — M7
+
+| Task | Name | Depends On | Files |
+|------|------|------------|-------|
+| IMPL-029 | Presets DB Schema + Methods | M1 DB | `db/database.py` |
+| IMPL-030 | Preset API Endpoints | IMPL-029 | `routes/knowledge_base.py` |
+| IMPL-031 | Resume Builder Frontend | IMPL-030, M5 KB module | `static/js/resume-builder.js`, `static/js/app.js` |
+| IMPL-032 | Builder HTML + CSS | IMPL-031 | `templates/index.html`, `static/css/main.css` |
+| IMPL-033 | i18n Keys | IMPL-032 | `static/locales/en.json`, `static/locales/es.json` |
+| IMPL-034 | Preset Tests | IMPL-029, IMPL-030 | `tests/test_resume_builder.py` |
+
+---
+
 ## System Architecture -- GATE 4 OUTPUT
 
 **Document**: SAD-TASK-030-smart-resume-reuse
-**Components**: 21 components defined (7 M1 + 2 M2 + 3 M3 + 3 M4 + 4 M5 + 2 M6)
-**Interfaces**: 29 contracts specified (10 M1 + 4 M2 + 5 M3 + 5 M4 + 3 M5 + 2 M6)
-**Entities**: 4 data entities modeled (3 new tables + 1 modified with 2 new columns)
+**Components**: 23 components defined (7 M1 + 2 M2 + 3 M3 + 3 M4 + 4 M5 + 2 M6 + 2 M7)
+**Interfaces**: 32 contracts specified (10 M1 + 4 M2 + 5 M3 + 5 M4 + 3 M5 + 2 M6 + 3 M7)
+**Entities**: 5 data entities modeled (4 new tables + 1 modified with 2 new columns)
 **ADRs**: 7 decisions documented (ADR-027 to ADR-033)
-**Impl Tasks**: 28 tasks in dependency order (8 M1 + 3 M2 + 3 M3 + 3 M4 + 8 M5 + 3 M6)
-**Traceability**: 68/68 requirements mapped (100%)
-**Checklist**: 28/28 items passed
+**Impl Tasks**: 34 tasks in dependency order (8 M1 + 3 M2 + 3 M3 + 3 M4 + 8 M5 + 3 M6 + 6 M7)
+**Traceability**: 76/76 requirements mapped (100%)
+**Checklist**: 34/34 items passed
 
 ### Handoff Routing
 | Recipient | What They Receive |
