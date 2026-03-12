@@ -5,7 +5,7 @@
 AutoApply searches LinkedIn and Indeed, scores each job against your preferences, generates tailored resumes and cover letters using AI, and submits applications — all running locally on your machine. Your data never leaves your computer.
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/tests-1181%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-1385%20passing-brightgreen.svg)](#testing)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
@@ -122,7 +122,12 @@ AutoApply/
 │   ├── resume_parser.py    # Markdown resume → KB entries
 │   ├── resume_scorer.py    # TF-IDF cosine similarity scoring
 │   ├── jd_analyzer.py      # JD keyword extraction, section detection
-│   └── experience_calculator.py  # Domain-specific years from roles
+│   ├── experience_calculator.py  # Domain-specific years from roles
+│   ├── resume_assembler.py # Score, select, render, compile resumes from KB
+│   ├── latex_compiler.py   # LaTeX → PDF compilation (TinyTeX/pdflatex)
+│   ├── ats_scorer.py       # ATS compatibility scoring (6 platforms)
+│   ├── ats_profiles.py     # ATS platform-specific scoring profiles
+│   └── kb_migrator.py      # Auto-migrate legacy .txt/.md files to KB
 ├── bot/
 │   ├── bot.py              # Main bot loop (search → filter → generate → apply)
 │   ├── browser.py          # Playwright browser manager
@@ -133,13 +138,13 @@ AutoApply/
 │   ├── css/main.css        # Extracted stylesheet
 │   ├── js/                 # 17 ES modules (app.js entry point)
 │   └── locales/en.json     # i18n string catalog (430+ keys, 25 sections)
-├── routes/                 # 7 Flask Blueprints (bot, applications, config, profile, login, analytics, lifecycle)
+├── routes/                 # 8 Flask Blueprints (bot, applications, config, profile, login, analytics, lifecycle, knowledge_base)
 ├── electron/               # Electron desktop shell
 │   ├── main.js             # App window, tray, lifecycle
 │   ├── python-backend.js   # Python process management
 │   ├── icons/              # Generated app icons (PNG, ICO, ICNS)
 │   └── scripts/            # Build scripts (version sync, icon gen, Python bundling)
-├── tests/                  # 1181 tests (pytest)
+├── tests/                  # 1385 tests (pytest)
 └── docs/                   # User and developer documentation
 ```
 
@@ -153,6 +158,7 @@ AutoApply/
 | [How AI Generation Works](docs/guides/ai-generation.md) | What happens when AutoApply creates your documents |
 | [Application Flow](docs/architecture/application-flow.md) | Flowcharts for the full bot pipeline |
 | [Configuration](docs/guides/configuration.md) | All settings explained |
+| [Knowledge Base](docs/guides/knowledge-base.md) | Upload documents, build KB, assemble resumes with zero API calls |
 | [Troubleshooting](docs/guides/troubleshooting.md) | Common problems and fixes |
 | [API Reference](docs/api/endpoints.md) | REST API for developers |
 | [Changelog](CHANGELOG.md) | Version history |
@@ -181,7 +187,7 @@ Everything stays on your machine at `~/.autoapply/`:
 python -m pytest tests/ -v
 ```
 
-1181 tests covering settings, database, API endpoints, bot logic, AI engine, scoring/filtering, resume rendering, scheduling, login flow, applier modules, i18n, accessibility, security hardening, resilience, analytics, resume versioning, knowledge base, and TF-IDF scoring.
+1385 tests covering settings, database, API endpoints, bot logic, AI engine, scoring/filtering, resume rendering, scheduling, login flow, applier modules, i18n, accessibility, security hardening, resilience, analytics, resume versioning, knowledge base, TF-IDF scoring, LaTeX compilation, ATS scoring, resume assembly, performance, intelligence, and migration.
 
 ## Tech Stack
 
@@ -191,13 +197,13 @@ python -m pytest tests/ -v
 | Database | SQLite (stdlib `sqlite3`) |
 | Browser automation | Playwright (persistent context, system Chrome) |
 | AI | Multi-provider LLM API (Anthropic, OpenAI, Google, DeepSeek) |
-| PDF generation | ReportLab |
+| PDF generation | ReportLab (fallback), LaTeX via Jinja2 templates (KB assembly) |
 | Config | Pydantic v2 |
 | Desktop | Electron |
 | Frontend | Vanilla JS SPA (17 ES modules, no build step) |
 | i18n | JSON locale files (`static/locales/`) with `t()` translation function |
 | Accessibility | WCAG 2.1 AA (ARIA, keyboard nav, focus management, reduced motion) |
-| Tests | pytest (1181 tests, 97% coverage on core modules) |
+| Tests | pytest (1385 tests, 97% coverage on core modules) |
 
 ## Disclaimer
 

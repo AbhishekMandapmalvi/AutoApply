@@ -382,6 +382,263 @@ These endpoints are used by the Electron desktop shell to manage the Python back
 
 Returns 400 if `provider` or `api_key` is missing, or if the provider is not supported.
 
+## Knowledge Base
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/kb/upload` | Upload a career document for KB extraction |
+| POST | `/api/kb/upload/async` | Upload asynchronously (returns task ID) |
+| GET | `/api/kb/upload/status/:task_id` | Poll async upload status |
+| GET | `/api/kb/stats` | KB summary statistics |
+| GET | `/api/kb` | List KB entries (paginated, filterable) |
+| GET | `/api/kb/:id` | Get a single KB entry |
+| PUT | `/api/kb/:id` | Update a KB entry |
+| DELETE | `/api/kb/:id` | Soft-delete a KB entry |
+| GET | `/api/kb/documents` | List uploaded documents |
+| POST | `/api/kb/preview` | Preview a resume from KB entries |
+| POST | `/api/kb/ats-score` | Score KB entries against a JD for ATS compatibility |
+| GET | `/api/kb/ats-profiles` | List available ATS platform profiles |
+| POST | `/api/kb/feedback` | Submit outcome feedback for effectiveness learning |
+| GET | `/api/kb/effectiveness` | Get entries ranked by effectiveness score |
+| GET | `/api/kb/presets` | List saved resume presets |
+| POST | `/api/kb/presets` | Create a resume preset |
+| PUT | `/api/kb/presets/:id` | Update a preset |
+| DELETE | `/api/kb/presets/:id` | Delete a preset |
+
+### POST `/api/kb/upload`
+
+Upload a career document (PDF, DOCX, TXT, MD) for AI extraction into KB entries.
+
+**Request**: `multipart/form-data` with `file` field.
+
+**Constraints**: Max 10 MB. Extensions: `.pdf`, `.docx`, `.txt`, `.md`.
+
+**Response 200**:
+```json
+{
+  "entries_created": 8,
+  "message": "Processed resume.pdf: 8 entries created"
+}
+```
+
+**Response 400**: No file, empty filename, or unsupported type.
+
+### POST `/api/kb/upload/async`
+
+Same as `/api/kb/upload` but returns immediately with a task ID. Use `/api/kb/upload/status/:task_id` to poll for completion.
+
+**Response 202**:
+```json
+{
+  "task_id": "a1b2c3d4e5f6",
+  "status": "processing"
+}
+```
+
+### GET `/api/kb/upload/status/:task_id`
+
+**Response 200**:
+```json
+{
+  "task_id": "a1b2c3d4e5f6",
+  "status": "completed",
+  "filename": "resume.pdf",
+  "entries_created": 8,
+  "message": "Upload completed: 8 entries created"
+}
+```
+
+Status values: `processing`, `completed`, `failed`. Returns 404 for unknown task IDs.
+
+### GET `/api/kb`
+
+Query parameters:
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `category` | string | — | Filter by category (`experience`, `skill`, `education`, `certification`, `project`, `summary`) |
+| `search` | string | — | Full-text search in entry text |
+| `limit` | int | 50 | Results per page (max 500) |
+| `offset` | int | 0 | Skip this many results |
+
+**Response 200**:
+```json
+[
+  {
+    "id": 1,
+    "category": "experience",
+    "text": "Built REST APIs serving 10k requests per second",
+    "subsection": "Senior Engineer — Acme Corp",
+    "job_types": "[\"backend\", \"fullstack\"]",
+    "tags": "[\"python\", \"api\"]",
+    "effectiveness_score": 0.75,
+    "usage_count": 12,
+    "created_at": "2026-03-10T14:30:00"
+  }
+]
+```
+
+### GET `/api/kb/:id`
+
+Returns a single KB entry. Returns 404 if not found.
+
+### PUT `/api/kb/:id`
+
+Update a KB entry's text, category, subsection, job_types, or tags.
+
+**Request body** (all fields optional):
+```json
+{
+  "text": "Updated entry text",
+  "category": "skill",
+  "subsection": "Technical Skills",
+  "job_types": "[\"backend\"]",
+  "tags": "[\"python\"]"
+}
+```
+
+Returns 404 if not found.
+
+### DELETE `/api/kb/:id`
+
+Soft-deletes a KB entry (sets `is_active = 0`). Returns 404 if not found.
+
+### POST `/api/kb/ats-score`
+
+Score KB entries against a job description for ATS compatibility.
+
+**Request body**:
+```json
+{
+  "jd_text": "We are looking for a senior backend engineer...",
+  "platform": "greenhouse",
+  "entry_ids": [1, 2, 3]
+}
+```
+
+- `jd_text`: Required. The job description text.
+- `platform`: Optional. ATS platform for vendor-specific weights (default: `"default"`).
+- `entry_ids`: Optional. Score only these entries (defaults to all active entries).
+
+**Response 200**:
+```json
+{
+  "score": 78,
+  "components": {
+    "keyword_match": 85,
+    "section_completeness": 80,
+    "skill_match": 70,
+    "content_length": 75,
+    "format_compliance": 90
+  },
+  "matched_keywords": ["python", "rest api", "postgresql"],
+  "missing_keywords": ["kubernetes", "terraform"],
+  "matched_skills": ["python", "sql"],
+  "missing_skills": ["go", "rust"],
+  "platform": "greenhouse"
+}
+```
+
+### GET `/api/kb/ats-profiles`
+
+**Response 200**:
+```json
+{
+  "profiles": ["default", "greenhouse", "lever", "workday", "ashby", "icims", "taleo"]
+}
+```
+
+### POST `/api/kb/feedback`
+
+Submit outcome feedback for an application to update effectiveness scores.
+
+**Request body**:
+```json
+{
+  "application_id": 42,
+  "outcome": "interview"
+}
+```
+
+- `outcome`: One of `"interview"`, `"rejected"`, `"no_response"`.
+
+**Response 200**:
+```json
+{
+  "success": true,
+  "updated": 5
+}
+```
+
+### GET `/api/kb/effectiveness`
+
+Returns KB entries ranked by effectiveness score (entries that lead to interviews rank higher).
+
+**Response 200**: Array of entry objects with `effectiveness_score`, `usage_count`, `last_used_at`.
+
+### POST `/api/kb/presets`
+
+**Request body**:
+```json
+{
+  "name": "Backend Engineer",
+  "entry_ids": [1, 5, 8, 12, 15],
+  "template": "modern"
+}
+```
+
+- `name`: Required, non-empty string.
+- `entry_ids`: Required, array of integers.
+- `template`: Optional, defaults to `"classic"`.
+
+**Response 201**:
+```json
+{
+  "id": 1,
+  "name": "Backend Engineer",
+  "entry_ids": [1, 5, 8, 12, 15],
+  "template": "modern"
+}
+```
+
+### POST `/api/kb/preview`
+
+Preview a resume compiled from KB entries.
+
+**Request body**:
+```json
+{
+  "template": "classic",
+  "jd_text": "Optional job description for auto-selection...",
+  "entry_ids": [1, 2, 3]
+}
+```
+
+Returns PDF bytes with `Content-Type: application/pdf`.
+
+## Reuse Analytics
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/analytics/reuse-stats` | KB assembly metrics |
+
+### GET `/api/analytics/reuse-stats`
+
+**Response 200**:
+```json
+{
+  "total_assemblies": 45,
+  "total_entries_used": 312,
+  "unique_entries_used": 28,
+  "interviews_from_kb": 5,
+  "avg_effectiveness": 0.42,
+  "top_categories": [
+    {"category": "experience", "count": 180},
+    {"category": "skill", "count": 90}
+  ]
+}
+```
+
 ## Error Responses
 
 All errors return JSON:
