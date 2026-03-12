@@ -513,6 +513,48 @@ def delete_preset(preset_id: int):
 # ---------------------------------------------------------------------------
 
 
+def _context_to_markdown(ctx: dict) -> str:
+    """Convert a LaTeX template context dict into Markdown for ReportLab."""
+    lines: list[str] = []
+    if ctx.get("name"):
+        lines.append(f"# {ctx['name']}")
+    contact = " | ".join(
+        v for v in [ctx.get("email"), ctx.get("phone"), ctx.get("location")] if v
+    )
+    if contact:
+        lines.append(contact)
+    lines.append("")
+
+    if ctx.get("summary"):
+        lines.append("## Summary")
+        lines.append(ctx["summary"])
+        lines.append("")
+
+    section_map = [
+        ("experience", "Experience"),
+        ("skills", "Skills"),
+        ("education", "Education"),
+        ("projects", "Projects"),
+        ("certifications", "Certifications"),
+        ("volunteer", "Volunteer"),
+    ]
+    for key, title in section_map:
+        entries = ctx.get(key, [])
+        if not entries:
+            continue
+        lines.append(f"## {title}")
+        for entry in entries:
+            sub = entry.get("subsection", "")
+            if sub:
+                lines.append(f"### {sub}")
+            text = entry.get("text", "")
+            if text:
+                lines.append(f"- {text}")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
 @kb_bp.route("/api/kb/preview", methods=["POST"])
 def preview_resume():
     """Preview a resume assembled from KB entries with a chosen template.
@@ -577,12 +619,22 @@ def preview_resume():
     context = _build_context(profile, selected)
 
     pdflatex = find_pdflatex()
-    if pdflatex is None:
-        abort(503, description=t("errors.pdflatex_not_found"))
+    if pdflatex is not None:
+        pdf_bytes = compile_resume(template, context, pdflatex_path=pdflatex)
+        if pdf_bytes is None:
+            abort(500, description=t("errors.compilation_failed"))
+    else:
+        # Fallback: render via ReportLab when pdflatex is unavailable
+        from core.resume_renderer import render_resume_to_pdf
 
-    pdf_bytes = compile_resume(template, context, pdflatex_path=pdflatex)
-    if pdf_bytes is None:
-        abort(500, description=t("errors.compilation_failed"))
+        md = _context_to_markdown(context)
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            tmp_path = Path(tmp.name)
+        try:
+            render_resume_to_pdf(md, tmp_path)
+            pdf_bytes = tmp_path.read_bytes()
+        finally:
+            tmp_path.unlink(missing_ok=True)
 
     from flask import Response
 
