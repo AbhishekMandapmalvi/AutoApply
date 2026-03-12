@@ -1455,12 +1455,79 @@ All new database queries SHALL use parameterized SQL (? placeholders). No string
 
 ---
 
+## 14. Milestone 10 — Migration + Polish
+
+### 14.1 Functional Requirements
+
+#### FR-030-71: Migration Marker File
+The system SHALL track KB migration state via a `.kb_migrated` marker file in the data directory.
+- **AC-071-1 (positive)**: `needs_migration()` returns True when marker file does not exist.
+- **AC-071-2 (positive)**: `needs_migration()` returns False after `mark_migrated()` is called.
+- **AC-071-3 (positive)**: `mark_migrated()` creates `.kb_migrated` file in data directory.
+
+#### FR-030-72: Experience File Migration
+The system SHALL auto-migrate `.txt` experience files into KB entries.
+- **AC-072-1 (positive)**: Lines starting with `-` or `*` are parsed as individual entries.
+- **AC-072-2 (positive)**: Lines shorter than 5 characters are skipped.
+- **AC-072-3 (positive)**: `README.txt` files are skipped.
+- **AC-072-4 (positive)**: Returns 0 when directory does not exist or is empty.
+- **AC-072-5 (positive)**: Multiple files processed with correct cumulative count.
+
+#### FR-030-73: Resume File Migration
+The system SHALL auto-migrate `.md` resume files into KB entries using `parse_resume_md`.
+- **AC-073-1 (positive)**: Markdown resumes parsed into categorized KB entries.
+- **AC-073-2 (positive)**: All migrated entries tagged with `"migrated"`.
+- **AC-073-3 (positive)**: Returns 0 when directory does not exist or is empty.
+
+#### FR-030-74: Full Migration Pipeline
+`run_migration()` SHALL orchestrate txt + md migration and mark completion.
+- **AC-074-1 (positive)**: Skips migration if already migrated (returns `{migrated: false, skipped_reason: "already_migrated"}`).
+- **AC-074-2 (positive)**: Processes both experience and resume directories.
+- **AC-074-3 (positive)**: Creates marker even when no files found.
+- **AC-074-4 (positive)**: Returns counts of txt and md entries.
+
+#### FR-030-75: Category Guessing
+`_guess_category()` SHALL classify text into experience/skill/education/certification using keyword heuristics.
+- **AC-075-1 (positive)**: Certification keywords detected (certified, certification, license).
+- **AC-075-2 (positive)**: Education keywords detected (bachelor, master, degree, university).
+- **AC-075-3 (positive)**: Skill keywords detected (proficient, python, frameworks).
+- **AC-075-4 (positive)**: Defaults to "experience" when no keywords match.
+
+#### FR-030-76: LaTeX Backslash Escaping
+`escape_latex()` SHALL handle backslash characters without double-escaping braces.
+- **AC-076-1 (positive)**: Backslash converted to `\textbackslash{}`.
+- **AC-076-2 (positive)**: All 9 special characters (`& % $ # _ { } ~ ^`) properly escaped.
+- **AC-076-3 (positive)**: Empty string returns empty string.
+- **AC-076-4 (positive)**: Mixed backslash and special chars produce correct output.
+- **AC-076-5 (negative)**: Single backslash does not produce doubled `\textbackslash{}`.
+
+### 14.2 Non-Functional Requirements
+
+#### NFR-030-27: Structured Logging (M10)
+All M10 modules SHALL use `logging.getLogger(__name__)` with `%s` formatting. No silent exception swallowing.
+
+#### NFR-030-28: Test Coverage (M10)
+M10 SHALL include ≥25 unit tests covering all new functions, error paths, and edge cases.
+
+### 14.3 Traceability Seeds
+
+| FR | → Design | → Source | → Test |
+|----|----------|----------|--------|
+| FR-030-71 | SAD §3.46 | `core/kb_migrator.py` | `test_migration.py::TestMigrationMarker` |
+| FR-030-72 | SAD §3.46 | `core/kb_migrator.py` | `test_migration.py::TestMigrateExperienceFiles` |
+| FR-030-73 | SAD §3.46 | `core/kb_migrator.py` | `test_migration.py::TestMigrateResumeFiles` |
+| FR-030-74 | SAD §3.46 | `core/kb_migrator.py` | `test_migration.py::TestRunMigration` |
+| FR-030-75 | SAD §3.46 | `core/kb_migrator.py` | `test_migration.py::TestCategoryGuessing` |
+| FR-030-76 | SAD §3.47 | `core/latex_compiler.py` | `test_migration.py::TestLatexEscapingHardening` |
+
+---
+
 ## Software Requirements Specification -- GATE 3 OUTPUT
 
 **Document**: SRS-TASK-030-smart-resume-reuse
-**FRs**: 70 functional requirements (12 M1 + 7 M2 + 7 M3 + 6 M4 + 10 M5 + 6 M6 + 6 M7 + 8 M8 + 8 M9)
-**NFRs**: 26 non-functional requirements (6 M1 + 4 M2 + 3 M3 + 2 M4 + 3 M5 + 2 M6 + 2 M7 + 2 M8 + 2 M9)
-**ACs**: 218 total acceptance criteria (185 positive + 33 negative)
+**FRs**: 76 functional requirements (12 M1 + 7 M2 + 7 M3 + 6 M4 + 10 M5 + 6 M6 + 6 M7 + 8 M8 + 8 M9 + 6 M10)
+**NFRs**: 28 non-functional requirements (6 M1 + 4 M2 + 3 M3 + 2 M4 + 3 M5 + 2 M6 + 2 M7 + 2 M8 + 2 M9 + 2 M10)
+**ACs**: 241 total acceptance criteria (207 positive + 34 negative)
 **Quality Checklist**: 48/48 items passed (100%)
 
 ### Handoff Routing

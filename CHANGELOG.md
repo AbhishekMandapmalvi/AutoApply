@@ -167,9 +167,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - **DB migration**: 3 new columns on knowledge_base (effectiveness_score, usage_count, last_used_at) + kb_usage_log table
   - **27 new tests**: Usage log (10), cover letter (4), JD integration (1), effectiveness weighting (2), API endpoints (10)
   - **Security**: 6 findings all PASS — parameterized SQL, input validation, derived scores
+- **Smart Resume Reuse M10: Migration + Polish (TASK-030)**: Auto-migration of legacy files and LaTeX hardening. (FR-030-71 to FR-030-76, NFR-030-27 to NFR-030-28)
+  - **KB migrator**: `core/kb_migrator.py` — auto-migrates `.txt` experience files and `.md` resumes into KB on first startup
+  - **Migration pipeline**: `run_migration()` checks marker → migrates experiences + resumes → marks complete (idempotent)
+  - **Category guessing**: Keyword heuristics classify entries as experience/skill/education/certification
+  - **LaTeX backslash hardening**: Placeholder-based escaping prevents double-escaping of braces in `\textbackslash{}`
+  - **28 new tests**: Migration marker (3), experience files (6), resume files (4), full pipeline (4), category guessing (4), LaTeX escaping (7)
+  - **Security**: 6 findings all PASS — hardcoded paths, safe JSON, graceful error handling
+  - **TASK-030 COMPLETE**: All 10 milestones delivered (M1–M10)
 
 ### Changed
-- **Traceability matrix v14.0**: 186 requirements, all ✅ (0 ⚠️). M5 adds 13 new requirements (10 FRs + 3 NFRs).
+- **Traceability matrix v15.0**: 230 requirements, all ✅ (0 ⚠️). TASK-030 M1-M10 adds 104 new requirements (76 FRs + 28 NFRs).
 - **CLAUDE.md v5.0**: Gitflow-lite branching model (develop + master), shared-workflows.md as single source of truth
 - **CLAUDE.md v4.2**: Added principle #9 (GitHub Issues for every implementation), lesson 12.8 (issue lifecycle)
 
