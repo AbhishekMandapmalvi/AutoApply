@@ -10,6 +10,10 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from core.knowledge_base import KnowledgeBase
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +35,7 @@ def mark_migrated(data_dir: Path) -> None:
 
 def migrate_experience_files(
     experience_dir: Path,
-    kb: object,
+    kb: KnowledgeBase,
 ) -> int:
     """Migrate .txt experience files into KB entries.
 
@@ -77,7 +81,7 @@ def migrate_experience_files(
 
 def migrate_resume_files(
     resumes_dir: Path,
-    kb: object,
+    kb: KnowledgeBase,
 ) -> int:
     """Migrate .md resume files into KB entries.
 
