@@ -745,7 +745,90 @@
     <!-- Template Management -->
     <div class="card" style="margin-bottom:16px;">
       <h3 data-i18n="reuse.templates_title">Resume Templates</h3>
-      <p class="text-muted" data-i18n="reuse.templates_desc">Upload your own Overleaf/LaTeX templates (.tex files). Use Jinja2 variables for dynamic content.</p>
+
+      <!-- Rules / Help — collapsible -->
+      <details style="margin-bottom:12px; border:1px solid var(--border-color); border-radius:6px; padding:8px 12px;">
+        <summary style="cursor:pointer; font-weight:600;">How to create a custom template</summary>
+        <div style="margin-top:8px; font-size:0.9em; line-height:1.6;">
+          <p>Upload any <code>.tex</code> file (e.g. from Overleaf). To inject your KB data, use these <strong>special delimiters</strong> instead of standard LaTeX commands:</p>
+
+          <table style="width:100%; border-collapse:collapse; margin:8px 0;">
+            <thead><tr style="border-bottom:2px solid var(--border-color); text-align:left;">
+              <th style="padding:4px 8px;">Syntax</th><th style="padding:4px 8px;">Purpose</th>
+            </tr></thead>
+            <tbody>
+              <tr style="border-bottom:1px solid var(--border-color);">
+                <td style="padding:4px 8px;"><code>\VAR{name}</code></td>
+                <td style="padding:4px 8px;">Insert a variable (name, email, phone, location, summary)</td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border-color);">
+                <td style="padding:4px 8px;"><code>\BLOCK{if experience}...\BLOCK{endif}</code></td>
+                <td style="padding:4px 8px;">Conditional section — only render if data exists</td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border-color);">
+                <td style="padding:4px 8px;"><code>\BLOCK{for entry in experience}...\BLOCK{endfor}</code></td>
+                <td style="padding:4px 8px;">Loop over entries in a section</td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border-color);">
+                <td style="padding:4px 8px;"><code>\VAR{entry.text}</code></td>
+                <td style="padding:4px 8px;">The entry's bullet text (inside a loop)</td>
+              </tr>
+              <tr>
+                <td style="padding:4px 8px;"><code>\VAR{entry.subsection}</code></td>
+                <td style="padding:4px 8px;">The entry's heading — e.g. "Software Engineer — Acme Corp"</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <p><strong>Available variables:</strong></p>
+          <ul style="margin:4px 0; padding-left:20px;">
+            <li><code>name</code>, <code>email</code>, <code>phone</code>, <code>location</code> — profile fields</li>
+            <li><code>summary</code> — summary text (string, not a list)</li>
+            <li><code>experience</code> — list of entries, each has <code>.text</code> and <code>.subsection</code></li>
+            <li><code>education</code> — same structure as experience</li>
+            <li><code>skills</code> — list of entries, each has <code>.text</code></li>
+            <li><code>projects</code> — same structure as experience (optional)</li>
+            <li><code>certifications</code> — list of entries, each has <code>.text</code> (optional)</li>
+          </ul>
+
+          <p><strong>Loop helpers:</strong> <code>\BLOCK{if not loop.last}...\BLOCK{endif}</code> — insert separators between items.</p>
+
+          <p><strong>Minimal example:</strong></p>
+          <pre style="background:var(--bg-secondary); padding:8px; border-radius:4px; overflow-x:auto; font-size:0.85em;">\documentclass[11pt]{article}
+\usepackage[margin=0.75in]{geometry}
+\usepackage{enumitem}
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+
+\begin{document}
+{\LARGE\bfseries \VAR{name}} \\
+\VAR{email} | \VAR{phone} | \VAR{location}
+
+\BLOCK{if experience}
+\section*{Experience}
+\BLOCK{for entry in experience}
+\textbf{\VAR{entry.subsection}} \\
+\begin{itemize}[leftmargin=1.5em,topsep=0pt]
+  \item \VAR{entry.text}
+\end{itemize}
+\BLOCK{endfor}
+\BLOCK{endif}
+
+\BLOCK{if education}
+\section*{Education}
+\BLOCK{for entry in education}
+\textbf{\VAR{entry.subsection}} --- \VAR{entry.text} \\
+\BLOCK{endfor}
+\BLOCK{endif}
+
+\BLOCK{if skills}
+\section*{Skills}
+\BLOCK{for entry in skills}\VAR{entry.text}\BLOCK{if not loop.last}, \BLOCK{endif}\BLOCK{endfor}
+\BLOCK{endif}
+\end{document}</pre>
+          <p style="margin-top:8px;"><strong>Tip:</strong> Start from an Overleaf template and replace hardcoded content with the <code>\VAR{}</code> / <code>\BLOCK{}</code> placeholders above. LaTeX special characters in your data (&amp; % $ # _ { }) are escaped automatically.</p>
+        </div>
+      </details>
 
       <div class="flex-row gap-sm" style="margin-bottom:12px; flex-wrap:wrap; align-items:flex-end;">
         <label style="flex:1; min-width:200px;">

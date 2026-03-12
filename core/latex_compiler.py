@@ -248,37 +248,24 @@ def compile_latex(
         tex_path.write_text(tex_content, encoding="utf-8")
 
         try:
-            # Run pdflatex twice (for references/TOC resolution)
-            for run in range(2):
-                result = subprocess.run(
-                    [pdflatex_path, "-interaction=nonstopmode", "-halt-on-error", "resume.tex"],
-                    cwd=tmpdir,
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout,
-                )
+            pdf_bytes = _run_pdflatex(pdflatex_path, tmpdir, pdf_path, timeout)
 
-                if result.returncode != 0 and run == 1:
-                    # Only log error on second run (first run may have unresolved refs)
-                    logger.error(
-                        "pdflatex compilation failed (run %d):\n%s",
-                        run + 1,
-                        result.stdout[-2000:] if result.stdout else "no output",
-                    )
-                    return None
+            # Auto-install missing packages and retry once
+            if pdf_bytes is None:
+                log_path = Path(tmpdir) / "resume.log"
+                log_text = log_path.read_text(errors="replace") if log_path.exists() else ""
+                missing = _find_missing_packages(log_text)
+                if missing and _auto_install_packages(missing, pdflatex_path):
+                    logger.info("Retrying after installing: %s", ", ".join(missing))
+                    pdf_bytes = _run_pdflatex(pdflatex_path, tmpdir, pdf_path, timeout)
 
-            if pdf_path.exists():
-                pdf_bytes = pdf_path.read_bytes()
+            if pdf_bytes is not None:
                 logger.info("LaTeX compilation successful: %d bytes", len(pdf_bytes))
-                # Store in cache (M8)
                 if use_cache:
                     from core.pdf_cache import store
 
                     store(tex_content, pdf_bytes)
-                return pdf_bytes
-
-            logger.error("pdflatex did not produce PDF output")
-            return None
+            return pdf_bytes
 
         except subprocess.TimeoutExpired:
             logger.error("pdflatex compilation timed out after %ds", timeout)
@@ -286,6 +273,71 @@ def compile_latex(
         except FileNotFoundError:
             logger.error("pdflatex binary not found at: %s", pdflatex_path)
             return None
+
+
+def _run_pdflatex(
+    pdflatex_path: str, tmpdir: str, pdf_path: Path, timeout: int,
+) -> bytes | None:
+    """Run pdflatex twice and return PDF bytes or None."""
+    for run in range(2):
+        result = subprocess.run(
+            [pdflatex_path, "-interaction=nonstopmode", "-halt-on-error", "resume.tex"],
+            cwd=tmpdir,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        if result.returncode != 0 and run == 1:
+            logger.error(
+                "pdflatex compilation failed (run %d):\n%s",
+                run + 1,
+                result.stdout[-2000:] if result.stdout else "no output",
+            )
+            return None
+
+    if pdf_path.exists():
+        return pdf_path.read_bytes()
+
+    logger.error("pdflatex did not produce PDF output")
+    return None
+
+
+def _find_missing_packages(log_text: str) -> list[str]:
+    """Parse pdflatex log to find missing .sty files."""
+    # Pattern: "! LaTeX Error: File `foo.sty' not found."
+    pattern = re.compile(r"File `([^']+\.sty)' not found")
+    matches = pattern.findall(log_text)
+    # Strip .sty extension — tlmgr uses package names
+    return list(dict.fromkeys(m.replace(".sty", "") for m in matches))
+
+
+def _auto_install_packages(packages: list[str], pdflatex_path: str) -> bool:
+    """Auto-install missing LaTeX packages via tlmgr (TinyTeX)."""
+    # Find tlmgr relative to pdflatex
+    pdflatex_dir = Path(pdflatex_path).parent
+    tlmgr = pdflatex_dir / "tlmgr.bat"
+    if not tlmgr.exists():
+        tlmgr = pdflatex_dir / "tlmgr"
+    if not tlmgr.exists():
+        logger.warning("tlmgr not found — cannot auto-install packages")
+        return False
+
+    logger.info("Auto-installing LaTeX packages: %s", ", ".join(packages))
+    try:
+        result = subprocess.run(
+            [str(tlmgr), "install"] + packages,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        if result.returncode == 0:
+            logger.info("Successfully installed: %s", ", ".join(packages))
+            return True
+        logger.error("tlmgr install failed: %s", result.stderr[-500:])
+        return False
+    except Exception as e:
+        logger.error("tlmgr install error: %s", e)
+        return False
 
 
 def render_custom_template(
