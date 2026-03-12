@@ -60,12 +60,12 @@ jobs:
           # Windows code signing (optional — skipped if not configured)
           WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
-          # macOS code signing (optional — skipped if not configured)
+          # macOS code signing (optional — identity:null in package.json skips signing by default;
+          # setting CSC_LINK overrides and enables signing + hardened runtime + entitlements)
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          # Disable auto-discovery of local signing identities when no cert is configured
-          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.CSC_LINK != '' }}
-          # macOS notarization (optional — skipped if not configured)
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+          # macOS notarization (optional — only runs when APPLE_ID is configured)
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
