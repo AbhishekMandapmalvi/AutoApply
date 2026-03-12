@@ -82,9 +82,7 @@ CREATE TABLE IF NOT EXISTS knowledge_base (
     category TEXT NOT NULL,
     text TEXT NOT NULL,
     subsection TEXT,
-    start_date TEXT,
-    end_date TEXT,
-    location TEXT,
+    role_id INTEGER REFERENCES roles(id),
     job_types TEXT,
     tags TEXT,
     source_doc_id INTEGER REFERENCES uploaded_documents(id),
@@ -103,6 +101,7 @@ CREATE TABLE IF NOT EXISTS roles (
     company TEXT NOT NULL,
     start_date TEXT,
     end_date TEXT,
+    location TEXT,
     domain TEXT,
     source_doc_id INTEGER REFERENCES uploaded_documents(id),
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -187,17 +186,18 @@ class Database:
             conn.execute(
                 "ALTER TABLE knowledge_base ADD COLUMN last_used_at DATETIME"
             )
-        if "start_date" not in kb_columns:
+        if "role_id" not in kb_columns:
             conn.execute(
-                "ALTER TABLE knowledge_base ADD COLUMN start_date TEXT"
+                "ALTER TABLE knowledge_base ADD COLUMN role_id INTEGER REFERENCES roles(id)"
             )
-        if "end_date" not in kb_columns:
+
+        # Add location to roles for existing DBs
+        role_columns = {
+            row[1] for row in conn.execute("PRAGMA table_info(roles)").fetchall()
+        }
+        if "location" not in role_columns:
             conn.execute(
-                "ALTER TABLE knowledge_base ADD COLUMN end_date TEXT"
-            )
-        if "location" not in kb_columns:
-            conn.execute(
-                "ALTER TABLE knowledge_base ADD COLUMN location TEXT"
+                "ALTER TABLE roles ADD COLUMN location TEXT"
             )
 
     def save_application(
@@ -624,9 +624,7 @@ class Database:
         category: str,
         text: str,
         subsection: str | None = None,
-        start_date: str | None = None,
-        end_date: str | None = None,
-        location: str | None = None,
+        role_id: int | None = None,
         job_types: str | None = None,
         tags: str | None = None,
         source_doc_id: int | None = None,
@@ -638,12 +636,12 @@ class Database:
                 cursor = conn.execute(
                     """
                     INSERT INTO knowledge_base (
-                        category, text, subsection, start_date, end_date,
-                        location, job_types, tags, source_doc_id, embedding
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        category, text, subsection, role_id,
+                        job_types, tags, source_doc_id, embedding
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (category, text, subsection, start_date, end_date,
-                     location, job_types, tags, source_doc_id, embedding),
+                    (category, text, subsection, role_id,
+                     job_types, tags, source_doc_id, embedding),
                 )
                 return cursor.lastrowid  # type: ignore[return-value]
             except sqlite3.IntegrityError:
@@ -657,18 +655,26 @@ class Database:
         limit: int = 500,
         offset: int = 0,
     ) -> list[dict]:
-        """Return KB entries with optional filtering."""
-        query = "SELECT * FROM knowledge_base WHERE 1=1"
+        """Return KB entries with optional filtering, joined with roles."""
+        query = """
+            SELECT kb.*,
+                   r.title AS role_title, r.company AS role_company,
+                   r.start_date AS role_start_date, r.end_date AS role_end_date,
+                   r.location AS role_location
+            FROM knowledge_base kb
+            LEFT JOIN roles r ON kb.role_id = r.id
+            WHERE 1=1
+        """
         params: list = []
         if active_only:
-            query += " AND is_active = 1"
+            query += " AND kb.is_active = 1"
         if category:
-            query += " AND category = ?"
+            query += " AND kb.category = ?"
             params.append(category)
         if search:
-            query += " AND (text LIKE ? OR subsection LIKE ? OR tags LIKE ?)"
-            params.extend([f"%{search}%", f"%{search}%", f"%{search}%"])
-        query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+            query += " AND (kb.text LIKE ? OR kb.subsection LIKE ? OR kb.tags LIKE ? OR r.company LIKE ? OR r.title LIKE ?)"
+            params.extend([f"%{search}%"] * 5)
+        query += " ORDER BY kb.created_at DESC LIMIT ? OFFSET ?"
         params.extend([limit, offset])
 
         with self._connect() as conn:
@@ -676,10 +682,17 @@ class Database:
             return [dict(row) for row in rows]
 
     def get_kb_entry(self, entry_id: int) -> dict | None:
-        """Return a single KB entry by id."""
+        """Return a single KB entry by id, joined with role."""
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT * FROM knowledge_base WHERE id = ?", (entry_id,)
+                """SELECT kb.*,
+                          r.title AS role_title, r.company AS role_company,
+                          r.start_date AS role_start_date, r.end_date AS role_end_date,
+                          r.location AS role_location
+                   FROM knowledge_base kb
+                   LEFT JOIN roles r ON kb.role_id = r.id
+                   WHERE kb.id = ?""",
+                (entry_id,),
             ).fetchone()
             return dict(row) if row else None
 
@@ -701,9 +714,7 @@ class Database:
         entry_id: int,
         text: str | None = None,
         subsection: str | None = None,
-        start_date: str | None = None,
-        end_date: str | None = None,
-        location: str | None = None,
+        role_id: int | None = None,
         job_types: str | None = None,
         tags: str | None = None,
     ) -> bool:
@@ -716,15 +727,9 @@ class Database:
         if subsection is not None:
             sets.append("subsection = ?")
             params.append(subsection)
-        if start_date is not None:
-            sets.append("start_date = ?")
-            params.append(start_date)
-        if end_date is not None:
-            sets.append("end_date = ?")
-            params.append(end_date)
-        if location is not None:
-            sets.append("location = ?")
-            params.append(location)
+        if role_id is not None:
+            sets.append("role_id = ?")
+            params.append(role_id)
         if job_types is not None:
             sets.append("job_types = ?")
             params.append(job_types)
@@ -934,6 +939,7 @@ class Database:
         company: str,
         start_date: str | None = None,
         end_date: str | None = None,
+        location: str | None = None,
         domain: str | None = None,
         source_doc_id: int | None = None,
     ) -> int | None:
@@ -942,14 +948,19 @@ class Database:
             try:
                 cursor = conn.execute(
                     """
-                    INSERT INTO roles (title, company, start_date, end_date, domain, source_doc_id)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT INTO roles (title, company, start_date, end_date, location, domain, source_doc_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (title, company, start_date, end_date, domain, source_doc_id),
+                    (title, company, start_date, end_date, location, domain, source_doc_id),
                 )
                 return cursor.lastrowid  # type: ignore[return-value]
             except sqlite3.IntegrityError:
-                return None
+                # Duplicate — return existing role id
+                row = conn.execute(
+                    "SELECT id FROM roles WHERE title = ? AND company = ? AND start_date IS ?",
+                    (title, company, start_date),
+                ).fetchone()
+                return row["id"] if row else None
 
     def get_roles(self) -> list[dict]:
         """Return all roles ordered by start_date descending."""

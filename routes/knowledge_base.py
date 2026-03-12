@@ -394,9 +394,7 @@ def update_entry(entry_id: int):
         entry_id=entry_id,
         text=data.get("text"),
         subsection=data.get("subsection"),
-        start_date=data.get("start_date"),
-        end_date=data.get("end_date"),
-        location=data.get("location"),
+        role_id=data.get("role_id"),
         job_types=data.get("job_types"),
         tags=data.get("tags"),
     )
