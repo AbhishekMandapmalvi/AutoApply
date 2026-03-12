@@ -4,6 +4,11 @@ All notable changes to AutoApply are documented in this file.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.3.3] - 2026-03-12
+
+### Fixed
+- **Blank page on load**: Created missing `static/js/api.js` module. `resumes.js` imported `apiFetch` from `./api.js` which didn't exist, causing a 404 that broke the entire ES module tree.
+
 ## [2.3.2] - 2026-03-12
 
 ### Fixed
