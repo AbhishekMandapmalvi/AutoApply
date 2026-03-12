@@ -5,6 +5,7 @@ import { state } from './state.js';
 import { setTags } from './tag-input.js';
 import { checkLoginSessions } from './login.js';
 import { t, getLocale, setLocale } from './i18n.js';
+import { updateAIIndicators } from './ai-status.js';
 
 const LLM_DEFAULT_MODELS = {
   anthropic: 'claude-sonnet-4-20250514',
@@ -197,6 +198,16 @@ export async function saveSettings() {
       body: JSON.stringify(schedData),
     });
     updateScheduleUI();
+
+    // Refresh AI availability indicator after config change
+    try {
+      const statusRes = await fetch('/api/setup/status');
+      const statusData = await statusRes.json();
+      state.aiAvailable = !!statusData.ai_available;
+      updateAIIndicators();
+      const banner = document.getElementById('ai-warning-banner');
+      if (banner) banner.classList.toggle('hidden', state.aiAvailable);
+    } catch { /* non-critical */ }
 
     const msg = document.getElementById('settings-saved-msg');
     msg.classList.remove('hidden');
