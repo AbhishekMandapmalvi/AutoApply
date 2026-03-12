@@ -282,6 +282,18 @@ export async function validateLLMKey() {
     if (data.valid) {
       status.textContent = t('settings.key_valid');
       status.style.color = '#34d399';
+      // Auto-save the validated key so it persists immediately
+      try {
+        await fetch('/api/config', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ llm: { provider, api_key: apiKey, model: model || '' } }),
+        });
+        state.aiAvailable = true;
+        updateAIIndicators();
+        const banner = document.getElementById('ai-warning-banner');
+        if (banner) banner.classList.toggle('hidden', true);
+      } catch { /* save failed silently — user can still use main Save */ }
     } else {
       status.textContent = t('settings.key_invalid');
       status.style.color = '#f87171';
