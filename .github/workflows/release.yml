@@ -63,6 +63,8 @@ jobs:
           # macOS code signing (optional — skipped if not configured)
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          # Disable auto-discovery of local signing identities when no cert is configured
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.CSC_LINK != '' }}
           # macOS notarization (optional — skipped if not configured)
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
