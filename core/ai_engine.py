@@ -231,7 +231,7 @@ def _call_anthropic(api_key: str, model: str, prompt: str, timeout: int) -> str:
         },
         json={
             "model": model,
-            "max_tokens": 4096,
+            "max_tokens": 8192,
             "messages": [{"role": "user", "content": prompt}],
         },
         timeout=timeout,
@@ -255,7 +255,7 @@ def _call_openai_compatible(
         json={
             "model": model,
             "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 4096,
+            "max_tokens": 8192,
         },
         timeout=timeout,
     )
