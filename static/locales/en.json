@@ -594,6 +594,35 @@
     "margin": "Page Margin"
   },
 
+  "builder": {
+    "title": "Resume Builder",
+    "desc": "Drag and drop KB entries to manually build a custom resume.",
+    "open_btn": "Open Resume Builder",
+    "kb_panel_title": "Knowledge Base Entries",
+    "resume_panel_title": "Your Resume",
+    "drop_here": "Drop entries here",
+    "add_entry": "Add to resume",
+    "remove_entry": "Remove from resume",
+    "no_entries": "No available entries",
+    "preview_btn": "Preview PDF",
+    "autofill_btn": "Auto-Fill from JD",
+    "autofill_go": "Auto-Fill",
+    "autofilling": "Auto-selecting best entries...",
+    "save_preset": "Save Preset",
+    "load": "Load",
+    "load_preset": "Load this preset",
+    "delete_preset": "Delete this preset",
+    "presets_title": "Saved Presets",
+    "no_presets": "No saved presets yet",
+    "entries": "entries",
+    "one_page_mode": "One-page mode",
+    "page_empty": "No entries selected",
+    "page_count": "Estimated: {pages} page(s)",
+    "page_overflow": "Estimated: {pages} page(s) — remove ~{excess} lines to fit 1 page",
+    "generating": "Generating PDF preview...",
+    "preview_error": "Preview generation failed"
+  },
+
   "ats": {
     "title": "ATS Compatibility Score",
     "score_label": "ATS Score",

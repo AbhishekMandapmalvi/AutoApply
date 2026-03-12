@@ -135,6 +135,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - **i18n**: 18 new keys in `ats` section (en.json + es.json)
   - **31 new tests**: Component scorers (16), composite scorer (4), platform profiles (6), API endpoints (5)
   - **WCAG 2.1 AA**: ARIA labels, aria-live results region, semantic HTML, keyboard navigation
+- **Smart Resume Reuse M7: Manual Resume Builder (TASK-030)**: Drag-and-drop resume builder with presets and one-page mode. (FR-030-49 to FR-030-54, NFR-030-21 to NFR-030-22)
+  - **Resume presets CRUD**: Save/load/update/delete named entry ID combinations with template choice
+  - **`resume_presets` table**: New SQLite table (id, name, entry_ids JSON, template, created_at, updated_at)
+  - **4 API endpoints**: `GET/POST /api/kb/presets`, `PUT/DELETE /api/kb/presets/<id>`
+  - **Drag-and-drop builder UI**: Full-screen overlay with left panel (KB entries + search/filter) and right panel (6 resume sections with drop zones)
+  - **Entry reorder**: Up/down controls within each resume section
+  - **One-page mode**: Live page indicator with line estimation (~55 lines/page), warning when exceeding 1 page
+  - **Auto-fill from JD**: Keyword-based auto-selection using ATS scoring with per-category limits
+  - **PDF preview**: Inline iframe preview using existing `/api/kb/preview` endpoint
+  - **i18n**: 27 new keys in `builder` section (en.json + es.json)
+  - **15 new tests**: Preset DB methods (7) + preset API endpoints (8)
+  - **WCAG 2.1 AA**: ARIA labels on panels/zones/buttons, aria-live regions, keyboard-accessible controls, reduced motion
 
 ### Changed
 - **Traceability matrix v14.0**: 186 requirements, all ✅ (0 ⚠️). M5 adds 13 new requirements (10 FRs + 3 NFRs).

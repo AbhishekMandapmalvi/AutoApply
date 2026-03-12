@@ -1200,12 +1200,98 @@ The ATS scoring card SHALL have ARIA labels, aria-live region for results, seman
 
 ---
 
+## 11. Functional Requirements — M7: Manual Resume Builder
+
+### 11.1 User Stories
+
+| ID | As a… | I want to… | So that… | Priority |
+|----|-------|-----------|----------|----------|
+| US-117 | Job seeker | Drag and drop KB entries to build a custom resume | I have full control over which content appears | Must |
+| US-118 | Job seeker | Save resume entry combinations as named presets | I can quickly reuse configurations for similar roles | Must |
+| US-119 | Job seeker | See a one-page indicator while building | I know when my resume exceeds 1 page | Should |
+| US-120 | Job seeker | Auto-fill the builder from a job description | The system pre-selects the best entries for me to review | Should |
+
+### 11.2 Functional Requirements
+
+#### FR-030-49: Resume Presets CRUD
+
+The system SHALL support creating, listing, updating, and deleting named resume presets that store entry ID combinations and template choice.
+
+**Acceptance Criteria**:
+- AC-030-49-1: Given valid name and entry_ids, When POST /api/kb/presets, Then 201 with preset data
+- AC-030-49-2: Given missing name or entry_ids, When POST, Then 400 error
+- AC-030-49-3: Given existing presets, When GET /api/kb/presets, Then returns all presets
+- AC-030-49-4: Given valid preset ID, When PUT, Then preset updated
+- AC-030-49-5: Given valid preset ID, When DELETE, Then preset removed
+
+#### FR-030-50: Resume Presets Database Table
+
+The system SHALL store presets in a `resume_presets` table with id, name, entry_ids (JSON), template, created_at, updated_at columns.
+
+**Acceptance Criteria**:
+- AC-030-50-1: Given new DB, When schema initialized, Then resume_presets table exists
+- AC-030-50-2: Given preset saved, When retrieved, Then all fields populated correctly
+
+#### FR-030-51: Drag-and-Drop Resume Builder UI
+
+The system SHALL provide a full-screen overlay with a left panel (KB entries with search/filter) and right panel (resume sections with drop zones) supporting drag-and-drop entry selection.
+
+**Acceptance Criteria**:
+- AC-030-51-1: Given builder opened, When rendered, Then left panel shows KB entries grouped by category
+- AC-030-51-2: Given entry dragged to drop zone, When dropped, Then entry appears in that section
+- AC-030-51-3: Given entry in section, When remove clicked, Then entry returns to available pool
+
+#### FR-030-52: Entry Reorder in Builder
+
+The system SHALL allow reordering entries within a resume section using up/down controls.
+
+**Acceptance Criteria**:
+- AC-030-52-1: Given multiple entries in a section, When up arrow clicked, Then entry moves up
+- AC-030-52-2: Given entry at top, When up arrow clicked, Then button is disabled
+
+#### FR-030-53: One-Page Mode with Line Estimation
+
+The system SHALL estimate page count based on entry word counts and display a live page indicator. In one-page mode, it SHALL warn when content exceeds estimated 1-page limit.
+
+**Acceptance Criteria**:
+- AC-030-53-1: Given entries selected, When page indicator updates, Then shows estimated page count
+- AC-030-53-2: Given one-page mode enabled and >55 estimated lines, Then warning displayed
+
+#### FR-030-54: Auto-Fill from Job Description
+
+The system SHALL allow pasting a JD to auto-select the best-matching KB entries using ATS keyword scoring, with per-category limits.
+
+**Acceptance Criteria**:
+- AC-030-54-1: Given JD text entered, When auto-fill clicked, Then entries selected based on keyword match
+- AC-030-54-2: Given auto-fill, When complete, Then per-category limits respected (e.g., max 5 experience)
+
+### 11.3 Non-Functional Requirements
+
+#### NFR-030-21: Builder i18n Coverage
+All builder UI strings SHALL use `data-i18n` attributes. All keys SHALL exist in en.json and es.json `builder` section.
+
+#### NFR-030-22: Builder Accessibility
+The builder SHALL have ARIA labels on all panels, drop zones, buttons, and live regions. Keyboard navigation SHALL work for add/remove/reorder operations.
+
+### 11.4 Traceability Seeds
+
+| FR | → Design | → Source | → Test |
+|----|----------|----------|--------|
+| FR-030-49 | SAD §3.35, IC-030/031/032 | `routes/knowledge_base.py`, `db/database.py` | `test_resume_builder.py::TestPresetsAPI` |
+| FR-030-50 | SAD §3.35 | `db/database.py` | `test_resume_builder.py::TestPresetDB` |
+| FR-030-51 | SAD §3.36 | `static/js/resume-builder.js` | — |
+| FR-030-52 | SAD §3.36 | `static/js/resume-builder.js` | — |
+| FR-030-53 | SAD §3.36 | `static/js/resume-builder.js` | — |
+| FR-030-54 | SAD §3.36 | `static/js/resume-builder.js` | — |
+
+---
+
 ## Software Requirements Specification -- GATE 3 OUTPUT
 
 **Document**: SRS-TASK-030-smart-resume-reuse
-**FRs**: 48 functional requirements (12 M1 + 7 M2 + 7 M3 + 6 M4 + 10 M5 + 6 M6)
-**NFRs**: 20 non-functional requirements (6 M1 + 4 M2 + 3 M3 + 2 M4 + 3 M5 + 2 M6)
-**ACs**: 167 total acceptance criteria (134 positive + 33 negative)
+**FRs**: 54 functional requirements (12 M1 + 7 M2 + 7 M3 + 6 M4 + 10 M5 + 6 M6 + 6 M7)
+**NFRs**: 22 non-functional requirements (6 M1 + 4 M2 + 3 M3 + 2 M4 + 3 M5 + 2 M6 + 2 M7)
+**ACs**: 184 total acceptance criteria (151 positive + 33 negative)
 **Quality Checklist**: 48/48 items passed (100%)
 
 ### Handoff Routing

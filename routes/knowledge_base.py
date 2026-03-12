@@ -1,10 +1,12 @@
-"""Knowledge Base routes — upload, CRUD, search, preview.
+"""Knowledge Base routes — upload, CRUD, search, preview, presets.
 
 Implements: TASK-030 M5 — Upload API, KB entry management, resume preview.
+Implements: TASK-030 M7 — Resume presets CRUD.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 import tempfile
@@ -245,6 +247,85 @@ def list_documents():
     db = _get_db()
     docs = db.get_uploaded_documents()
     return jsonify({"documents": docs})
+
+
+# ---------------------------------------------------------------------------
+# Resume presets (TASK-030 M7)
+# ---------------------------------------------------------------------------
+
+
+@kb_bp.route("/api/kb/presets", methods=["GET"])
+def list_presets():
+    """List all saved resume presets."""
+    db = _get_db()
+    presets = db.get_presets()
+    return jsonify({"presets": presets})
+
+
+@kb_bp.route("/api/kb/presets", methods=["POST"])
+def create_preset():
+    """Create a new resume preset.
+
+    Request body:
+        name: str (required)
+        entry_ids: list[int] (required)
+        template: str (optional — classic/modern/academic/minimal)
+    """
+    db = _get_db()
+    data = request.get_json(silent=True)
+    if not data or not data.get("name") or not data.get("entry_ids"):
+        abort(400, description=t("errors.invalid_request"))
+
+    name = str(data["name"]).strip()
+    entry_ids = data["entry_ids"]
+    if not isinstance(entry_ids, list) or not all(isinstance(i, int) for i in entry_ids):
+        abort(400, description=t("errors.invalid_request"))
+
+    template = data.get("template", "classic")
+    entry_ids_json = json.dumps(entry_ids)
+
+    preset_id = db.save_preset(name=name, entry_ids=entry_ids_json, template=template)
+    preset = db.get_preset(preset_id)
+
+    return jsonify(preset), 201
+
+
+@kb_bp.route("/api/kb/presets/<int:preset_id>", methods=["PUT"])
+def update_preset(preset_id: int):
+    """Update a resume preset."""
+    db = _get_db()
+    data = request.get_json(silent=True)
+    if not data:
+        abort(400, description=t("errors.invalid_request"))
+
+    entry_ids = data.get("entry_ids")
+    entry_ids_json = None
+    if entry_ids is not None:
+        if not isinstance(entry_ids, list) or not all(isinstance(i, int) for i in entry_ids):
+            abort(400, description=t("errors.invalid_request"))
+        entry_ids_json = json.dumps(entry_ids)
+
+    updated = db.update_preset(
+        preset_id=preset_id,
+        name=data.get("name"),
+        entry_ids=entry_ids_json,
+        template=data.get("template"),
+    )
+    if not updated:
+        abort(404, description=t("errors.not_found"))
+
+    return jsonify({"success": True})
+
+
+@kb_bp.route("/api/kb/presets/<int:preset_id>", methods=["DELETE"])
+def delete_preset(preset_id: int):
+    """Delete a resume preset."""
+    db = _get_db()
+    deleted = db.delete_preset(preset_id)
+    if not deleted:
+        abort(404, description=t("errors.not_found"))
+
+    return jsonify({"success": True})
 
 
 # ---------------------------------------------------------------------------

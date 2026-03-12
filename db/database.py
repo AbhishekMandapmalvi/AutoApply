@@ -105,6 +105,15 @@ CREATE TABLE IF NOT EXISTS roles (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(title, company, start_date)
 );
+
+CREATE TABLE IF NOT EXISTS resume_presets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    entry_ids TEXT NOT NULL,
+    template TEXT NOT NULL DEFAULT 'classic',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME
+);
 """
 
 
@@ -1036,3 +1045,75 @@ class Database:
             "response_times": response_times,
             "daily": daily,
         }
+
+    # ------------------------------------------------------------------
+    # Resume Presets (TASK-030 M7)
+    # ------------------------------------------------------------------
+
+    def save_preset(
+        self,
+        name: str,
+        entry_ids: str,
+        template: str = "classic",
+    ) -> int:
+        """Create a resume preset. entry_ids is a JSON string like '[1,5,12]'."""
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "INSERT INTO resume_presets (name, entry_ids, template) VALUES (?, ?, ?)",
+                (name, entry_ids, template),
+            )
+            return cursor.lastrowid  # type: ignore[return-value]
+
+    def get_presets(self) -> list[dict]:
+        """Return all resume presets ordered by most recent first."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM resume_presets ORDER BY updated_at DESC, created_at DESC"
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    def get_preset(self, preset_id: int) -> dict | None:
+        """Return a single preset by ID."""
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM resume_presets WHERE id = ?", (preset_id,)
+            ).fetchone()
+            return dict(row) if row else None
+
+    def update_preset(
+        self,
+        preset_id: int,
+        name: str | None = None,
+        entry_ids: str | None = None,
+        template: str | None = None,
+    ) -> bool:
+        """Update a preset. Returns True if found and updated."""
+        fields: list[str] = []
+        values: list[object] = []
+        if name is not None:
+            fields.append("name = ?")
+            values.append(name)
+        if entry_ids is not None:
+            fields.append("entry_ids = ?")
+            values.append(entry_ids)
+        if template is not None:
+            fields.append("template = ?")
+            values.append(template)
+        if not fields:
+            return False
+        fields.append("updated_at = CURRENT_TIMESTAMP")
+        values.append(preset_id)
+        with self._connect() as conn:
+            cursor = conn.execute(
+                f"UPDATE resume_presets SET {', '.join(fields)} WHERE id = ?",
+                tuple(values),
+            )
+            return cursor.rowcount > 0
+
+    def delete_preset(self, preset_id: int) -> bool:
+        """Delete a preset. Returns True if found and deleted."""
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "DELETE FROM resume_presets WHERE id = ?", (preset_id,)
+            )
+            return cursor.rowcount > 0

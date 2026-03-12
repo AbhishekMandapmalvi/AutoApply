@@ -2,7 +2,7 @@
 
 **Date**: 2026-03-11
 **Auditor**: Claude (Security Engineer)
-**Scope**: TASK-030 M1+M2+M3+M4+M5+M6 — Knowledge Base foundation (4 M1 modules, 3 DB tables, 2 config models) + Scoring Engine (2 M2 modules) + LaTeX Engine (compile_latex, escape_latex, TinyTeX bundling) + Resume Assembly (resume_assembler, save_assembled_resume, _ingest_llm_output) + Upload UI + KB Viewer (M5) + ATS Scoring + Platform Profiles (M6)
+**Scope**: TASK-030 M1–M7 — KB foundation (M1) + Scoring (M2) + LaTeX (M3) + Assembly (M4) + Upload UI + KB Viewer (M5) + ATS Scoring + Profiles (M6) + Manual Resume Builder + Presets (M7)
 
 ---
 
@@ -44,6 +44,11 @@
 | 32 | Info | C1 | **ATS endpoint auth**: Both ATS endpoints (`POST /api/kb/ats-score`, `GET /api/kb/ats-profiles`) go through existing `@app.before_request` Bearer token middleware. Verified in tests. | PASS |
 | 33 | Info | A5 | **ATS endpoint validation**: `ats-score` validates `jd_text` is present and non-empty, returns 400 if missing. `platform` defaults to "default" if absent. `entry_ids` is optional. | PASS |
 | 34 | Info | B3 | **ATS frontend XSS prevention**: `analyzeATS()` and `renderATSResult()` use `escHtml()` and `escAttr()` for all user-derived content (keywords, skills, categories). No raw innerHTML with user data. | PASS |
+| 35 | Info | A5 | **Preset input validation**: `create_preset` validates `name` is non-empty string, `entry_ids` is list of integers. Rejects non-list and non-integer values with 400. | PASS |
+| 36 | Info | B1 | **Preset SQL**: All preset DB methods use parameterized queries (`?` placeholders). `update_preset` builds SET clause dynamically but values are parameterized, no string interpolation of user data. | PASS |
+| 37 | Info | C1 | **Preset endpoint auth**: All 4 preset endpoints go through existing `@app.before_request` Bearer token middleware. | PASS |
+| 38 | Info | B3 | **Builder frontend XSS**: `resume-builder.js` uses `escHtml()` and `escAttr()` for all KB entry text/subsection content. No raw innerHTML with user data. | PASS |
+| 39 | Info | A1 | **Drag-and-drop**: Client-side only (HTML5 Drag API). Entry IDs from `data-entry-id` attributes are integers parsed via `parseInt()`. No server-side security implications. | PASS |
 | 29 | Info | A3 | **ATS input validation**: `POST /api/kb/ats-score` validates `jd_text` is present and non-empty. Missing `jd_text` returns 400. Empty KB returns 400. `platform` defaults to "default" if missing/unknown. `entry_ids` optional filter. | PASS |
 | 30 | Info | B5 | **ATS scoring is pure computation**: `score_ats()` performs in-memory text analysis — no SQL, no file I/O, no subprocess calls. Input is JD text (from request body) and KB entries (from DB via parameterized queries). Zero injection surface. | PASS |
 | 31 | Info | B7 | **ATS profiles are frozen data**: `ATS_PROFILES` dict is module-level constant. `get_profile()` returns a copy via dict lookup, no mutation possible. Unknown platform falls back to default — no error path. | PASS |
@@ -54,9 +59,9 @@
 
 | Section | Pass | Fail | N/A | Notes |
 |---------|:----:|:----:|:---:|-------|
-| A. Input Validation | 11 | 0 | 0 | M6: ATS scorer handles empty inputs gracefully. ATS endpoint validates jd_text presence. |
-| B. Injection Prevention | 21 | 0 | 0 | M6: ATS scorer is pure computation. ATS profiles are frozen data. Frontend uses escHtml/escAttr. |
-| C. Authentication | 1 | 0 | 5 | M6: Both ATS endpoints covered by existing Bearer token middleware. |
+| A. Input Validation | 13 | 0 | 0 | M7: Preset name/entry_ids validated. Drag-drop uses parseInt for IDs. |
+| B. Injection Prevention | 23 | 0 | 0 | M7: Preset SQL parameterized. Builder frontend uses escHtml/escAttr. |
+| C. Authentication | 1 | 0 | 5 | M7: All 4 preset endpoints covered by existing Bearer token middleware. |
 | D. Authorization | 0 | 0 | 5 | Single-user desktop app, no authorization needed. |
 | E. Secrets Management | 7 | 0 | 0 | No secrets in code, LLM keys not stored. |
 | F. Data Protection | 1 | 0 | 3 | Raw text stored locally (acceptable for desktop app). |
@@ -114,4 +119,4 @@
 
 ## Verdict
 
-**PASS** — No security vulnerabilities found in M1+M2+M3+M4+M5+M6 code. M1 is backend-only with no user-facing endpoints. M2 is pure computation with zero I/O. M3 mitigates subprocess/temp file risks via escape_latex(), explicit arg lists, timeouts, and try/finally cleanup. M4 is pure Python orchestration with filename sanitization and parameterized SQL. M5 adds upload validation (extension allowlist, filename sanitization, size cap), parameterized SQL in all CRUD, XSS prevention via escHtml/escAttr, and Bearer token auth on all 8 endpoints. M6 (ATS Scoring) is pure in-memory computation — `ats_scorer.py` performs string matching and arithmetic only (no SQL, no file I/O, no network). `ats_profiles.py` uses frozen module-level data structures. Both ATS endpoints are covered by existing Bearer token middleware. Frontend uses escHtml/escAttr for all user-derived content. Attack surface remains minimal. Future milestones (M8 ONNX) must follow the recommendations above.
+**PASS** — No security vulnerabilities found in M1–M7 code. M1 is backend-only with no user-facing endpoints. M2 is pure computation with zero I/O. M3 mitigates subprocess/temp file risks via escape_latex(), explicit arg lists, timeouts, and try/finally cleanup. M4 is pure Python orchestration with filename sanitization and parameterized SQL. M5 adds upload validation (extension allowlist, filename sanitization, size cap), parameterized SQL in all CRUD, XSS prevention via escHtml/escAttr, and Bearer token auth on all 8 endpoints. M6 (ATS Scoring) is pure in-memory computation — `ats_scorer.py` performs string matching and arithmetic only (no SQL, no file I/O, no network). `ats_profiles.py` uses frozen module-level data structures. Both ATS endpoints are covered by existing Bearer token middleware. Frontend uses escHtml/escAttr for all user-derived content. Attack surface remains minimal. Future milestones (M8 ONNX) must follow the recommendations above.

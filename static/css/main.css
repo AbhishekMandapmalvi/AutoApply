@@ -1246,3 +1246,139 @@ tr.clickable-row:focus-visible { outline: 2px solid var(--info); outline-offset:
     grid-template-columns: 1fr;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   RESUME BUILDER — Drag-and-drop UI (TASK-030 M7)
+   ═══════════════════════════════════════════════════════════════ */
+
+.rb-container {
+  background: var(--bg-main);
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.rb-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.rb-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.rb-left-panel, .rb-right-panel {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.rb-entries-list {
+  max-height: 45vh;
+  overflow-y: auto;
+}
+
+.rb-category-group { margin-bottom: 12px; }
+.rb-category-header { margin: 8px 0 4px; text-transform: capitalize; color: var(--text-bright); font-size: 0.85rem; }
+
+.rb-kb-entry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  margin: 2px 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: grab;
+  transition: background 0.15s;
+}
+.rb-kb-entry:hover { background: var(--bg-hover); }
+.rb-kb-entry.rb-dragging { opacity: 0.5; }
+
+.rb-add-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-weight: bold;
+  min-width: 28px;
+}
+
+.rb-entry-cat {
+  font-size: 0.7rem;
+  padding: 1px 6px;
+  flex-shrink: 0;
+}
+
+/* Drop zones */
+.rb-drop-zone {
+  min-height: 40px;
+  border: 2px dashed var(--border);
+  border-radius: 6px;
+  padding: 6px;
+  margin-bottom: 8px;
+  transition: border-color 0.2s, background 0.2s;
+}
+.rb-drop-zone.rb-drop-active {
+  border-color: var(--primary);
+  background: rgba(var(--primary-rgb, 99, 102, 241), 0.08);
+}
+.rb-drop-placeholder { margin: 4px; text-align: center; font-size: 0.8rem; }
+
+/* Selected entries in drop zone */
+.rb-selected-entry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  margin: 2px 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.rb-entry-controls {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.rb-entry-controls .btn { padding: 0 4px; font-size: 0.7rem; min-width: 22px; }
+.rb-remove-btn { color: var(--danger, #ef4444); }
+
+/* Page indicator */
+.rb-controls { margin-top: 12px; }
+.rb-page-row { display: flex; justify-content: space-between; align-items: center; }
+.rb-page-indicator { font-weight: 600; font-size: 0.9rem; }
+.rb-page-ok { color: var(--success, #22c55e); }
+.rb-page-warning { color: var(--warning, #f59e0b); }
+.rb-toggle-label { display: flex; align-items: center; gap: 4px; font-size: 0.85rem; cursor: pointer; }
+
+/* Presets */
+.rb-presets-panel { border-top: 1px solid var(--border); padding-top: 12px; }
+.rb-preset-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  margin: 4px 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.rb-preset-info { display: flex; flex-direction: column; gap: 2px; }
+.rb-preset-actions { display: flex; gap: 4px; }
+
+@media (max-width: 768px) {
+  .rb-layout { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rb-kb-entry, .rb-drop-zone, .rb-selected-entry { transition: none; }
+}

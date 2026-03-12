@@ -594,6 +594,35 @@
     "margin": "Margen de Página"
   },
 
+  "builder": {
+    "title": "Constructor de Currículum",
+    "desc": "Arrastra y suelta entradas del KB para crear un currículum personalizado.",
+    "open_btn": "Abrir Constructor",
+    "kb_panel_title": "Entradas del Base de Conocimientos",
+    "resume_panel_title": "Tu Currículum",
+    "drop_here": "Suelta entradas aquí",
+    "add_entry": "Agregar al currículum",
+    "remove_entry": "Eliminar del currículum",
+    "no_entries": "No hay entradas disponibles",
+    "preview_btn": "Vista Previa PDF",
+    "autofill_btn": "Autocompletar desde JD",
+    "autofill_go": "Autocompletar",
+    "autofilling": "Seleccionando mejores entradas...",
+    "save_preset": "Guardar Plantilla",
+    "load": "Cargar",
+    "load_preset": "Cargar esta plantilla",
+    "delete_preset": "Eliminar esta plantilla",
+    "presets_title": "Plantillas Guardadas",
+    "no_presets": "Sin plantillas guardadas",
+    "entries": "entradas",
+    "one_page_mode": "Modo una página",
+    "page_empty": "Sin entradas seleccionadas",
+    "page_count": "Estimado: {pages} página(s)",
+    "page_overflow": "Estimado: {pages} página(s) — elimina ~{excess} líneas para 1 página",
+    "generating": "Generando vista previa PDF...",
+    "preview_error": "Falló la generación de vista previa"
+  },
+
   "ats": {
     "title": "Puntuación de Compatibilidad ATS",
     "score_label": "Puntuación ATS",
