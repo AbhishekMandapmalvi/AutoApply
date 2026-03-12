@@ -202,12 +202,17 @@ def score_kb_entries(
             ]
             method_used = "blended"
 
-    # Build results
+    # Build results with optional effectiveness weighting (M9)
     results: list[dict] = []
     for entry, score in zip(entries, final_scores):
+        # Blend with effectiveness_score if available (M9)
+        eff = entry.get("effectiveness_score")
+        if eff is not None and eff > 0:
+            score = (score * 0.7) + (eff * 0.3)
+
         if score >= min_score:
             result = dict(entry)
-            result["score"] = round(score, 4)
+            result["score"] = round(min(score, 1.0), 4)
             result["scoring_method"] = method_used
             results.append(result)
 

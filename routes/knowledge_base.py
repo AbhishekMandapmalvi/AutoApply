@@ -243,6 +243,51 @@ def upload_status(task_id: str):
 
 
 # ---------------------------------------------------------------------------
+# KB Feedback + Effectiveness (TASK-030 M9)
+# ---------------------------------------------------------------------------
+
+
+@kb_bp.route("/api/kb/feedback", methods=["POST"])
+def update_feedback():
+    """Update outcome feedback for KB entries used in an application.
+
+    Request body:
+        application_id: int (required)
+        outcome: str (required) — "interview", "rejected", or "no_response"
+    """
+    db = _get_db()
+    data = request.get_json(silent=True)
+    if not data:
+        abort(400, description=t("errors.invalid_request"))
+
+    app_id = data.get("application_id")
+    outcome = data.get("outcome")
+
+    if not app_id or not isinstance(app_id, int):
+        abort(400, description=t("errors.invalid_request"))
+
+    valid_outcomes = {"interview", "rejected", "no_response"}
+    if outcome not in valid_outcomes:
+        abort(400, description=t("errors.invalid_request"))
+
+    updated = db.update_kb_outcome(app_id, outcome)
+
+    return jsonify({
+        "success": True,
+        "updated": updated,
+    })
+
+
+@kb_bp.route("/api/kb/effectiveness", methods=["GET"])
+def kb_effectiveness():
+    """Return KB entries ranked by effectiveness score."""
+    db = _get_db()
+    limit = request.args.get("limit", 50, type=int)
+    entries = db.get_kb_effectiveness(limit=limit)
+    return jsonify(entries)
+
+
+# ---------------------------------------------------------------------------
 # ATS Scoring
 # ---------------------------------------------------------------------------
 
