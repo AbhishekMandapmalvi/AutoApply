@@ -1,6 +1,6 @@
 [project]
 name = "autoapply"
-version = "2.3.1"
+version = "2.3.2"
 description = "Smart job application automation bot with Electron dashboard"
 requires-python = ">=3.11"
 dependencies = [
