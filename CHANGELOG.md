@@ -4,6 +4,11 @@ All notable changes to AutoApply are documented in this file.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.3.1] - 2026-03-12
+
+### Fixed
+- **macOS release build**: Removed unconditional `notarize: true` from electron-builder config and added `CSC_IDENTITY_AUTO_DISCOVERY=false` when no signing certificate is configured. Fixes "electron not a file" error in CI.
+
 ## [2.3.0] - 2026-03-12
 
 Smart Resume Reuse with Knowledge Base — upload career documents once, reuse entries across applications with zero API calls per resume.
