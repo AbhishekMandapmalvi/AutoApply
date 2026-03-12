@@ -439,7 +439,11 @@
     "invalid_filename": "Invalid filename",
     "invalid_filename_detail": "Invalid filename. Use only letters, numbers, hyphens, underscores, spaces, and .txt extension",
     "content_required": "content is required",
-    "file_not_found": "File not found"
+    "file_not_found": "File not found",
+    "template_not_found": "Template not found",
+    "pdflatex_not_found": "pdflatex not found — LaTeX compilation unavailable",
+    "compilation_failed": "LaTeX compilation failed",
+    "invalid_request": "Invalid request"
   },
 
   "dashboard": {
@@ -595,7 +599,19 @@
     "template": "Template",
     "font_family": "Font Family",
     "font_size": "Font Size",
-    "margin": "Page Margin"
+    "margin": "Page Margin",
+    "templates_title": "Resume Templates",
+    "templates_desc": "Upload your own Overleaf/LaTeX templates (.tex files). Use Jinja2 variables like \\VAR{name}, \\VAR{email}, \\BLOCK{for entry in experience} for dynamic content.",
+    "upload_template": "Upload Template",
+    "template_name": "Template Name",
+    "template_desc": "Description",
+    "set_default": "Set Default",
+    "default_badge": "Default",
+    "custom_badge": "Custom",
+    "builtin_badge": "Built-in",
+    "no_custom_templates": "No custom templates yet. Upload a .tex file to get started.",
+    "template_saved": "Template saved successfully",
+    "template_deleted": "Template deleted"
   },
 
   "builder": {

@@ -127,6 +127,16 @@ CREATE TABLE IF NOT EXISTS kb_usage_log (
 );
 CREATE INDEX IF NOT EXISTS idx_ulog_entry ON kb_usage_log(entry_id);
 CREATE INDEX IF NOT EXISTS idx_ulog_app ON kb_usage_log(application_id);
+
+CREATE TABLE IF NOT EXISTS custom_templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT,
+    tex_content TEXT NOT NULL,
+    is_default INTEGER NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME
+);
 """
 
 
@@ -1345,5 +1355,83 @@ class Database:
         with self._connect() as conn:
             cursor = conn.execute(
                 "DELETE FROM resume_presets WHERE id = ?", (preset_id,)
+            )
+            return cursor.rowcount > 0
+
+    # ------------------------------------------------------------------
+    # Custom LaTeX Templates
+    # ------------------------------------------------------------------
+
+    def save_custom_template(
+        self,
+        name: str,
+        tex_content: str,
+        description: str = "",
+        is_default: bool = False,
+    ) -> int:
+        """Save a custom LaTeX template. Returns template id."""
+        with self._connect() as conn:
+            if is_default:
+                conn.execute("UPDATE custom_templates SET is_default = 0")
+            cursor = conn.execute(
+                """INSERT INTO custom_templates (name, description, tex_content, is_default)
+                   VALUES (?, ?, ?, ?)
+                   ON CONFLICT(name) DO UPDATE SET
+                     tex_content = excluded.tex_content,
+                     description = excluded.description,
+                     is_default = excluded.is_default,
+                     updated_at = CURRENT_TIMESTAMP""",
+                (name, description, tex_content, int(is_default)),
+            )
+            return cursor.lastrowid  # type: ignore[return-value]
+
+    def get_custom_templates(self) -> list[dict]:
+        """Return all custom templates (without full tex_content for listing)."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                """SELECT id, name, description, is_default, created_at, updated_at
+                   FROM custom_templates ORDER BY name"""
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    def get_custom_template(self, template_id: int) -> dict | None:
+        """Return a single custom template with full tex_content."""
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM custom_templates WHERE id = ?", (template_id,)
+            ).fetchone()
+            return dict(row) if row else None
+
+    def get_custom_template_by_name(self, name: str) -> dict | None:
+        """Return a custom template by name with full tex_content."""
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM custom_templates WHERE name = ?", (name,)
+            ).fetchone()
+            return dict(row) if row else None
+
+    def get_default_template(self) -> dict | None:
+        """Return the default custom template, if any."""
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM custom_templates WHERE is_default = 1"
+            ).fetchone()
+            return dict(row) if row else None
+
+    def set_default_template(self, template_id: int) -> bool:
+        """Set a template as default, clearing other defaults."""
+        with self._connect() as conn:
+            conn.execute("UPDATE custom_templates SET is_default = 0")
+            cursor = conn.execute(
+                "UPDATE custom_templates SET is_default = 1 WHERE id = ?",
+                (template_id,),
+            )
+            return cursor.rowcount > 0
+
+    def delete_custom_template(self, template_id: int) -> bool:
+        """Delete a custom template. Returns True if found and deleted."""
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "DELETE FROM custom_templates WHERE id = ?", (template_id,)
             )
             return cursor.rowcount > 0

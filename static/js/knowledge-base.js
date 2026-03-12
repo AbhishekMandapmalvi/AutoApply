@@ -15,7 +15,7 @@ let kbSearch = '';
 // ---------------------------------------------------------------------------
 
 export async function loadKnowledgeBase() {
-  await Promise.all([loadKBStats(), loadKBEntries()]);
+  await Promise.all([loadKBStats(), loadKBEntries(), loadTemplates()]);
 }
 
 async function loadKBStats() {
@@ -435,6 +435,129 @@ function renderATSResult(data, el) {
   el.innerHTML = html;
   _applyDataI18n(el);
 }
+
+// ---------------------------------------------------------------------------
+// Template management
+// ---------------------------------------------------------------------------
+
+async function loadTemplates() {
+  try {
+    const res = await fetch('/api/templates');
+    if (!res.ok) return;
+    const data = await res.json();
+    renderTemplateList(data.templates || []);
+    populateTemplatePickers(data.templates || []);
+  } catch { /* ignore */ }
+}
+
+function renderTemplateList(templates) {
+  const el = document.getElementById('tpl-list');
+  if (!el) return;
+  const custom = templates.filter(t => t.type === 'custom');
+  if (!custom.length) {
+    el.innerHTML = `<p class="text-muted">${escHtml(t('reuse.no_custom_templates'))}</p>`;
+    return;
+  }
+  const rows = custom.map(tpl => `
+    <div class="flex-row gap-sm" style="align-items:center; padding:6px 0; border-bottom:1px solid var(--border-color);">
+      <strong>${escHtml(tpl.name)}</strong>
+      ${tpl.description ? `<span class="text-muted">— ${escHtml(tpl.description)}</span>` : ''}
+      ${tpl.is_default ? `<span class="badge badge-primary">${escHtml(t('reuse.default_badge'))}</span>` : ''}
+      <span class="badge">${escHtml(t('reuse.custom_badge'))}</span>
+      <span style="flex:1;"></span>
+      ${!tpl.is_default ? `<button type="button" class="btn btn-sm" onclick="setTemplateDefault(${tpl.id})" aria-label="Set as default">${escHtml(t('reuse.set_default'))}</button>` : ''}
+      <button type="button" class="btn btn-sm btn-danger" onclick="deleteTemplate(${tpl.id})" aria-label="Delete template">&times;</button>
+    </div>
+  `).join('');
+  el.innerHTML = rows;
+}
+
+function populateTemplatePickers(templates) {
+  const selects = [
+    document.getElementById('kb-preview-template'),
+    document.getElementById('rb-template-select'),
+  ];
+  for (const sel of selects) {
+    if (!sel) continue;
+    const currentVal = sel.value;
+    // Keep built-in options, add custom
+    const builtIn = Array.from(sel.options).filter(o => !o.value.startsWith('custom:'));
+    sel.innerHTML = '';
+    builtIn.forEach(o => sel.add(o));
+    const customTemplates = templates.filter(t => t.type === 'custom');
+    if (customTemplates.length) {
+      const group = document.createElement('optgroup');
+      group.label = 'Custom Templates';
+      customTemplates.forEach(tpl => {
+        const opt = document.createElement('option');
+        opt.value = `custom:${tpl.name}`;
+        opt.textContent = tpl.name + (tpl.is_default ? ' ★' : '');
+        group.appendChild(opt);
+      });
+      sel.appendChild(group);
+    }
+    // Restore selection or pick default
+    const defaultCustom = templates.find(t => t.is_default && t.type === 'custom');
+    if (defaultCustom) {
+      sel.value = `custom:${defaultCustom.name}`;
+    } else if (currentVal) {
+      sel.value = currentVal;
+    }
+  }
+}
+
+window.uploadTemplate = async function() {
+  const name = document.getElementById('tpl-upload-name')?.value?.trim();
+  const desc = document.getElementById('tpl-upload-desc')?.value?.trim() || '';
+  const fileInput = document.getElementById('tpl-upload-file');
+  const isDefault = document.getElementById('tpl-upload-default')?.checked || false;
+  const statusEl = document.getElementById('tpl-upload-status');
+
+  if (!fileInput?.files?.length) {
+    if (statusEl) statusEl.textContent = 'Please select a .tex file';
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('file', fileInput.files[0]);
+  formData.append('name', name || fileInput.files[0].name.replace(/\.tex$/, ''));
+  formData.append('description', desc);
+  formData.append('is_default', isDefault ? 'true' : 'false');
+
+  try {
+    if (statusEl) statusEl.textContent = 'Uploading...';
+    const res = await fetch('/api/templates', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (!res.ok) {
+      if (statusEl) statusEl.textContent = data.error || data.description || 'Upload failed';
+      return;
+    }
+    if (statusEl) statusEl.textContent = t('reuse.template_saved');
+    // Clear form
+    if (fileInput) fileInput.value = '';
+    document.getElementById('tpl-upload-name').value = '';
+    document.getElementById('tpl-upload-desc').value = '';
+    document.getElementById('tpl-upload-default').checked = false;
+    await loadTemplates();
+  } catch (err) {
+    if (statusEl) statusEl.textContent = 'Upload failed: ' + err.message;
+  }
+};
+
+window.setTemplateDefault = async function(id) {
+  try {
+    const res = await fetch(`/api/templates/${id}/default`, { method: 'PUT' });
+    if (res.ok) await loadTemplates();
+  } catch { /* ignore */ }
+};
+
+window.deleteTemplate = async function(id) {
+  if (!confirm('Delete this template?')) return;
+  try {
+    const res = await fetch(`/api/templates/${id}`, { method: 'DELETE' });
+    if (res.ok) await loadTemplates();
+  } catch { /* ignore */ }
+};
 
 // ---------------------------------------------------------------------------
 // Event delegation init

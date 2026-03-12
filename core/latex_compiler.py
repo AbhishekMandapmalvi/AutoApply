@@ -65,10 +65,12 @@ _COMMON_PATHS: list[str] = [
     "resources/tinytex/bin/x86_64-linux/pdflatex",
     "resources/tinytex/bin/universal-darwin/pdflatex",
     "resources/tinytex/bin/windows/pdflatex.exe",
-    # User-installed TinyTeX
+    # User-installed TinyTeX (~/.TinyTeX)
     str(Path.home() / ".TinyTeX" / "bin" / "x86_64-linux" / "pdflatex"),
     str(Path.home() / ".TinyTeX" / "bin" / "universal-darwin" / "pdflatex"),
     str(Path.home() / ".TinyTeX" / "bin" / "windows" / "pdflatex.exe"),
+    # TinyTeX via APPDATA (Windows standard install)
+    str(Path(os.environ.get("APPDATA", "")) / "TinyTeX" / "bin" / "windows" / "pdflatex.exe"),
     # TeX Live
     "/usr/local/texlive/2024/bin/x86_64-linux/pdflatex",
     "/usr/local/texlive/2024/bin/universal-darwin/pdflatex",
@@ -286,23 +288,59 @@ def compile_latex(
             return None
 
 
+def render_custom_template(
+    tex_source: str,
+    context: dict,
+) -> str:
+    """Render a user-provided LaTeX template string with the given context.
+
+    Uses the same Jinja2 delimiters and escaping as built-in templates.
+
+    Args:
+        tex_source: Raw .tex content with Jinja2 delimiters.
+        context: Same context dict as render_template().
+
+    Returns:
+        Rendered .tex content as string.
+    """
+    env = jinja2.Environment(
+        loader=jinja2.BaseLoader(),
+        block_start_string=r"\BLOCK{",
+        block_end_string="}",
+        variable_start_string=r"\VAR{",
+        variable_end_string="}",
+        comment_start_string=r"\#{",
+        comment_end_string="}",
+        autoescape=False,
+    )
+    env.filters["escape_latex"] = escape_latex
+    template = env.from_string(tex_source)
+    safe_context = _escape_context(context)
+    return template.render(**safe_context)
+
+
 def compile_resume(
     template_name: str,
     context: dict,
     pdflatex_path: str | None = None,
+    custom_tex: str | None = None,
 ) -> bytes | None:
     """Render template and compile to PDF in one step.
 
     Args:
-        template_name: Template name (e.g., "classic").
+        template_name: Template name (e.g., "classic") or custom template name.
         context: Template context dict.
         pdflatex_path: Optional pdflatex path override.
+        custom_tex: If provided, use this raw .tex source instead of built-in.
 
     Returns:
         PDF bytes, or None if rendering or compilation fails.
     """
     try:
-        tex_content = render_template(template_name, context)
+        if custom_tex:
+            tex_content = render_custom_template(custom_tex, context)
+        else:
+            tex_content = render_template(template_name, context)
     except (ValueError, jinja2.TemplateNotFound) as e:
         logger.error("Template rendering failed: %s", e)
         return None

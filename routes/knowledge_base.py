@@ -618,9 +618,20 @@ def preview_resume():
     # Build context and compile
     context = _build_context(profile, selected)
 
+    # Resolve custom template if template starts with "custom:"
+    custom_tex = None
+    if template.startswith("custom:"):
+        custom_name = template[len("custom:"):]
+        custom = db.get_custom_template_by_name(custom_name)
+        if not custom:
+            abort(404, description=t("errors.template_not_found"))
+        custom_tex = custom["tex_content"]
+
     pdflatex = find_pdflatex()
     if pdflatex is not None:
-        pdf_bytes = compile_resume(template, context, pdflatex_path=pdflatex)
+        pdf_bytes = compile_resume(
+            template, context, pdflatex_path=pdflatex, custom_tex=custom_tex,
+        )
         if pdf_bytes is None:
             abort(500, description=t("errors.compilation_failed"))
     else:
@@ -643,3 +654,134 @@ def preview_resume():
         mimetype="application/pdf",
         headers={"Content-Disposition": f"inline; filename=preview_{template}.pdf"},
     )
+
+
+# ---------------------------------------------------------------------------
+# Custom LaTeX Template Management
+# ---------------------------------------------------------------------------
+
+
+@kb_bp.route("/api/templates", methods=["GET"])
+def list_templates():
+    """List all templates — built-in + custom."""
+    db = _get_db()
+    from core.latex_compiler import AVAILABLE_TEMPLATES
+
+    built_in = [
+        {"name": name, "type": "built-in", "is_default": False}
+        for name in AVAILABLE_TEMPLATES
+    ]
+    custom = db.get_custom_templates()
+    custom_list = [
+        {
+            "id": t["id"],
+            "name": t["name"],
+            "description": t.get("description", ""),
+            "type": "custom",
+            "is_default": bool(t["is_default"]),
+            "created_at": t["created_at"],
+        }
+        for t in custom
+    ]
+    # Check if any custom is default; if so, mark built-in accordingly
+    has_custom_default = any(c["is_default"] for c in custom_list)
+    if not has_custom_default:
+        # Mark "classic" as implicit default
+        for b in built_in:
+            if b["name"] == "classic":
+                b["is_default"] = True
+    return jsonify({"templates": built_in + custom_list})
+
+
+@kb_bp.route("/api/templates", methods=["POST"])
+def upload_template():
+    """Upload a custom LaTeX template (.tex file or raw text)."""
+    db = _get_db()
+
+    # Accept either file upload or JSON body
+    if request.content_type and "multipart/form-data" in request.content_type:
+        file = request.files.get("file")
+        if not file or not file.filename:
+            abort(400, description=t("errors.invalid_request"))
+        name = request.form.get("name", "").strip()
+        if not name:
+            name = Path(file.filename).stem
+        description = request.form.get("description", "").strip()
+        is_default = request.form.get("is_default", "false").lower() == "true"
+        tex_content = file.read().decode("utf-8", errors="replace")
+    else:
+        data = request.get_json(silent=True)
+        if not data or not data.get("tex_content"):
+            abort(400, description=t("errors.invalid_request"))
+        name = data.get("name", "").strip()
+        if not name:
+            abort(400, description=t("errors.invalid_request"))
+        description = data.get("description", "").strip()
+        is_default = bool(data.get("is_default", False))
+        tex_content = data["tex_content"]
+
+    # Validate it's actually LaTeX
+    if "\\documentclass" not in tex_content and "\\begin{document}" not in tex_content:
+        abort(400, description="Invalid LaTeX template — must contain \\documentclass or \\begin{document}")
+
+    template_id = db.save_custom_template(
+        name=name,
+        tex_content=tex_content,
+        description=description,
+        is_default=is_default,
+    )
+    return jsonify({"id": template_id, "name": name, "message": "Template saved"}), 201
+
+
+@kb_bp.route("/api/templates/<int:template_id>", methods=["GET"])
+def get_template(template_id: int):
+    """Get a custom template's full content."""
+    db = _get_db()
+    tmpl = db.get_custom_template(template_id)
+    if not tmpl:
+        abort(404, description=t("errors.template_not_found"))
+    return jsonify(tmpl)
+
+
+@kb_bp.route("/api/templates/<int:template_id>", methods=["PUT"])
+def update_template(template_id: int):
+    """Update a custom template."""
+    db = _get_db()
+    data = request.get_json(silent=True)
+    if not data:
+        abort(400, description=t("errors.invalid_request"))
+
+    existing = db.get_custom_template(template_id)
+    if not existing:
+        abort(404, description=t("errors.template_not_found"))
+
+    tex_content = data.get("tex_content", existing["tex_content"])
+    name = data.get("name", existing["name"]).strip()
+    description = data.get("description", existing.get("description", "")).strip()
+    is_default = data.get("is_default", existing["is_default"])
+
+    db.save_custom_template(
+        name=name,
+        tex_content=tex_content,
+        description=description,
+        is_default=bool(is_default),
+    )
+    return jsonify({"message": "Template updated"})
+
+
+@kb_bp.route("/api/templates/<int:template_id>/default", methods=["PUT"])
+def set_template_default(template_id: int):
+    """Set a custom template as default."""
+    db = _get_db()
+    if not db.set_default_template(template_id):
+        abort(404, description=t("errors.template_not_found"))
+    return jsonify({"message": "Default template updated"})
+
+
+@kb_bp.route("/api/templates/<int:template_id>", methods=["DELETE"])
+def delete_template(template_id: int):
+    """Delete a custom template."""
+    db = _get_db()
+    if not db.delete_custom_template(template_id):
+        abort(404, description=t("errors.template_not_found"))
+    return jsonify({"message": "Template deleted"})

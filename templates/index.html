@@ -742,6 +742,36 @@
       <div class="kb-preview-content resume-detail-body"></div>
     </div>
 
+    <!-- Template Management -->
+    <div class="card" style="margin-bottom:16px;">
+      <h3 data-i18n="reuse.templates_title">Resume Templates</h3>
+      <p class="text-muted" data-i18n="reuse.templates_desc">Upload your own Overleaf/LaTeX templates (.tex files). Use Jinja2 variables for dynamic content.</p>
+
+      <div class="flex-row gap-sm" style="margin-bottom:12px; flex-wrap:wrap; align-items:flex-end;">
+        <label style="flex:1; min-width:200px;">
+          <span data-i18n="reuse.template_name">Template Name</span>
+          <input type="text" id="tpl-upload-name" class="form-input" placeholder="My Overleaf Template" aria-label="Template name">
+        </label>
+        <label style="flex:1; min-width:200px;">
+          <span data-i18n="reuse.template_desc">Description</span>
+          <input type="text" id="tpl-upload-desc" class="form-input" placeholder="Optional description" aria-label="Template description">
+        </label>
+        <label style="flex:0 0 auto;">
+          <span>.tex file</span>
+          <input type="file" id="tpl-upload-file" class="form-input" accept=".tex" aria-label="LaTeX template file">
+        </label>
+        <label style="flex:0 0 auto; display:flex; align-items:center; gap:6px; padding-top:20px;">
+          <input type="checkbox" id="tpl-upload-default" aria-label="Set as default template">
+          <span data-i18n="reuse.set_default">Set Default</span>
+        </label>
+        <button type="button" class="btn btn-primary btn-sm" onclick="uploadTemplate()" style="margin-top:auto;"
+                data-i18n="reuse.upload_template" aria-label="Upload template">Upload Template</button>
+      </div>
+      <span id="tpl-upload-status" class="text-muted" aria-live="polite"></span>
+
+      <div id="tpl-list" role="region" aria-label="Template list" style="margin-top:12px;"></div>
+    </div>
+
     <!-- Bottom row: Resume Builder + Documents side by side -->
     <div class="kb-bottom-grid">
       <div class="card">
