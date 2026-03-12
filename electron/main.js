@@ -47,7 +47,7 @@ function createSplashWindow() {
     transparent: false,
     resizable: false,
     alwaysOnTop: true,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#0f1923',
     show: true,
     webPreferences: {
       nodeIntegration: false,
@@ -64,7 +64,7 @@ function createMainWindow(port) {
     height: 850,
     minWidth: 800,
     minHeight: 600,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#0f1923',
     show: false,
     webPreferences: {
       nodeIntegration: false,
@@ -100,6 +100,10 @@ function createMainWindow(port) {
 // ---------------------------------------------------------------------------
 
 app.on('ready', async () => {
+  // Clear cached static files to prevent stale JS modules after updates
+  const ses = require('electron').session.defaultSession;
+  await ses.clearCache();
+
   createSplashWindow();
 
   try {

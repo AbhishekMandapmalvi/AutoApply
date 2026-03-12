@@ -210,6 +210,11 @@ async function main() {
       if (!content.includes('Lib/site-packages')) {
         content += '\nLib/site-packages\n';
       }
+      // Add python-backend to path so packaged app can find project modules
+      // (python-runtime and python-backend are siblings under resources/)
+      if (!content.includes('python-backend')) {
+        content += '../python-backend\n';
+      }
       fs.writeFileSync(pthPath, content);
       console.log(`  Patched: ${pthFile}`);
     }

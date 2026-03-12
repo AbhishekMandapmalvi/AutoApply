@@ -96,7 +96,7 @@ function detectLocale() {
  * Supports: data-i18n="key" (textContent), data-i18n-placeholder="key",
  * data-i18n-aria-label="key", data-i18n-title="key".
  */
-function _applyDataI18n() {
+export function _applyDataI18n() {
   document.querySelectorAll('[data-i18n]').forEach(el => {
     el.textContent = t(el.getAttribute('data-i18n'));
   });
