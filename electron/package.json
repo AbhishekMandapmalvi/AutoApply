@@ -74,10 +74,7 @@
       "target": "dmg",
       "icon": "icons/icon.icns",
       "category": "public.app-category.productivity",
-      "hardenedRuntime": true,
-      "gatekeeperAssess": false,
-      "entitlements": "entitlements.mac.plist",
-      "entitlementsInherit": "entitlements.mac.plist"
+      "identity": null
     },
     "linux": {
       "target": "AppImage",
