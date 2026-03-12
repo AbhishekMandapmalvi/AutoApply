@@ -250,14 +250,21 @@ def compile_latex(
         try:
             pdf_bytes = _run_pdflatex(pdflatex_path, tmpdir, pdf_path, timeout)
 
-            # Auto-install missing packages and retry once
-            if pdf_bytes is None:
+            # Auto-install missing packages and retry (up to 3 rounds)
+            for attempt in range(3):
+                if pdf_bytes is not None:
+                    break
                 log_path = Path(tmpdir) / "resume.log"
                 log_text = log_path.read_text(errors="replace") if log_path.exists() else ""
                 missing = _find_missing_packages(log_text)
-                if missing and _auto_install_packages(missing, pdflatex_path):
-                    logger.info("Retrying after installing: %s", ", ".join(missing))
-                    pdf_bytes = _run_pdflatex(pdflatex_path, tmpdir, pdf_path, timeout)
+                if not missing:
+                    break
+                if not _auto_install_packages(missing, pdflatex_path):
+                    break
+                logger.info(
+                    "Retry %d after installing: %s", attempt + 1, ", ".join(missing),
+                )
+                pdf_bytes = _run_pdflatex(pdflatex_path, tmpdir, pdf_path, timeout)
 
             if pdf_bytes is not None:
                 logger.info("LaTeX compilation successful: %d bytes", len(pdf_bytes))
@@ -303,12 +310,24 @@ def _run_pdflatex(
 
 
 def _find_missing_packages(log_text: str) -> list[str]:
-    """Parse pdflatex log to find missing .sty files."""
-    # Pattern: "! LaTeX Error: File `foo.sty' not found."
-    pattern = re.compile(r"File `([^']+\.sty)' not found")
+    """Parse pdflatex log to find missing .sty/.def/.cls files."""
+    # Patterns: "File `foo.sty' not found", "Encoding file `ly1enc.def' not found"
+    pattern = re.compile(r"File `([^']+\.(?:sty|def|cls))' not found")
     matches = pattern.findall(log_text)
-    # Strip .sty extension — tlmgr uses package names
-    return list(dict.fromkeys(m.replace(".sty", "") for m in matches))
+    # Also catch babel language errors
+    babel_re = re.compile(r"Unknown option '(\w+)'.*babel", re.DOTALL)
+    babel_matches = babel_re.findall(log_text)
+    # Strip extension — tlmgr uses package names
+    pkgs: list[str] = []
+    for m in matches:
+        name = re.sub(r"\.(sty|def|cls)$", "", m)
+        # Common renames: ly1enc → ly1, etc.
+        name = re.sub(r"enc$", "", name) or name
+        pkgs.append(name)
+    for lang in babel_matches:
+        pkgs.append(f"babel-{lang}")
+        pkgs.append(f"hyphen-{lang}")
+    return list(dict.fromkeys(pkgs))
 
 
 def _auto_install_packages(packages: list[str], pdflatex_path: str) -> bool:
@@ -330,14 +349,42 @@ def _auto_install_packages(packages: list[str], pdflatex_path: str) -> bool:
             text=True,
             timeout=120,
         )
-        if result.returncode == 0:
-            logger.info("Successfully installed: %s", ", ".join(packages))
+        # tlmgr returns non-zero if some packages weren't found, but may
+        # have installed others successfully — still consider it a success
+        installed_any = "install:" in (result.stdout or "")
+        if result.returncode == 0 or installed_any:
+            logger.info("Installed packages (exit %d): %s", result.returncode, ", ".join(packages))
+            # Rebuild formats if hyphen/babel packages were installed
+            if any(p.startswith(("hyphen-", "babel-")) for p in packages):
+                _rebuild_formats(pdflatex_dir)
             return True
         logger.error("tlmgr install failed: %s", result.stderr[-500:])
         return False
     except Exception as e:
         logger.error("tlmgr install error: %s", e)
         return False
+
+
+def _rebuild_formats(pdflatex_dir: Path) -> None:
+    """Rebuild LaTeX formats after installing hyphenation packages."""
+    fmtutil = pdflatex_dir / "fmtutil-sys.exe"
+    if not fmtutil.exists():
+        fmtutil = pdflatex_dir / "fmtutil-sys"
+    if not fmtutil.exists():
+        return
+    try:
+        env = os.environ.copy()
+        env["PATH"] = str(pdflatex_dir) + os.pathsep + env.get("PATH", "")
+        subprocess.run(
+            [str(fmtutil), "--all"],
+            capture_output=True,
+            text=True,
+            timeout=120,
+            env=env,
+        )
+        logger.info("LaTeX formats rebuilt successfully")
+    except Exception as e:
+        logger.warning("Format rebuild failed: %s", e)
 
 
 def render_custom_template(
