@@ -2,7 +2,7 @@
 
 **Date**: 2026-03-11
 **Auditor**: Claude (Security Engineer)
-**Scope**: TASK-030 M1–M7 — KB foundation (M1) + Scoring (M2) + LaTeX (M3) + Assembly (M4) + Upload UI + KB Viewer (M5) + ATS Scoring + Profiles (M6) + Manual Resume Builder + Presets (M7)
+**Scope**: TASK-030 M1–M8 — KB foundation (M1) + Scoring (M2) + LaTeX (M3) + Assembly (M4) + Upload UI + KB Viewer (M5) + ATS Scoring + Profiles (M6) + Manual Resume Builder + Presets (M7) + Performance (M8)
 
 ---
 
@@ -117,6 +117,26 @@
 | M3 (LaTeX) | DONE — `escape_latex()` applied to all user content before template rendering. Templates use custom Jinja2 delimiters to avoid LaTeX brace conflicts. |
 | M8 (ONNX) | Validate that embedding vectors come from local KB. Do not accept embeddings from external sources without integrity check. |
 
+## M8 Findings — Performance (PDF Cache, JD Classifier, Async Upload)
+
+### Finding #40: PDF Cache Path Traversal — PASS
+`pdf_cache.py` uses `content_hash()` (SHA256[:16] hex) as filename — no user input in path construction. Cache directory is hardcoded (`~/.autoapply/cache/pdf/`). No path traversal risk.
+
+### Finding #41: Cache Poisoning — PASS
+Cache keys are derived from SHA256 of LaTeX content. An attacker would need to provide identical LaTeX content to get a cache hit, which would return the same PDF anyway. No poisoning vector.
+
+### Finding #42: JD Classifier Input Handling — PASS
+`jd_classifier.py` performs case-insensitive substring matching on user-provided JD text. No regex injection risk (keywords are static literals). No SQL, no file I/O, no network calls.
+
+### Finding #43: Async Upload Thread Safety — PASS
+`_upload_tasks` dict is protected by `_upload_lock` (threading.Lock). Task IDs are UUID4 hex[:12] — unpredictable. Background thread uses daemon=True for clean shutdown.
+
+### Finding #44: Async Upload File Handling — PASS
+Same validation as sync upload: extension allowlist, filename sanitization via regex, 10MB size cap. Temp file cleanup in finally block. Bearer token auth applies via existing middleware.
+
+### Finding #45: Task ID Enumeration — LOW RISK (ACCEPTED)
+Task IDs are UUID4 hex[:12] (48 bits of entropy). Brute-forcing to find a valid task ID is infeasible (2^48 possibilities). Status endpoint returns no sensitive data beyond entry count and filename.
+
 ## Verdict
 
-**PASS** — No security vulnerabilities found in M1–M7 code. M1 is backend-only with no user-facing endpoints. M2 is pure computation with zero I/O. M3 mitigates subprocess/temp file risks via escape_latex(), explicit arg lists, timeouts, and try/finally cleanup. M4 is pure Python orchestration with filename sanitization and parameterized SQL. M5 adds upload validation (extension allowlist, filename sanitization, size cap), parameterized SQL in all CRUD, XSS prevention via escHtml/escAttr, and Bearer token auth on all 8 endpoints. M6 (ATS Scoring) is pure in-memory computation — `ats_scorer.py` performs string matching and arithmetic only (no SQL, no file I/O, no network). `ats_profiles.py` uses frozen module-level data structures. Both ATS endpoints are covered by existing Bearer token middleware. Frontend uses escHtml/escAttr for all user-derived content. Attack surface remains minimal. Future milestones (M8 ONNX) must follow the recommendations above.
+**PASS** — No security vulnerabilities found in M1–M8 code. M1 is backend-only with no user-facing endpoints. M2 is pure computation with zero I/O. M3 mitigates subprocess/temp file risks via escape_latex(), explicit arg lists, timeouts, and try/finally cleanup. M4 is pure Python orchestration with filename sanitization and parameterized SQL. M5 adds upload validation (extension allowlist, filename sanitization, size cap), parameterized SQL in all CRUD, XSS prevention via escHtml/escAttr, and Bearer token auth on all 8 endpoints. M6 (ATS Scoring) is pure in-memory computation. M7 (Resume Builder) uses existing KB API with input validation. M8 (Performance) uses content-hash cache keys (no user input in paths), thread-safe task tracking with Lock, and reuses M5's upload validation for async endpoint. Attack surface remains minimal.

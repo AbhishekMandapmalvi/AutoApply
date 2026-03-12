@@ -207,6 +207,7 @@ def compile_latex(
     tex_content: str,
     pdflatex_path: str | None = None,
     timeout: int = 30,
+    use_cache: bool = True,
 ) -> bytes | None:
     """Compile LaTeX content to PDF.
 
@@ -214,10 +215,19 @@ def compile_latex(
         tex_content: Full .tex document content.
         pdflatex_path: Path to pdflatex binary. If None, auto-discovers.
         timeout: Compilation timeout in seconds.
+        use_cache: If True, check/store in PDF cache (TASK-030 M8).
 
     Returns:
         PDF file content as bytes, or None if compilation fails.
     """
+    # Check cache first (M8)
+    if use_cache:
+        from core.pdf_cache import get_cached
+
+        cached = get_cached(tex_content)
+        if cached is not None:
+            return cached
+
     if pdflatex_path is None:
         pdflatex_path = find_pdflatex()
 
@@ -254,6 +264,11 @@ def compile_latex(
             if pdf_path.exists():
                 pdf_bytes = pdf_path.read_bytes()
                 logger.info("LaTeX compilation successful: %d bytes", len(pdf_bytes))
+                # Store in cache (M8)
+                if use_cache:
+                    from core.pdf_cache import store
+
+                    store(tex_content, pdf_bytes)
                 return pdf_bytes
 
             logger.error("pdflatex did not produce PDF output")

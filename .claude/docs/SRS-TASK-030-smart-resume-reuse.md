@@ -1286,12 +1286,99 @@ The builder SHALL have ARIA labels on all panels, drop zones, buttons, and live 
 
 ---
 
+## 12. Milestone 8 — Performance (PDF Cache, JD Classifier, Async Upload)
+
+### 12.1 Scope
+Performance optimizations: PDF compilation cache to avoid recompiling identical LaTeX, JD classifier for pre-filtering KB entries, async document upload with background processing and status polling.
+
+### 12.2 Functional Requirements
+
+#### FR-030-55: PDF Compilation Cache
+The system SHALL cache compiled PDF bytes keyed by a SHA256[:16] hash of LaTeX content, returning cached PDFs on cache hit.
+
+**Acceptance Criteria**:
+- AC-030-55-1: Given identical LaTeX content, When compile_latex called twice, Then second call returns cached bytes without invoking pdflatex
+- AC-030-55-2: Given cache disabled (use_cache=False), When compile_latex called, Then cache is bypassed entirely
+
+#### FR-030-56: PDF Cache LRU Eviction
+The system SHALL evict oldest cached PDFs when cache exceeds MAX_CACHE_SIZE (200), based on file modification time.
+
+**Acceptance Criteria**:
+- AC-030-56-1: Given 205 cached PDFs, When evict_lru called, Then 5 oldest are removed
+- AC-030-56-2: Given fewer than MAX_CACHE_SIZE PDFs, When evict_lru called, Then 0 files removed
+
+#### FR-030-57: PDF Cache Management
+The system SHALL provide clear_cache() and cache_stats() functions for cache administration.
+
+**Acceptance Criteria**:
+- AC-030-57-1: Given 3 cached PDFs, When clear_cache called, Then all 3 removed, returns count 3
+- AC-030-57-2: Given cached PDFs, When cache_stats called, Then returns count, size_bytes, size_mb, max_size, cache_dir
+
+#### FR-030-58: JD Classification
+The system SHALL classify job descriptions into job types (backend, frontend, fullstack, data_engineer, data_scientist, ml_engineer, devops, mobile, security) using keyword matching, sorted by match count descending.
+
+**Acceptance Criteria**:
+- AC-030-58-1: Given JD with "Python, Django, REST API, PostgreSQL", When classify_jd called, Then "backend" is in result
+- AC-030-58-2: Given JD with no matching keywords, When classify_jd called, Then returns ["general"]
+- AC-030-58-3: Given empty JD text, When classify_jd called, Then returns ["general"]
+
+#### FR-030-59: JD Type Expansion
+The system SHALL expand primary job types to include related types (e.g., backend → fullstack, devops) without duplicates.
+
+**Acceptance Criteria**:
+- AC-030-59-1: Given primary type ["backend"], When get_relevant_types called, Then result includes "fullstack" and "devops"
+- AC-030-59-2: Given overlapping types, When expanded, Then no duplicates in result
+
+#### FR-030-60: KB Entry Pre-Filtering by Job Type
+The system SHALL filter KB entries by job type match, with fallback to all entries when fewer than min_entries match.
+
+**Acceptance Criteria**:
+- AC-030-60-1: Given entries with job_types, When filtered by ["backend"], Then only matching + universal entries returned
+- AC-030-60-2: Given fewer than min_entries matching, When filtered, Then all entries returned as fallback
+
+#### FR-030-61: Async Document Upload
+The system SHALL accept document uploads via POST /api/kb/upload/async, return a task_id immediately (202), and process in a background thread.
+
+**Acceptance Criteria**:
+- AC-030-61-1: Given valid file upload, When POST /api/kb/upload/async, Then returns 202 with task_id and status "processing"
+- AC-030-61-2: Given no file in request, When POST /api/kb/upload/async, Then returns 400
+
+#### FR-030-62: Upload Status Polling
+The system SHALL provide GET /api/kb/upload/status/<task_id> to poll async upload task status, returning current status, entries_created, and error if any.
+
+**Acceptance Criteria**:
+- AC-030-62-1: Given valid task_id with completed task, When GET /api/kb/upload/status/<id>, Then returns status "completed" with entries_created
+- AC-030-62-2: Given unknown task_id, When GET /api/kb/upload/status/<id>, Then returns 404
+
+### 12.3 Non-Functional Requirements
+
+#### NFR-030-23: Cache Performance
+Cache lookup SHALL complete in < 5ms for hits. Cache directory SHALL be created lazily on first use.
+
+#### NFR-030-24: Thread Safety
+Async upload task tracking SHALL use threading.Lock for concurrent access to the shared task dict.
+
+### 12.4 Traceability Seeds
+
+| FR | → Design | → Source | → Test |
+|----|----------|----------|--------|
+| FR-030-55 | SAD §3.38 | `core/pdf_cache.py`, `core/latex_compiler.py` | `test_performance.py::TestPDFCache`, `TestLatexCompilerCache` |
+| FR-030-56 | SAD §3.38 | `core/pdf_cache.py` | `test_performance.py::TestPDFCache::test_evict_lru_*` |
+| FR-030-57 | SAD §3.38 | `core/pdf_cache.py` | `test_performance.py::TestPDFCache::test_clear_cache`, `test_cache_stats` |
+| FR-030-58 | SAD §3.39 | `core/jd_classifier.py` | `test_performance.py::TestJDClassifier::test_classify_*` |
+| FR-030-59 | SAD §3.39 | `core/jd_classifier.py` | `test_performance.py::TestJDClassifier::test_get_relevant_*` |
+| FR-030-60 | SAD §3.39 | `core/jd_classifier.py` | `test_performance.py::TestJDClassifier::test_filter_*` |
+| FR-030-61 | SAD §3.40, IC-033 | `routes/knowledge_base.py` | `test_performance.py::TestAsyncUpload::test_async_upload_*` |
+| FR-030-62 | SAD §3.40, IC-034 | `routes/knowledge_base.py` | `test_performance.py::TestAsyncUpload::test_upload_status_*` |
+
+---
+
 ## Software Requirements Specification -- GATE 3 OUTPUT
 
 **Document**: SRS-TASK-030-smart-resume-reuse
-**FRs**: 54 functional requirements (12 M1 + 7 M2 + 7 M3 + 6 M4 + 10 M5 + 6 M6 + 6 M7)
-**NFRs**: 22 non-functional requirements (6 M1 + 4 M2 + 3 M3 + 2 M4 + 3 M5 + 2 M6 + 2 M7)
-**ACs**: 184 total acceptance criteria (151 positive + 33 negative)
+**FRs**: 62 functional requirements (12 M1 + 7 M2 + 7 M3 + 6 M4 + 10 M5 + 6 M6 + 6 M7 + 8 M8)
+**NFRs**: 24 non-functional requirements (6 M1 + 4 M2 + 3 M3 + 2 M4 + 3 M5 + 2 M6 + 2 M7 + 2 M8)
+**ACs**: 204 total acceptance criteria (171 positive + 33 negative)
 **Quality Checklist**: 48/48 items passed (100%)
 
 ### Handoff Routing
