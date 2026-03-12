@@ -1577,16 +1577,95 @@ GET /api/kb/upload/status/<task_id> → read _upload_tasks[task_id] → return s
 
 ---
 
+### §3.42 Outcome-Based Learning (M9)
+
+**Module**: `db/database.py` (additions)
+**Purpose**: Track KB entry usage and outcome feedback to compute effectiveness scores.
+
+**Schema Additions**:
+```sql
+-- New table
+CREATE TABLE kb_usage_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entry_id INTEGER NOT NULL REFERENCES knowledge_base(id),
+    application_id INTEGER REFERENCES applications(id),
+    tfidf_score REAL,
+    outcome TEXT,  -- "interview", "rejected", "no_response"
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- New columns on knowledge_base (via migration)
+ALTER TABLE knowledge_base ADD COLUMN effectiveness_score REAL DEFAULT 0.0;
+ALTER TABLE knowledge_base ADD COLUMN usage_count INTEGER DEFAULT 0;
+ALTER TABLE knowledge_base ADD COLUMN last_used_at DATETIME;
+```
+
+**Key Methods**:
+- `log_kb_usage(entry_ids, application_id, scores)` → int — log usage, increment counters
+- `update_kb_outcome(application_id, outcome)` → int — update outcomes, recalculate effectiveness
+- `get_kb_effectiveness(limit)` → list[dict] — entries ranked by effectiveness_score
+- `get_reuse_stats()` → dict — aggregate KB assembly metrics
+
+**Effectiveness Formula**: `effectiveness_score = interviews / total_uses_with_outcome`
+
+### §3.43 Cover Letter KB Assembly (M9)
+
+**Module**: `core/cover_letter_assembler.py`
+**Purpose**: Generate cover letters from KB entries without LLM API calls.
+
+**Pipeline**:
+1. Fetch all active KB entries
+2. Score against JD using existing TF-IDF scorer
+3. Select top experience (3) and skill (4) entries
+4. Compose template-based cover letter with greeting, intro, body paragraphs, closing
+
+**Key Function**: `assemble_cover_letter(jd_text, profile, kb, job_title, company, reuse_config) → str | None`
+
+### §3.44 Intelligence Integration (M9)
+
+**Modifications**:
+- `core/resume_assembler.py`: Pre-filters KB entries using `classify_jd()` + `filter_entries_by_type()` before scoring
+- `core/resume_scorer.py`: Blends effectiveness_score into TF-IDF: `final = (tfidf × 0.7) + (effectiveness × 0.3)` when effectiveness > 0
+- `routes/analytics.py`: New `GET /api/analytics/reuse-stats` endpoint
+
+### Interface Contracts — M9
+
+#### IC-035: `POST /api/kb/feedback`
+**Request**: `{ application_id: int, outcome: "interview" | "rejected" | "no_response" }`
+**Response 200**: `{ success: true, updated: int }`
+**Response 400**: Missing/invalid application_id or outcome
+
+#### IC-036: `GET /api/kb/effectiveness`
+**Response 200**: `[{id, category, text, subsection, effectiveness_score, usage_count, last_used_at}]`
+
+#### IC-037: `GET /api/analytics/reuse-stats`
+**Response 200**: `{total_assemblies, total_entries_used, unique_entries_used, interviews_from_kb, avg_effectiveness, top_categories}`
+
+### §3.45 Implementation Tasks — M9
+
+| Task | Name | Depends On | Files |
+|------|------|------------|-------|
+| IMPL-040 | kb_usage_log Table + Migration | M1 DB | `db/database.py` |
+| IMPL-041 | Usage Log + Outcome DB Methods | IMPL-040 | `db/database.py` |
+| IMPL-042 | Cover Letter Assembler | M2 Scorer | `core/cover_letter_assembler.py` |
+| IMPL-043 | JD Classifier Integration | M8 Classifier | `core/resume_assembler.py` |
+| IMPL-044 | Effectiveness Weighting | IMPL-041 | `core/resume_scorer.py` |
+| IMPL-045 | Feedback + Effectiveness Endpoints | IMPL-041 | `routes/knowledge_base.py` |
+| IMPL-046 | Reuse Stats Endpoint | IMPL-041 | `routes/analytics.py` |
+| IMPL-047 | M9 Tests | IMPL-040–046 | `tests/test_intelligence.py` |
+
+---
+
 ## System Architecture -- GATE 4 OUTPUT
 
 **Document**: SAD-TASK-030-smart-resume-reuse
-**Components**: 26 components defined (7 M1 + 2 M2 + 3 M3 + 3 M4 + 4 M5 + 2 M6 + 2 M7 + 3 M8)
-**Interfaces**: 34 contracts specified (10 M1 + 4 M2 + 5 M3 + 5 M4 + 3 M5 + 2 M6 + 3 M7 + 2 M8)
-**Entities**: 5 data entities modeled (4 new tables + 1 modified with 2 new columns)
+**Components**: 30 components defined (7 M1 + 2 M2 + 3 M3 + 3 M4 + 4 M5 + 2 M6 + 2 M7 + 3 M8 + 4 M9)
+**Interfaces**: 37 contracts specified (10 M1 + 4 M2 + 5 M3 + 5 M4 + 3 M5 + 2 M6 + 3 M7 + 2 M8 + 3 M9)
+**Entities**: 6 data entities modeled (5 new tables + 1 modified with 5 new columns)
 **ADRs**: 7 decisions documented (ADR-027 to ADR-033)
-**Impl Tasks**: 39 tasks in dependency order (8 M1 + 3 M2 + 3 M3 + 3 M4 + 8 M5 + 3 M6 + 6 M7 + 5 M8)
-**Traceability**: 86/86 requirements mapped (100%)
-**Checklist**: 39/39 items passed
+**Impl Tasks**: 47 tasks in dependency order (8 M1 + 3 M2 + 3 M3 + 3 M4 + 8 M5 + 3 M6 + 6 M7 + 5 M8 + 8 M9)
+**Traceability**: 96/96 requirements mapped (100%)
+**Checklist**: 47/47 items passed
 
 ### Handoff Routing
 | Recipient | What They Receive |

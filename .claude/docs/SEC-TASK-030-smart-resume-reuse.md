@@ -2,7 +2,7 @@
 
 **Date**: 2026-03-11
 **Auditor**: Claude (Security Engineer)
-**Scope**: TASK-030 M1–M8 — KB foundation (M1) + Scoring (M2) + LaTeX (M3) + Assembly (M4) + Upload UI + KB Viewer (M5) + ATS Scoring + Profiles (M6) + Manual Resume Builder + Presets (M7) + Performance (M8)
+**Scope**: TASK-030 M1–M9 — KB foundation (M1) + Scoring (M2) + LaTeX (M3) + Assembly (M4) + Upload UI + KB Viewer (M5) + ATS Scoring + Profiles (M6) + Manual Resume Builder + Presets (M7) + Performance (M8) + Intelligence (M9)
 
 ---
 
@@ -137,6 +137,26 @@ Same validation as sync upload: extension allowlist, filename sanitization via r
 ### Finding #45: Task ID Enumeration — LOW RISK (ACCEPTED)
 Task IDs are UUID4 hex[:12] (48 bits of entropy). Brute-forcing to find a valid task ID is infeasible (2^48 possibilities). Status endpoint returns no sensitive data beyond entry count and filename.
 
+## M9 Findings — Intelligence (Outcome Learning, CL Assembly, Reuse Stats)
+
+### Finding #46: Usage Log SQL Injection — PASS
+All new DB methods (`log_kb_usage`, `update_kb_outcome`, `get_kb_effectiveness`, `get_reuse_stats`) use parameterized SQL with `?` placeholders. No string interpolation in queries.
+
+### Finding #47: Feedback Endpoint Input Validation — PASS
+`POST /api/kb/feedback` validates `application_id` is an integer and `outcome` is one of 3 valid values ("interview", "rejected", "no_response"). Invalid inputs return 400. Covered by existing Bearer token middleware.
+
+### Finding #48: Effectiveness Score Integrity — PASS
+`effectiveness_score` is recalculated from actual `kb_usage_log` data (interviews/total) on each feedback update — cannot be directly set by user. No trust boundary violation.
+
+### Finding #49: Cover Letter Assembly — PASS
+`cover_letter_assembler.py` operates on in-memory KB data only. No file I/O, no subprocess, no network calls. Template strings are hardcoded constants — no injection vector.
+
+### Finding #50: Reuse Stats Data Exposure — LOW RISK (ACCEPTED)
+`GET /api/analytics/reuse-stats` returns aggregate counts only (no PII, no entry content). Covered by existing Bearer token middleware.
+
+### Finding #51: Schema Migration Safety — PASS
+Migration uses `PRAGMA table_info` to check column existence before `ALTER TABLE`. Safe against duplicate migration runs. No data loss risk.
+
 ## Verdict
 
-**PASS** — No security vulnerabilities found in M1–M8 code. M1 is backend-only with no user-facing endpoints. M2 is pure computation with zero I/O. M3 mitigates subprocess/temp file risks via escape_latex(), explicit arg lists, timeouts, and try/finally cleanup. M4 is pure Python orchestration with filename sanitization and parameterized SQL. M5 adds upload validation (extension allowlist, filename sanitization, size cap), parameterized SQL in all CRUD, XSS prevention via escHtml/escAttr, and Bearer token auth on all 8 endpoints. M6 (ATS Scoring) is pure in-memory computation. M7 (Resume Builder) uses existing KB API with input validation. M8 (Performance) uses content-hash cache keys (no user input in paths), thread-safe task tracking with Lock, and reuses M5's upload validation for async endpoint. Attack surface remains minimal.
+**PASS** — No security vulnerabilities found in M1–M9 code. M1 is backend-only with no user-facing endpoints. M2 is pure computation with zero I/O. M3 mitigates subprocess/temp file risks via escape_latex(), explicit arg lists, timeouts, and try/finally cleanup. M4 is pure Python orchestration with filename sanitization and parameterized SQL. M5 adds upload validation (extension allowlist, filename sanitization, size cap), parameterized SQL in all CRUD, XSS prevention via escHtml/escAttr, and Bearer token auth on all 8 endpoints. M6 (ATS Scoring) is pure in-memory computation. M7 (Resume Builder) uses existing KB API with input validation. M8 (Performance) uses content-hash cache keys, thread-safe task tracking. M9 (Intelligence) uses parameterized SQL for all new queries, validates feedback input against allowlist, and derives effectiveness_score from actual data (not user-settable). Attack surface remains minimal.

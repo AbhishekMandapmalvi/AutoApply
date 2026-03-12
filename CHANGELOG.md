@@ -156,6 +156,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - **Thread safety**: `threading.Lock` protects shared upload task dict, daemon threads for clean shutdown
   - **30 new tests**: PDF cache (9), JD classifier (14), async upload (5), LaTeX cache integration (2)
   - **Security**: 6 findings all PASS — content-hash keys prevent path traversal, UUID4 task IDs prevent enumeration
+- **Smart Resume Reuse M9: Intelligence (TASK-030)**: Outcome-based learning, cover letter KB assembly, reuse stats. (FR-030-63 to FR-030-70, NFR-030-25 to NFR-030-26)
+  - **Outcome-based learning**: `kb_usage_log` table tracks entry usage per application; `effectiveness_score` recalculated from interview/total ratio
+  - **Feedback API**: `POST /api/kb/feedback` accepts outcome (interview/rejected/no_response), updates effectiveness scores
+  - **Effectiveness ranking**: `GET /api/kb/effectiveness` returns entries ranked by effectiveness_score
+  - **Cover letter KB assembly**: `core/cover_letter_assembler.py` — template-based cover letter from KB entries (0 API calls)
+  - **Reuse stats**: `GET /api/analytics/reuse-stats` — total assemblies, entries used, interview rate, avg effectiveness
+  - **JD classifier integration**: Resume assembler pre-filters entries by JD type before TF-IDF scoring
+  - **Effectiveness weighting**: TF-IDF scores blended with effectiveness_score (0.7 × tfidf + 0.3 × effectiveness)
+  - **DB migration**: 3 new columns on knowledge_base (effectiveness_score, usage_count, last_used_at) + kb_usage_log table
+  - **27 new tests**: Usage log (10), cover letter (4), JD integration (1), effectiveness weighting (2), API endpoints (10)
+  - **Security**: 6 findings all PASS — parameterized SQL, input validation, derived scores
 
 ### Changed
 - **Traceability matrix v14.0**: 186 requirements, all ✅ (0 ⚠️). M5 adds 13 new requirements (10 FRs + 3 NFRs).

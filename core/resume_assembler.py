@@ -1,15 +1,16 @@
 """Resume assembler — score KB entries, select best, render LaTeX, compile PDF.
 
-Implements: TASK-030 M4.
+Implements: TASK-030 M4, M9.
 
 The assembler is the core pipeline that turns Knowledge Base entries into
 a tailored resume PDF without any LLM API calls:
 
     1. Fetch all active KB entries
-    2. Score them against the job description (TF-IDF)
-    3. Select top entries per category (experience, skills, education, etc.)
-    4. Build a LaTeX template context
-    5. Render and compile to PDF
+    2. Pre-filter entries by JD classification (M9)
+    3. Score them against the job description (TF-IDF)
+    4. Select top entries per category (experience, skills, education, etc.)
+    5. Build a LaTeX template context
+    6. Render and compile to PDF
 
 If the KB has insufficient entries (below configured thresholds), the
 assembler returns None so the caller can fall through to LLM generation.
@@ -72,8 +73,19 @@ def assemble_resume(
         logger.info("KB is empty — cannot assemble resume")
         return None
 
+    # 1b. Pre-filter by JD classification (M9)
+    from core.jd_classifier import classify_jd, filter_entries_by_type, get_relevant_types
+
+    job_types = classify_jd(jd_text)
+    relevant_types = get_relevant_types(job_types)
+    filtered_entries = filter_entries_by_type(all_entries, relevant_types)
+    logger.debug(
+        "JD classified as %s; %d/%d entries after pre-filter",
+        job_types, len(filtered_entries), len(all_entries),
+    )
+
     # 2. Score entries against JD
-    scored = score_kb_entries(jd_text, all_entries, cfg)
+    scored = score_kb_entries(jd_text, filtered_entries, cfg)
     if not scored:
         logger.info("No KB entries scored above threshold (%.2f)", cfg.min_score)
         return None

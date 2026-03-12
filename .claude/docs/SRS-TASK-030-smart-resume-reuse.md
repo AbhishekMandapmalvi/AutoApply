@@ -1373,12 +1373,94 @@ Async upload task tracking SHALL use threading.Lock for concurrent access to the
 
 ---
 
+## 13. Milestone 9 — Intelligence (Outcome Learning, CL Assembly, Reuse Stats)
+
+### 13.1 Scope
+User intelligence features: outcome-based learning (effectiveness_score from interview feedback), cover letter KB assembly (0 API calls), reuse stats analytics, and JD classifier integration into the resume assembler pipeline.
+
+### 13.2 Functional Requirements
+
+#### FR-030-63: KB Usage Logging
+The system SHALL log each KB entry's usage when selected for a resume assembly, tracking entry_id, application_id, and TF-IDF score. Usage count and last_used_at SHALL be updated on the knowledge_base table.
+
+**Acceptance Criteria**:
+- AC-030-63-1: Given a resume assembled from 5 KB entries, When log_kb_usage called, Then 5 rows inserted into kb_usage_log and usage_count incremented on each entry
+
+#### FR-030-64: Outcome Feedback
+The system SHALL accept outcome feedback (interview/rejected/no_response) for an application and update all associated kb_usage_log rows. For "interview" outcomes, effectiveness_score SHALL be recalculated as interviews/total_uses.
+
+**Acceptance Criteria**:
+- AC-030-64-1: Given application with 3 KB entries, When outcome "interview" submitted, Then all 3 log rows updated and effectiveness_score = 1.0
+- AC-030-64-2: Given entry used twice (1 interview, 1 rejection), When both outcomes recorded, Then effectiveness_score = 0.5
+
+#### FR-030-65: Effectiveness Ranking
+The system SHALL provide GET /api/kb/effectiveness returning KB entries ranked by effectiveness_score descending, limited to entries with usage_count > 0.
+
+**Acceptance Criteria**:
+- AC-030-65-1: Given entries with varying effectiveness, When GET /api/kb/effectiveness, Then returns entries sorted by score DESC
+
+#### FR-030-66: Feedback API Endpoint
+The system SHALL provide POST /api/kb/feedback accepting {application_id, outcome} and updating outcomes via update_kb_outcome().
+
+**Acceptance Criteria**:
+- AC-030-66-1: Given valid application_id and outcome "interview", When POST /api/kb/feedback, Then returns success with updated count
+- AC-030-66-2: Given invalid outcome value, When POST /api/kb/feedback, Then returns 400
+
+#### FR-030-67: Cover Letter KB Assembly
+The system SHALL assemble cover letters from KB entries scored against a JD using template-based generation, requiring no LLM API calls. Requires at least 2 experience entries above threshold.
+
+**Acceptance Criteria**:
+- AC-030-67-1: Given sufficient KB entries, When assemble_cover_letter called, Then returns formatted cover letter with greeting, intro, body, closing
+- AC-030-67-2: Given empty KB, When assemble_cover_letter called, Then returns None
+
+#### FR-030-68: Reuse Stats Analytics
+The system SHALL provide GET /api/analytics/reuse-stats returning aggregate KB assembly metrics: total_assemblies, total_entries_used, unique_entries_used, interviews_from_kb, avg_effectiveness, top_categories.
+
+**Acceptance Criteria**:
+- AC-030-68-1: Given usage log data, When GET /api/analytics/reuse-stats, Then returns all 6 metrics accurately
+
+#### FR-030-69: JD Classifier Integration
+The resume assembler SHALL pre-filter KB entries using the JD classifier before TF-IDF scoring, narrowing entries to those matching the detected job type(s) plus related types.
+
+**Acceptance Criteria**:
+- AC-030-69-1: Given a backend-focused JD, When assemble_resume called, Then classify_jd is called to pre-filter entries
+
+#### FR-030-70: Effectiveness Weighting in Scoring
+The TF-IDF scorer SHALL blend effectiveness_score into final entry scores using weighted formula: (tfidf × 0.7) + (effectiveness × 0.3), only when effectiveness > 0.
+
+**Acceptance Criteria**:
+- AC-030-70-1: Given entry with effectiveness_score=0.9, When scored, Then final score is boosted
+- AC-030-70-2: Given entry without effectiveness_score, When scored, Then original TF-IDF score used
+
+### 13.3 Non-Functional Requirements
+
+#### NFR-030-25: Migration Safety
+Schema migration for effectiveness columns SHALL use PRAGMA table_info check before ALTER TABLE to handle existing databases safely.
+
+#### NFR-030-26: SQL Parameterization
+All new database queries SHALL use parameterized SQL (? placeholders). No string interpolation in SQL.
+
+### 13.4 Traceability Seeds
+
+| FR | → Design | → Source | → Test |
+|----|----------|----------|--------|
+| FR-030-63 | SAD §3.42 | `db/database.py` | `test_intelligence.py::TestKBUsageLog::test_log_*` |
+| FR-030-64 | SAD §3.42 | `db/database.py` | `test_intelligence.py::TestKBUsageLog::test_update_outcome_*` |
+| FR-030-65 | SAD §3.42, IC-036 | `db/database.py`, `routes/knowledge_base.py` | `test_intelligence.py::TestEffectivenessAPI` |
+| FR-030-66 | SAD §3.42, IC-035 | `routes/knowledge_base.py` | `test_intelligence.py::TestFeedbackAPI` |
+| FR-030-67 | SAD §3.43 | `core/cover_letter_assembler.py` | `test_intelligence.py::TestCoverLetterAssembly` |
+| FR-030-68 | SAD §3.44, IC-037 | `db/database.py`, `routes/analytics.py` | `test_intelligence.py::TestReuseStatsAPI` |
+| FR-030-69 | SAD §3.44 | `core/resume_assembler.py` | `test_intelligence.py::TestAssemblerJDPreFilter` |
+| FR-030-70 | SAD §3.44 | `core/resume_scorer.py` | `test_intelligence.py::TestEffectivenessWeighting` |
+
+---
+
 ## Software Requirements Specification -- GATE 3 OUTPUT
 
 **Document**: SRS-TASK-030-smart-resume-reuse
-**FRs**: 62 functional requirements (12 M1 + 7 M2 + 7 M3 + 6 M4 + 10 M5 + 6 M6 + 6 M7 + 8 M8)
-**NFRs**: 24 non-functional requirements (6 M1 + 4 M2 + 3 M3 + 2 M4 + 3 M5 + 2 M6 + 2 M7 + 2 M8)
-**ACs**: 204 total acceptance criteria (171 positive + 33 negative)
+**FRs**: 70 functional requirements (12 M1 + 7 M2 + 7 M3 + 6 M4 + 10 M5 + 6 M6 + 6 M7 + 8 M8 + 8 M9)
+**NFRs**: 26 non-functional requirements (6 M1 + 4 M2 + 3 M3 + 2 M4 + 3 M5 + 2 M6 + 2 M7 + 2 M8 + 2 M9)
+**ACs**: 218 total acceptance criteria (185 positive + 33 negative)
 **Quality Checklist**: 48/48 items passed (100%)
 
 ### Handoff Routing

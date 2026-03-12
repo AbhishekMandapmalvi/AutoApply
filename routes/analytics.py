@@ -1,6 +1,7 @@
 """Analytics and feed event routes.
 
 Implements: FR-013 (analytics API), FR-014 (feed events).
+Implements: TASK-030 M9 — Reuse stats analytics endpoint.
 """
 
 from __future__ import annotations
@@ -46,3 +47,18 @@ def get_feed_events():
     limit = request.args.get("limit", 50, type=int)
     events = _get_db().get_feed_events(limit=limit)
     return jsonify([e.model_dump() for e in events])
+
+
+# ---------------------------------------------------------------------------
+# KB Reuse Stats (TASK-030 M9)
+# ---------------------------------------------------------------------------
+
+
+@analytics_bp.route("/api/analytics/reuse-stats", methods=["GET"])
+def reuse_stats():
+    """Return aggregate KB assembly statistics.
+
+    Response: {total_assemblies, total_entries_used, unique_entries_used,
+               interviews_from_kb, avg_effectiveness, top_categories}
+    """
+    return jsonify(_get_db().get_reuse_stats())
