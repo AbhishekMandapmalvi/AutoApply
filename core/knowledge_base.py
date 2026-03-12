@@ -161,6 +161,9 @@ class KnowledgeBase:
                 "category": category,
                 "text": text,
                 "subsection": entry.get("subsection"),
+                "start_date": entry.get("start_date"),
+                "end_date": entry.get("end_date"),
+                "location": entry.get("location"),
                 "job_types": json.dumps(entry.get("job_types", ["general"])),
             })
 
