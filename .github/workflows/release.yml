@@ -50,12 +50,14 @@ jobs:
           VERSION=$(python -c "import tomllib; print(tomllib.load(open('../pyproject.toml','rb'))['project']['version'])")
           if [ "$RUNNER_OS" = "Windows" ]; then
             PLATFORM="win-x64"
+            7z a "AutoApply-${VERSION}-${PLATFORM}.zip" AutoApply/
           elif [ "$RUNNER_OS" = "macOS" ]; then
             PLATFORM="mac-x64"
+            zip -r "AutoApply-${VERSION}-${PLATFORM}.zip" AutoApply/
           else
             PLATFORM="linux-x64"
+            zip -r "AutoApply-${VERSION}-${PLATFORM}.zip" AutoApply/
           fi
-          zip -r "AutoApply-${VERSION}-${PLATFORM}.zip" AutoApply/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
