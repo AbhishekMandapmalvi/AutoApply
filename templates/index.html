@@ -388,6 +388,24 @@
           <button class="btn btn-warning btn-sm" id="btn-pause" onclick="botControl('pause')" disabled data-i18n="button.pause">Pause</button>
           <button class="btn btn-danger btn-sm"  id="btn-stop"  onclick="botControl('stop')"  disabled data-i18n="button.stop">Stop</button>
         </div>
+        <div class="bot-toggles">
+          <label class="bot-toggle" for="set-adaptive-resume">
+            <input type="checkbox" id="set-adaptive-resume" checked>
+            <span data-i18n="settings.adaptive_resume">Adaptive Resume</span>
+          </label>
+          <label class="bot-toggle" for="set-cover-letter">
+            <input type="checkbox" id="set-cover-letter" checked>
+            <span data-i18n="settings.cover_letter">Cover Letter</span>
+          </label>
+          <span class="bot-toggle-separator"></span>
+          <div class="default-resume-control">
+            <span class="default-resume-label" data-i18n="settings.default_resume">Default Resume:</span>
+            <span id="default-resume-name" class="default-resume-name">None</span>
+            <button class="btn btn-xs btn-secondary" id="btn-upload-default-resume" onclick="document.getElementById('default-resume-input').click()" data-i18n="button.upload">Upload</button>
+            <button class="btn btn-xs btn-danger hidden" id="btn-remove-default-resume" onclick="removeDefaultResume()">&#10005;</button>
+            <input type="file" id="default-resume-input" accept=".pdf,.docx" style="display:none" onchange="uploadDefaultResume(this)">
+          </div>
+        </div>
       </div>
     </div>
 
@@ -707,19 +725,20 @@
       </div>
       <div class="card">
         <h3>Uploaded Documents</h3>
+        <div class="kb-toolbar-upload" style="margin-bottom:12px;">
+          <input type="file" id="kb-upload-input" accept=".pdf,.docx,.txt,.md"
+                 aria-label="Choose document to upload" class="form-input">
+          <button type="button" class="btn btn-primary" onclick="uploadKBDocument()"
+                  data-i18n="kb.upload_title">Upload</button>
+          <div id="kb-upload-status" class="kb-upload-status" aria-live="polite"></div>
+        </div>
         <div id="kb-documents-list" role="region" aria-label="Uploaded documents list"></div>
       </div>
     </div>
 
     <!-- KB Entries Database -->
     <div class="kb-toolbar">
-      <div class="kb-toolbar-upload">
-        <input type="file" id="kb-upload-input" accept=".pdf,.docx,.txt,.md"
-               aria-label="Choose document to upload" class="form-input">
-        <button type="button" class="btn btn-primary" onclick="uploadKBDocument()"
-                data-i18n="kb.upload_title">Upload</button>
-        <div id="kb-upload-status" class="kb-upload-status" aria-live="polite"></div>
-      </div>
+      <div></div>
       <div class="kb-toolbar-filter">
         <select id="kb-filter-category" class="form-input"
                 onchange="filterKBCategory(this.value)"

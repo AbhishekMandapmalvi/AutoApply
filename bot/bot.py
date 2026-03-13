@@ -332,11 +332,14 @@ def _generate_docs(scored: ScoredJob, config, profile_dir: Path, db=None):
     cover_letter_text = ""
     version_meta = None
 
+    skip_cover_letter = not config.bot.cover_letter_enabled
+
     # --- Phase 1: Try KB assembly (LLM-powered with strict KB data) ---
     kb_result = _try_kb_assembly(scored, config, profile_dir)
     if kb_result is not None:
         resume_path = kb_result["resume_path"]
-        cover_letter_text = config.bot.cover_letter_template or ""
+        if not skip_cover_letter:
+            cover_letter_text = config.bot.cover_letter_template or ""
         version_meta = {
             "resume_md_path": "",  # KB assembly has no .md
             "resume_pdf_path": str(resume_path),
@@ -357,8 +360,10 @@ def _generate_docs(scored: ScoredJob, config, profile_dir: Path, db=None):
             output_dir_resumes=profile_dir / "resumes",
             output_dir_cover_letters=profile_dir / "cover_letters",
             llm_config=config.llm,
+            skip_cover_letter=skip_cover_letter,
         )
-        cover_letter_text = cl_path.read_text(encoding="utf-8")
+        if cl_path and cl_path.exists():
+            cover_letter_text = cl_path.read_text(encoding="utf-8")
 
         # Tag as LLM-generated for version tracking
         if version_meta:
@@ -375,7 +380,8 @@ def _generate_docs(scored: ScoredJob, config, profile_dir: Path, db=None):
             fallback = Path(config.profile.fallback_resume_path)
             if fallback.exists():
                 resume_path = fallback
-        cover_letter_text = config.bot.cover_letter_template or ""
+        if not skip_cover_letter:
+            cover_letter_text = config.bot.cover_letter_template or ""
 
     return resume_path, cl_path, cover_letter_text, version_meta
 

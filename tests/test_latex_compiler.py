@@ -183,7 +183,7 @@ class TestRenderTemplate:
         }
 
     def test_render_all_templates(self, sample_context):
-        """All 5 templates should render without error."""
+        """All available templates should render without error."""
         for name in AVAILABLE_TEMPLATES:
             tex = render_template(name, sample_context)
             assert r"\documentclass" in tex
@@ -230,13 +230,6 @@ class TestRenderTemplate:
         tex = render_template("minimal", sample_context)
         assert "10pt" in tex
 
-    def test_render_jake_company_structure(self, sample_context):
-        """Jake template should show company and role in structured format."""
-        tex = render_template("jake", sample_context)
-        assert "TechCorp" in tex
-        assert "Senior Engineer" in tex
-        assert "Stanford University" in tex
-
     def test_render_multi_role_company(self):
         """Templates should handle multiple roles at the same company."""
         context = {
@@ -269,7 +262,7 @@ class TestRenderTemplate:
             "projects": [],
             "certifications": [],
         }
-        tex = render_template("jake", context)
+        tex = render_template("classic", context)
         assert "Google" in tex
         assert "Senior Software Engineer" in tex
         assert "Software Engineer" in tex

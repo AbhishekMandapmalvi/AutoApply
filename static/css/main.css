@@ -545,6 +545,52 @@ textarea.form-input { resize: vertical; min-height: 80px; }
   align-items: center;
 }
 .bot-buttons { display: flex; gap: 10px; }
+.bot-toggles {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  margin-top: -8px;
+}
+.bot-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: .85rem;
+  color: var(--text-dim);
+  cursor: pointer;
+  user-select: none;
+}
+.bot-toggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.bot-toggle-separator {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+}
+.default-resume-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: .85rem;
+}
+.default-resume-label {
+  color: var(--text-dim);
+}
+.default-resume-name {
+  color: var(--text);
+  font-weight: 500;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .bot-stats {
   display: flex;
   gap: 28px;

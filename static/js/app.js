@@ -16,7 +16,7 @@ import { botControl } from './bot-control.js';
 import { clearFeed } from './feed.js';
 import { debounceSearch, loadApplications, goAppPage, updateAppStatus, updateAppNotes, viewCoverLetter, viewApplicationDetail, updateDetailStatus, saveDetailNotes, exportCSV } from './applications.js';
 import { loadProfileFiles, showFileModal, editFile, saveFile, confirmDeleteFile } from './profile.js';
-import { loadSettings, saveSettings, updateScheduleUI, changeApplyMode, onLLMProviderChange, validateLLMKey, onLocaleChange } from './settings.js';
+import { loadSettings, saveSettings, updateScheduleUI, changeApplyMode, initBotToggles, uploadDefaultResume, removeDefaultResume, loadDefaultResume, onLLMProviderChange, validateLLMKey, onLocaleChange } from './settings.js';
 import { reviewApprove, reviewEdit, reviewManualSubmit, reviewSkip } from './review.js';
 import { openLoginBrowser, closeLoginBrowser } from './login.js';
 import { closeModal } from './modals.js';
@@ -59,6 +59,8 @@ window.confirmDeleteFile = confirmDeleteFile;
 window.saveSettings = saveSettings;
 window.updateScheduleUI = updateScheduleUI;
 window.changeApplyMode = changeApplyMode;
+window.uploadDefaultResume = uploadDefaultResume;
+window.removeDefaultResume = removeDefaultResume;
 window.onLLMProviderChange = onLLMProviderChange;
 window.validateLLMKey = validateLLMKey;
 window.onLocaleChange = onLocaleChange;
@@ -184,6 +186,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initKnowledgeBase();
   initResumePreview();
   initResumeBuilder();
+  initBotToggles();
 
   try {
     const res = await fetch('/api/setup/status');

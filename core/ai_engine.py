@@ -419,11 +419,13 @@ def generate_documents(
     output_dir_resumes: Path,
     output_dir_cover_letters: Path,
     llm_config=None,
-) -> tuple[Path, Path, dict]:
+    skip_cover_letter: bool = False,
+) -> tuple[Path, Path | None, dict]:
     """Generate tailored resume and cover letter for a job application.
 
-    Reads experience files, calls the configured LLM twice (resume + cover
-    letter), saves outputs to disk, and returns paths plus version metadata.
+    Reads experience files, calls the configured LLM for resume (and
+    optionally cover letter), saves outputs to disk, and returns paths
+    plus version metadata.
 
     Args:
         job: Object with ``.id`` (str), ``.raw.company`` (str),
@@ -434,9 +436,10 @@ def generate_documents(
         output_dir_resumes: Where to save resume .md and .pdf files.
         output_dir_cover_letters: Where to save cover letter .txt files.
         llm_config: LLMConfig with provider, api_key, model.
+        skip_cover_letter: If True, skip cover letter generation.
 
     Returns:
-        Tuple of (resume_pdf_path, cover_letter_txt_path, version_meta).
+        Tuple of (resume_pdf_path, cover_letter_txt_path | None, version_meta).
         version_meta contains resume_md_path, resume_pdf_path, llm_provider,
         and llm_model for resume version recording (FR-118).
 
@@ -471,23 +474,23 @@ def generate_documents(
         portfolio_url=profile.portfolio_url or "N/A",
     ), llm_config)
 
-    # Generate cover letter via LLM
-    cover_letter_text = invoke_llm(COVER_LETTER_PROMPT.format(
-        experience_files_content=experience_content,
-        job_description=job.raw.description,
-        full_name=profile.full_name,
-        bio=profile.bio,
-    ), llm_config)
-
     # Save resume Markdown + PDF
     resume_md_path = output_dir_resumes / f"{base_name}.md"
     resume_pdf_path = output_dir_resumes / f"{base_name}.pdf"
     resume_md_path.write_text(resume_md_text, encoding="utf-8")
     render_resume_to_pdf(resume_md_text, resume_pdf_path)
 
-    # Save cover letter
-    cl_path = output_dir_cover_letters / f"{base_name}.txt"
-    cl_path.write_text(cover_letter_text, encoding="utf-8")
+    # Generate and save cover letter (unless disabled)
+    cl_path = None
+    if not skip_cover_letter:
+        cover_letter_text = invoke_llm(COVER_LETTER_PROMPT.format(
+            experience_files_content=experience_content,
+            job_description=job.raw.description,
+            full_name=profile.full_name,
+            bio=profile.bio,
+        ), llm_config)
+        cl_path = output_dir_cover_letters / f"{base_name}.txt"
+        cl_path.write_text(cover_letter_text, encoding="utf-8")
 
     version_meta = {
         "resume_md_path": str(resume_md_path),

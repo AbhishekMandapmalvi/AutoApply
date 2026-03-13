@@ -8,7 +8,7 @@ import { loadProfileFiles } from './profile.js';
 import { loadAnalytics } from './analytics.js';
 import { loadResumes } from './resumes.js';
 import { loadKnowledgeBase } from './knowledge-base.js';
-import { loadSettings, loadApplyMode } from './settings.js';
+import { loadSettings, loadApplyMode, loadDefaultResume } from './settings.js';
 
 export function initNavTabs() {
   const tabs = document.querySelectorAll('#navbar .nav-tabs a[role="tab"]');
@@ -44,7 +44,7 @@ export function switchScreen(name) {
   if (el) el.classList.remove('hidden');
 
   // Load data for the screen
-  if (name === 'dashboard') { loadFeedHistory(); loadApplyMode(); }
+  if (name === 'dashboard') { loadFeedHistory(); loadApplyMode(); loadDefaultResume(); }
   if (name === 'applications') loadApplications();
   if (name === 'profile') loadProfileFiles();
   if (name === 'analytics') loadAnalytics();

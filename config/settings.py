@@ -146,6 +146,7 @@ class BotConfig(BaseModel):
     search_interval_seconds: int = 1800
     apply_mode: str = "full_auto"  # "full_auto" | "review" | "watch"
     watch_mode: bool = False  # Deprecated: use apply_mode instead
+    cover_letter_enabled: bool = True
     cover_letter_template: str = ""
     schedule: ScheduleConfig = ScheduleConfig()
 

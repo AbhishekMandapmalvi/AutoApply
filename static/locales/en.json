@@ -186,7 +186,8 @@
     "clear_feed": "Clear",
     "close_browser": "Close Browser",
     "add_tag": "Add",
-    "approve_and_apply": "Approve & Apply"
+    "approve_and_apply": "Approve & Apply",
+    "upload": "Upload"
   },
 
   "bot": {
@@ -286,6 +287,13 @@
     "platform_login_hint": "Open a browser to log into your job platforms. Sessions are saved across restarts.",
     "open_linkedin_login": "Open LinkedIn Login",
     "open_indeed_login": "Open Indeed Login",
+    "section_automation": "Automation Options",
+    "automation_description": "Control how the bot generates documents for each application.",
+    "adaptive_resume": "Adaptive Resume",
+    "adaptive_resume_hint": "Tailor resume to each job using Knowledge Base entries. When off, uses your default resume.",
+    "cover_letter": "Cover Letter",
+    "cover_letter_hint": "Generate a tailored cover letter for each application. When off, no cover letter is attached.",
+    "default_resume": "Default Resume:",
     "section_schedule": "Schedule",
     "schedule_hint": "Auto-start and stop the bot on a time schedule. The bot only runs during the configured window.",
     "schedule_active": "Active",

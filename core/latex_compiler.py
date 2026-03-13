@@ -121,7 +121,7 @@ def find_pdflatex(bundled_dir: Path | None = None) -> str | None:
 # Template directory: templates/latex/ relative to project root
 _TEMPLATE_DIR = Path(__file__).parent.parent / "templates" / "latex"
 
-AVAILABLE_TEMPLATES = ("jake", "classic", "modern", "academic", "minimal")
+AVAILABLE_TEMPLATES = ("classic", "modern", "academic", "minimal")
 
 
 def _get_jinja_env() -> jinja2.Environment:
