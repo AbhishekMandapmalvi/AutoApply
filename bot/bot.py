@@ -1,6 +1,7 @@
 """Main bot loop — search, filter, generate documents, apply, repeat.
 
-Implements: FR-042 (bot main loop), FR-050 (search-filter-generate-apply pipeline).
+Implements: FR-042 (bot main loop), FR-050 (search-filter-generate-apply pipeline),
+            FR-086–FR-089 (portal auth integration).
 """
 
 from __future__ import annotations
@@ -222,8 +223,53 @@ def run_bot(
                         )
 
                         result = _apply_to_job(
-                            scored, resume_path, cover_letter_text, config, page
+                            scored, resume_path, cover_letter_text, config, page,
+                            db=db,
                         )
+
+                        # Login gate — pause for user to log in (FR-089)
+                        if result.login_required:
+                            domain = result.login_domain or "unknown"
+                            portal_type = result.login_portal_type or "generic"
+                            emit(
+                                "LOGIN_REQUIRED",
+                                job_title=raw_job.title,
+                                company=raw_job.company,
+                                platform=raw_job.platform,
+                                domain=domain,
+                                portal_type=portal_type,
+                                message=f"Login required at {domain} — please log in manually",
+                            )
+
+                            state.begin_login_gate(
+                                domain, portal_type, raw_job.apply_url,
+                            )
+                            login_decision = state.wait_for_login()
+
+                            if login_decision == "stop":
+                                break
+                            if login_decision == "skip":
+                                emit(
+                                    "SKIPPED",
+                                    job_title=raw_job.title,
+                                    company=raw_job.company,
+                                    platform=raw_job.platform,
+                                    message=f"Skipped (login not completed): {raw_job.title}",
+                                )
+                                # Save as login_required so user can retry later
+                                _save_application(
+                                    db, scored, resume_path, cl_path,
+                                    cover_letter_text, result,
+                                    description_path=desc_path,
+                                    version_meta=version_meta,
+                                )
+                                continue
+
+                            # User logged in — retry the application
+                            result = _apply_to_job(
+                                scored, resume_path, cover_letter_text, config, page,
+                                db=db,
+                            )
 
                         # Save to DB
                         _save_application(
@@ -463,8 +509,15 @@ def _ingest_llm_output(resume_path, config, db) -> None:
         logger.debug("LLM resume ingestion skipped: %s", e)
 
 
-def _apply_to_job(scored, resume_path, cover_letter_text, config, page):
-    """Apply to a job using the appropriate platform applier."""
+def _apply_to_job(scored, resume_path, cover_letter_text, config, page, db=None):
+    """Apply to a job using the appropriate platform applier.
+
+    Integrates portal auth: detects login walls after navigation,
+    attempts auto-login with stored credentials, and signals login_required
+    when manual intervention is needed (FR-086–FR-089).
+    """
+    from core.portal_auth import PortalAuthManager
+
     platform = detect_ats(scored.raw.apply_url) or scored.raw.platform
 
     applier_cls = APPLIERS.get(platform)
@@ -473,6 +526,49 @@ def _apply_to_job(scored, resume_path, cover_letter_text, config, page):
             success=False, manual_required=True,
             error_message=f"No applier for platform: {platform}",
         )
+
+    # Navigate to the apply URL first to check for login walls
+    try:
+        page.goto(
+            scored.raw.apply_url,
+            wait_until="domcontentloaded",
+            timeout=30000,
+        )
+    except Exception as e:
+        logger.warning("Navigation failed for %s: %s", scored.raw.apply_url, e)
+
+    # Login detection + auto-login (FR-087, FR-088)
+    if db and PortalAuthManager.detect_login_wall(page):
+        domain = PortalAuthManager.extract_domain(scored.raw.apply_url)
+        portal_type = PortalAuthManager.detect_portal_type(scored.raw.apply_url)
+        auth_mgr = PortalAuthManager(db)
+
+        logger.info("Login wall detected at %s (domain: %s)", scored.raw.apply_url, domain)
+
+        # Try auto-login with stored credentials
+        if auth_mgr.get_credential(domain):
+            if auth_mgr.try_auto_login(page, domain, portal_type):
+                logger.info("Auto-login succeeded for %s", domain)
+            else:
+                # Auto-login failed — signal browser handoff (FR-089)
+                logger.warning("Auto-login failed for %s, requesting manual login", domain)
+                return ApplyResult(
+                    success=False,
+                    login_required=True,
+                    login_domain=domain,
+                    login_portal_type=portal_type,
+                    error_message=f"Auto-login failed at {domain}",
+                )
+        else:
+            # No stored credentials — signal browser handoff (FR-089)
+            logger.info("No credentials for %s, requesting manual login", domain)
+            return ApplyResult(
+                success=False,
+                login_required=True,
+                login_domain=domain,
+                login_portal_type=portal_type,
+                error_message=f"Login required at {domain} (first visit)",
+            )
 
     applier = applier_cls(page)
     return applier.apply(scored, resume_path, cover_letter_text, config.profile)

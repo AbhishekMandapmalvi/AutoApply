@@ -108,12 +108,13 @@ The system SHALL NOT provide: Greenhouse/Lever/Workday appliers (Phase 6), CAPTC
 
 ### FR-046: Apply Result Model
 
-**Description**: The system SHALL define an `ApplyResult` dataclass with success, error_message, captcha_detected, and manual_required fields.
+**Description**: The system SHALL define an `ApplyResult` dataclass with success, error_message, captcha_detected, manual_required, and attempts fields.
 **Priority**: P0
 **Dependencies**: None
 
 **Acceptance Criteria**:
-- **AC-046-1**: `ApplyResult` has fields: success (bool), error_message (str|None), captcha_detected (bool, default False), manual_required (bool, default False).
+- **AC-046-1**: `ApplyResult` has fields: success (bool), error_message (str|None), captcha_detected (bool, default False), manual_required (bool, default False), attempts (int, default 1).
+- **AC-046-2**: The `attempts` field records how many tries were made before the final result.
 
 ---
 
@@ -235,10 +236,123 @@ The system SHALL NOT provide: Greenhouse/Lever/Workday appliers (Phase 6), CAPTC
 
 ---
 
+### FR-083: BaseApplier Retry Wrapper
+
+**Description**: The system SHALL implement automatic retry logic in the `BaseApplier.apply()` method, wrapping each subclass's `_do_apply()` with configurable retry count and exponential backoff.
+**Priority**: P0
+**Dependencies**: FR-046
+
+**Acceptance Criteria**:
+- **AC-083-1**: Given `MAX_RETRIES = 2`, When `_do_apply()` fails with a transient error (network timeout, generic exception), Then the system retries up to 2 additional times (3 total attempts).
+- **AC-083-2**: Given retries are configured with `RETRY_DELAYS = [3, 8]`, When a retry occurs, Then the system waits the specified delay (3s, then 8s) before the next attempt.
+- **AC-083-3**: Given `_do_apply()` returns `captcha_detected=True` or `manual_required=True`, When evaluating the result, Then the system does NOT retry (returns immediately).
+- **AC-083-4**: Given `_do_apply()` returns a form validation error (error_message contains "form error", "validation", or "required field"), When evaluating the result, Then the system does NOT retry.
+- **AC-083-5**: Given all retry attempts are exhausted, Then `ApplyResult.attempts` reflects the total number of attempts made.
+- **AC-083-6**: Each retry attempt is logged at INFO level with platform name, attempt number, and delay.
+
+---
+
+### FR-084: Safe Navigation & Element Waiting
+
+**Description**: The system SHALL provide helper methods in `BaseApplier` for safe page navigation and element waiting with configurable timeouts.
+**Priority**: P0
+**Dependencies**: FR-046, FR-047
+
+**Acceptance Criteria**:
+- **AC-084-1**: `_safe_goto(url)` navigates with `wait_until="domcontentloaded"` and `timeout=NAV_TIMEOUT` (default 30000ms).
+- **AC-084-2**: `_wait_and_query(selector, timeout)` waits for the element to become visible within `ELEMENT_TIMEOUT` (default 5000ms), returning the element or None on timeout.
+- **AC-084-3**: Both `ELEMENT_TIMEOUT` and `NAV_TIMEOUT` are class-level constants that subclasses can override (e.g., Workday uses 8000ms / 45000ms).
+- **AC-084-4**: `_wait_and_query()` catches all exceptions during wait and returns None (never raises).
+
+---
+
+### FR-085: Safe Form Interaction Helpers
+
+**Description**: The system SHALL provide helper methods in `BaseApplier` for safe form filling, file upload, and element clicking with built-in error handling.
+**Priority**: P0
+**Dependencies**: FR-046, FR-047
+
+**Acceptance Criteria**:
+- **AC-085-1**: `_safe_fill(selector, value, clear_first)` finds the element, clears it if `clear_first=True` and it has a different value, then fills using `_human_type()`. Returns True if filled, False if element not found or already has the correct value.
+- **AC-085-2**: `_safe_upload(resume_path, selectors)` tries multiple selectors in order, uploading the file via the first matching file input. Logs warnings on failure. Returns True if uploaded.
+- **AC-085-3**: `_safe_click(selector, timeout)` waits for the element using `_wait_and_query()`, then clicks if visible. Returns True if clicked.
+- **AC-085-4**: All helper methods handle exceptions gracefully (log and return False, never raise).
+
+---
+
+### NFR-028: Applier Timeout Configuration
+
+**Description**: Each applier platform SHALL have configurable timeout values for element waits and navigation, allowing platform-specific tuning for slow-rendering SPAs.
+**Priority**: P1
+**Metric**: Workday uses ELEMENT_TIMEOUT=8000ms and NAV_TIMEOUT=45000ms; all others use defaults (5000ms / 30000ms).
+
+---
+
+### FR-086: Portal Credential Vault
+
+**Description**: The system SHALL store and retrieve portal login credentials using an OS keyring (preferred) with SQLite database fallback, keyed by extracted domain.
+**Priority**: P0
+**Dependencies**: FR-004
+
+**Acceptance Criteria**:
+- **AC-086-1**: Given a domain, username, and password, When `store_credential()` is called, Then the username is stored in the DB and the password is stored in the OS keyring (if available) or DB (fallback).
+- **AC-086-2**: Given a stored credential, When `get_credential(domain)` is called, Then it returns `(username, password)` retrieving the password from keyring first, DB second.
+- **AC-086-3**: Given a stored credential, When `delete_credential(domain)` is called, Then it removes the credential from both keyring and DB.
+- **AC-086-4**: Given multiple stored credentials, When `list_credentials()` is called, Then it returns all credentials with passwords masked (not included).
+- **AC-086-5**: Domain extraction SHALL use hostname for standard sites, and `hostname/company` for shared-domain ATS portals (Greenhouse, Lever, Ashby).
+- **AC-086-6**: Storing a credential for an existing domain SHALL upsert (update, not duplicate).
+- **AC-086-7**: Login attempts (success/failure) SHALL be tracked per domain with counters and timestamps.
+
+---
+
+### FR-087: Login Detection
+
+**Description**: The system SHALL detect login/signup walls on ATS portal pages using URL pattern matching (tier 1) and DOM element inspection (tier 2).
+**Priority**: P0
+**Dependencies**: FR-047
+
+**Acceptance Criteria**:
+- **AC-087-1**: Given a page URL containing login-related path segments (`login`, `signin`, `auth`, `sso`, etc.), When `detect_login_wall(page)` is called, Then it returns True.
+- **AC-087-2**: Given a page with a visible `input[type="password"]` element, When `detect_login_wall(page)` is called, Then it returns True.
+- **AC-087-3**: Given a page with Workday-specific sign-in selectors (`data-automation-id="signIn-email"`), When `detect_login_wall(page)` is called, Then it returns True.
+- **AC-087-4**: Given a normal application page with no login indicators, Then `detect_login_wall()` returns False.
+- **AC-087-N1**: Given any exception during detection, Then the method returns False (never raises).
+
+---
+
+### FR-088: Auto-Login
+
+**Description**: The system SHALL attempt automatic login using stored credentials, with platform-specific strategies (generic form fill and Workday-specific selectors).
+**Priority**: P0
+**Dependencies**: FR-086, FR-087, FR-047
+
+**Acceptance Criteria**:
+- **AC-088-1**: Given stored credentials for a domain, When `try_auto_login()` is called, Then it fills email/username and password fields with human-like typing (30–80ms per character).
+- **AC-088-2**: Given a Workday portal, When auto-login is attempted, Then it uses `data-automation-id` selectors; if those fail, it falls back to generic login.
+- **AC-088-3**: Given login succeeds (no longer on login wall after submit), Then the method returns True and records a success attempt.
+- **AC-088-4**: Given login fails (still on login wall after submit), Then the method returns False and records a failure attempt.
+- **AC-088-5**: Given no stored credentials for a domain, Then `try_auto_login()` returns False immediately.
+
+---
+
+### FR-089: Browser Handoff Login Gate
+
+**Description**: The system SHALL pause the bot when a login wall is detected and auto-login fails (or no credentials exist), emitting a `LOGIN_REQUIRED` SocketIO event and blocking until the user responds with "done" (logged in) or "skip".
+**Priority**: P0
+**Dependencies**: FR-086, FR-087, FR-088, FR-050
+
+**Acceptance Criteria**:
+- **AC-089-1**: Given a login wall detected and no stored credentials, When the bot encounters the wall, Then it emits a `LOGIN_REQUIRED` feed event with domain, portal_type, and URL.
+- **AC-089-2**: Given a `LOGIN_REQUIRED` state, When the bot thread calls `wait_for_login()`, Then it blocks until the user sets a decision via `set_login_decision()`.
+- **AC-089-3**: Given the user responds "done" with credentials, When the decision is set, Then the credentials are saved to the vault and the bot retries the application.
+- **AC-089-4**: Given the user responds "skip", When the decision is set, Then the job is saved with status `login_required` for later retry.
+- **AC-089-5**: Given the bot is stopped while waiting at the login gate, Then `wait_for_login()` returns "stop" immediately.
+- **AC-089-6**: `BotState.get_status_dict()` SHALL include `awaiting_login` (bool) and `login_context` (dict with domain, portal_type, url).
+- **AC-089-7**: The `POST /api/portal-auth/login-decision` endpoint SHALL accept `{"decision": "done"|"skip"}` and unblock the bot thread.
+
+---
+
 ## 4. Out of Scope
 
-- **Greenhouse, Lever, Workday appliers** — Phase 6
 - **CAPTCHA solving** — Phase 6 (detected and reported, not solved)
-- **Automatic retry on failure** — Phase 5
-- **Scheduled start/stop** — Phase 5
 - **Screening question AI answers** — Future

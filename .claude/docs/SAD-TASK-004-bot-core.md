@@ -214,9 +214,36 @@ Between each application, the bot sleeps for `delay_between_applications_seconds
 
 ### 3.7 bot/apply/base.py — Applier Abstractions
 
-**Purpose**: Defines `ApplyResult` data model and `BaseApplier` ABC with shared utilities.
+**Purpose**: Defines `ApplyResult` data model, `BaseApplier` ABC with retry wrapper, and shared safe interaction helpers.
 
-**Shared utilities**:
+**Class Constants** (overridable per subclass):
+- `ELEMENT_TIMEOUT: int = 5000` — default timeout (ms) for waiting on elements
+- `NAV_TIMEOUT: int = 30000` — default timeout (ms) for page navigation
+
+**Module Constants**:
+- `MAX_RETRIES = 2` — maximum retry attempts on transient failures
+- `RETRY_DELAYS = [3, 8]` — seconds to wait before each retry
+
+**Retry Wrapper** (`apply()` method):
+The base class `apply()` method wraps each subclass's `_do_apply()` with automatic retry logic:
+1. Calls `_do_apply()` up to `MAX_RETRIES + 1` times (3 total)
+2. Returns immediately on success, CAPTCHA detection, or manual_required
+3. Returns immediately on form validation errors (non-retryable)
+4. On transient failures (network errors, timeouts, generic exceptions), waits `RETRY_DELAYS[i]` seconds then retries
+5. Sets `ApplyResult.attempts` to the total number of attempts made
+6. Logs each retry at INFO level with platform name, attempt number, and delay
+
+**Abstract Method**:
+- `_do_apply(job, resume_pdf_path, cover_letter_text, profile) -> ApplyResult`: core application logic, implemented by each platform-specific applier
+
+**Safe Interaction Helpers**:
+- `_safe_goto(url, **kwargs)`: navigates with `wait_until="domcontentloaded"` and `timeout=NAV_TIMEOUT`; kwargs override defaults
+- `_wait_and_query(selector, timeout)`: waits for element visibility within timeout (default `ELEMENT_TIMEOUT`), returns element or None; never raises
+- `_safe_fill(selector, value, clear_first=True)`: finds element, clears if different value present, fills with `_human_type()`; returns True if filled
+- `_safe_upload(resume_path, selectors)`: tries multiple file input selectors in order, uploads via first match; logs warnings on failure; returns True if uploaded
+- `_safe_click(selector, timeout)`: waits for element via `_wait_and_query()`, clicks if visible; returns True if clicked
+
+**Human-Like Interaction Utilities**:
 - `_human_type(locator, text)`: types character-by-character with 30-80ms random delay
 - `_random_pause(min_s, max_s)`: sleeps 0.5-2.0s (default) between actions
 - `_detect_captcha()`: checks for reCAPTCHA iframes, `#captcha`, `.g-recaptcha`, `[data-sitekey]`
@@ -252,6 +279,52 @@ Between each application, the bot sleeps for `delay_between_applications_seconds
 - `_review_event`: `threading.Event` (blocks bot thread during review)
 - `_review_decision`: `"approve"` | `"skip"` | `"edit"` | None
 - `_review_edits`: str | None (edited cover letter)
+- `_awaiting_login`: bool (FR-089 login gate)
+- `_login_event`: `threading.Event` (blocks bot thread during login gate)
+- `_login_decision`: `"done"` | `"skip"` | None
+- `_login_context`: dict (domain, portal_type, url) | None
+
+### 3.11 core/portal_auth.py — PortalAuthManager
+
+**Purpose**: Manages portal credentials, login detection, and auto-login for ATS portals (FR-086–FR-089).
+
+**Key classes**:
+- `PortalAuthManager(db)` — credential vault, login detection, auto-login orchestration
+
+**Domain extraction** (`extract_domain(url)`):
+- Shared-domain ATS (Greenhouse, Lever, Ashby): returns `hostname/company`
+- Standard sites (Workday subdomains, custom career sites): returns `hostname`
+- Case-insensitive (all lowercased)
+
+**Credential vault** (`store_credential`, `get_credential`, `delete_credential`, `list_credentials`):
+- OS keyring preferred (via `config.settings._check_keyring()`), DB fallback
+- Passwords stored in keyring with prefix `portal_` under service `autoapply`
+- UPSERT on conflict (same domain updates credential)
+- Login attempt tracking via `db.record_login_attempt()`
+
+**Login detection** (`detect_login_wall(page)`):
+- Tier 1: URL path segment matching (login, signin, auth, sso, etc.)
+- Tier 2: DOM selector matching (password inputs, login forms, Workday selectors)
+- Returns False on any exception (never raises)
+
+**Auto-login** (`try_auto_login(page, domain, portal_type)`):
+- Generic: finds email/username + password fields, fills with human-like typing, clicks submit
+- Workday-specific: uses `data-automation-id` selectors, falls back to generic
+- Records attempt outcome to DB
+
+### 3.12 routes/portal_auth.py — Portal Auth API Routes
+
+**Purpose**: REST API for credential vault CRUD and login gate decisions (FR-086, FR-089).
+
+**Endpoints**:
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/portal-credentials` | List all credentials (masked) |
+| POST | `/api/portal-credentials` | Store/update a credential |
+| DELETE | `/api/portal-credentials/<domain>` | Delete a credential |
+| POST | `/api/portal-auth/login-decision` | Set login gate decision (done/skip) |
+| GET | `/api/portal-auth/login-status` | Get current login gate status |
+| POST | `/api/portal-auth/extract-domain` | Extract domain from URL (utility) |
 
 ---
 
@@ -373,7 +446,7 @@ Between each application, the bot sleeps for `delay_between_applications_seconds
 
 ### 4.7 BaseApplier.apply(job, resume_pdf_path, cover_letter_text, profile)
 
-**Purpose**: Submit a job application on a specific platform.
+**Purpose**: Submit a job application on a specific platform with automatic retry on transient failures.
 **Category**: command (web automation side effect)
 
 **Signature**:
@@ -387,7 +460,17 @@ Between each application, the bot sleeps for `delay_between_applications_seconds
 **Output**:
 | Field | Type | Description |
 |-------|------|-------------|
-| return | `ApplyResult` | Success/failure with error details |
+| return | `ApplyResult` | Success/failure with error details and attempt count |
+
+**Retry Behavior**:
+- Wraps subclass `_do_apply()` with retry logic (up to `MAX_RETRIES + 1` total attempts)
+- Retries on: network errors, timeouts, generic exceptions
+- Does NOT retry on: success, CAPTCHA detected, manual_required, form validation errors
+- Backoff: `RETRY_DELAYS[i]` seconds between retries (default [3, 8])
+- `ApplyResult.attempts` reflects total attempts made
+
+**Subclass Contract**:
+Subclasses implement `_do_apply()` (same signature as `apply()`) with platform-specific form automation. They should use the base class helpers (`_safe_goto`, `_wait_and_query`, `_safe_fill`, `_safe_upload`, `_safe_click`) for reliable element interaction.
 
 ---
 
@@ -406,7 +489,10 @@ Between each application, the bot sleeps for `delay_between_applications_seconds
 | `begin_review()` | command | Clears review event, sets awaiting_review=True |
 | `set_review_decision(decision, edits)` | command | Sets decision, unblocks bot thread |
 | `wait_for_review()` | blocking | Blocks until decision set or stop requested; returns `(decision, edited_cl)` |
-| `get_status_dict()` | query | Returns dict snapshot of all state for API response |
+| `begin_login_gate(domain, portal_type, url)` | command | Clears login event, sets awaiting_login=True, stores login_context (FR-089) |
+| `set_login_decision(decision)` | command | Sets login decision ("done"/"skip"), unblocks bot thread (FR-089) |
+| `wait_for_login()` | blocking | Blocks until login decision set or stop requested; returns decision string (FR-089) |
+| `get_status_dict()` | query | Returns dict snapshot of all state for API response (includes awaiting_login, login_context) |
 
 ---
 
@@ -450,6 +536,10 @@ Between each application, the bot sleeps for `delay_between_applications_seconds
 | error_message | `str \| None` | `None` | Error detail on failure |
 | captcha_detected | `bool` | `False` | Whether a CAPTCHA blocked the application |
 | manual_required | `bool` | `False` | Whether the user must apply manually (no automation path) |
+| login_required | `bool` | `False` | Whether a login wall was detected (FR-089) |
+| login_domain | `str \| None` | `None` | Domain where login is needed (FR-089) |
+| login_portal_type | `str \| None` | `None` | ATS type of login portal (FR-089) |
+| attempts | `int` | `1` | Number of attempts made (1 = first try, 2+ = retried) |
 
 ---
 
@@ -488,7 +578,9 @@ Between each application, the bot sleeps for `delay_between_applications_seconds
 | paused | `state.resume()` | running | Bot loop unblocks |
 | running | `state.begin_review()` | awaiting_review | Bot thread blocks on `_review_event` |
 | awaiting_review | `state.set_review_decision()` | running | Bot thread unblocks, processes decision |
-| any | `state.stop()` | stopped | Sets stop_flag, unblocks review gate, clears start_time |
+| running | `state.begin_login_gate()` | awaiting_login | Bot thread blocks on `_login_event` (FR-089) |
+| awaiting_login | `state.set_login_decision()` | running | Bot thread unblocks, retries or skips (FR-089) |
+| any | `state.stop()` | stopped | Sets stop_flag, unblocks review + login gates, clears start_time |
 
 ### 6.3 Thread Interaction Model
 
@@ -501,6 +593,7 @@ Between each application, the bot sleeps for `delay_between_applications_seconds
 │  POST /bot/pause ──────────┼──pause──▶│  _wait_while_paused()      │
 │  POST /bot/resume ─────────┼─resume──▶│  unblocks from pause       │
 │  POST /bot/review ─────────┼─decision▶│  wait_for_review() returns │
+│  POST /portal-auth/login──┼─decision▶│  wait_for_login() returns  │
 │  GET  /bot/status ◀────────┼──read────│  get_status_dict()         │
 │                            │          │                            │
 │  Shared: BotState (lock)   │          │  Shared: BotState (lock)   │
@@ -588,11 +681,19 @@ All state access goes through `BotState` which uses `threading.Lock` for atomici
 | FR-050 | FR | Main bot loop | run_bot() | ADR-015 | bot/bot.py |
 | FR-051 | FR | Live feed events | emit() in run_bot() | -- | bot/bot.py |
 | FR-052 | FR | Thread integration | BotState + daemon thread | -- | bot/state.py, bot/bot.py |
+| FR-083 | FR | Retry wrapper | BaseApplier.apply() retry logic | -- | bot/apply/base.py |
+| FR-084 | FR | Safe navigation/waiting | _safe_goto(), _wait_and_query() | -- | bot/apply/base.py |
+| FR-085 | FR | Safe form interaction | _safe_fill(), _safe_upload(), _safe_click() | -- | bot/apply/base.py |
+| NFR-028 | NFR | Timeout configuration | ELEMENT_TIMEOUT, NAV_TIMEOUT overrides | -- | bot/apply/base.py, bot/apply/workday.py |
 | NFR-023 | NFR | Human-like timing | _human_type(), _random_pause() | ADR-013 | bot/apply/base.py |
 | NFR-024 | NFR | Session persistence | Persistent context | ADR-012 | bot/browser.py |
 | NFR-025 | NFR | Rate limiting | delay_between_applications_seconds, search_interval_seconds | -- | bot/bot.py |
 | NFR-026 | NFR | Graceful degradation | Try/except around each job | -- | bot/bot.py |
 | NFR-027 | NFR | Daily limit | applied_today check in loop | -- | bot/bot.py, bot/state.py |
+| FR-086 | FR | Portal credential vault | PortalAuthManager.store/get/delete/list_credential() | -- | core/portal_auth.py, routes/portal_auth.py, db/database.py |
+| FR-087 | FR | Login detection | PortalAuthManager.detect_login_wall() | -- | core/portal_auth.py |
+| FR-088 | FR | Auto-login | PortalAuthManager.try_auto_login(), _login_generic(), _login_workday() | -- | core/portal_auth.py |
+| FR-089 | FR | Browser handoff login gate | BotState.begin_login_gate(), wait_for_login(), set_login_decision() | -- | bot/state.py, bot/bot.py, routes/portal_auth.py |
 
 ---
 

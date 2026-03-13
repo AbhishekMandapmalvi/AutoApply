@@ -137,6 +137,22 @@ CREATE TABLE IF NOT EXISTS custom_templates (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME
 );
+
+CREATE TABLE IF NOT EXISTS portal_credentials (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    domain TEXT NOT NULL UNIQUE,
+    portal_type TEXT NOT NULL,
+    username TEXT NOT NULL,
+    password_hash TEXT,
+    has_keyring_password INTEGER NOT NULL DEFAULT 0,
+    notes TEXT,
+    last_login_at DATETIME,
+    login_success_count INTEGER NOT NULL DEFAULT 0,
+    login_failure_count INTEGER NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME
+);
+CREATE INDEX IF NOT EXISTS idx_pc_domain ON portal_credentials(domain);
 """
 
 
@@ -1435,3 +1451,86 @@ class Database:
                 "DELETE FROM custom_templates WHERE id = ?", (template_id,)
             )
             return cursor.rowcount > 0
+
+    # ------------------------------------------------------------------
+    # Portal credential CRUD (FR-086)
+    # ------------------------------------------------------------------
+
+    def save_portal_credential(
+        self,
+        domain: str,
+        portal_type: str,
+        username: str,
+        password: str,
+        has_keyring: bool = False,
+        notes: str | None = None,
+    ) -> int:
+        """Insert or update a portal credential. Returns the credential ID."""
+        with self._connect() as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO portal_credentials
+                    (domain, portal_type, username, password_hash,
+                     has_keyring_password, notes)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(domain) DO UPDATE SET
+                    portal_type = excluded.portal_type,
+                    username = excluded.username,
+                    password_hash = excluded.password_hash,
+                    has_keyring_password = excluded.has_keyring_password,
+                    notes = excluded.notes,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (domain, portal_type, username, password,
+                 1 if has_keyring else 0, notes),
+            )
+            return cursor.lastrowid  # type: ignore[return-value]
+
+    def get_portal_credential_by_domain(self, domain: str) -> dict | None:
+        """Get a portal credential by domain. Returns dict or None."""
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM portal_credentials WHERE domain = ?",
+                (domain,),
+            ).fetchone()
+            if row is None:
+                return None
+            d = dict(row)
+            d["has_keyring_password"] = bool(d.get("has_keyring_password", 0))
+            return d
+
+    def get_all_portal_credentials(self) -> list[dict]:
+        """List all portal credentials (passwords masked)."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT id, domain, portal_type, username, has_keyring_password, "
+                "notes, last_login_at, login_success_count, login_failure_count, "
+                "created_at, updated_at "
+                "FROM portal_credentials ORDER BY domain"
+            ).fetchall()
+            result = []
+            for row in rows:
+                d = dict(row)
+                d["has_keyring_password"] = bool(d.get("has_keyring_password", 0))
+                result.append(d)
+            return result
+
+    def delete_portal_credential_by_domain(self, domain: str) -> bool:
+        """Delete a portal credential by domain. Returns True if deleted."""
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "DELETE FROM portal_credentials WHERE domain = ?", (domain,),
+            )
+            return cursor.rowcount > 0
+
+    def record_login_attempt(self, domain: str, success: bool) -> None:
+        """Record a login attempt outcome for a portal credential."""
+        col = "login_success_count" if success else "login_failure_count"
+        with self._connect() as conn:
+            conn.execute(
+                f"UPDATE portal_credentials SET {col} = {col} + 1, "
+                "last_login_at = CURRENT_TIMESTAMP, "
+                "updated_at = CURRENT_TIMESTAMP "
+                "WHERE domain = ?",
+                (domain,),
+            )

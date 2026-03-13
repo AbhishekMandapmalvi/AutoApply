@@ -670,5 +670,17 @@
     "categories_missing": "Sections Missing",
     "no_gaps": "No gaps found — excellent match!",
     "analyzing": "Analyzing ATS compatibility..."
+  },
+  "portal_auth": {
+    "missing_fields": "Domain, username, and password are required.",
+    "credential_saved": "Portal credential saved successfully.",
+    "credential_deleted": "Portal credential deleted.",
+    "not_found": "No credential found for this domain.",
+    "invalid_decision": "Decision must be 'done' or 'skip'.",
+    "not_awaiting_login": "Bot is not currently waiting for a login.",
+    "decision_set": "Login decision received.",
+    "login_required": "Login required at {domain} — please log in manually.",
+    "auto_login_failed": "Auto-login failed at {domain}.",
+    "auto_login_success": "Auto-login succeeded at {domain}."
   }
 }

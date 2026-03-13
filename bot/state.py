@@ -1,6 +1,6 @@
-"""Bot state machine — tracks status, counters, and review gate.
+"""Bot state machine — tracks status, counters, review gate, and login gate.
 
-Implements: FR-041 (bot state machine).
+Implements: FR-041 (bot state machine), FR-089 (browser handoff login gate).
 """
 
 from __future__ import annotations
@@ -24,6 +24,12 @@ class BotState:
         self._review_decision: str | None = None  # "approve" | "skip" | "edit"
         self._review_edits: str | None = None  # edited cover letter text
         self._awaiting_review: bool = False
+
+        # Login gate — bot blocks here until user logs in manually (FR-089)
+        self._login_event = threading.Event()
+        self._login_decision: str | None = None  # "done" | "skip"
+        self._awaiting_login: bool = False
+        self._login_context: dict | None = None  # domain, portal_type, url
 
     @property
     def status(self) -> str:
@@ -60,6 +66,16 @@ class BotState:
         with self._lock:
             return self._awaiting_review
 
+    @property
+    def awaiting_login(self) -> bool:
+        with self._lock:
+            return self._awaiting_login
+
+    @property
+    def login_context(self) -> dict | None:
+        with self._lock:
+            return self._login_context
+
     def start(self) -> None:
         with self._lock:
             self._status = "running"
@@ -75,8 +91,9 @@ class BotState:
             self._status = "stopped"
             self._stop_flag = True
             self._start_time = None
-            # Unblock review gate so bot thread can exit
+            # Unblock gates so bot thread can exit
             self._review_event.set()
+            self._login_event.set()
 
     def resume(self) -> None:
         with self._lock:
@@ -135,6 +152,46 @@ class BotState:
                 return "stop", None
             return self._review_decision or "skip", self._review_edits
 
+    # ------------------------------------------------------------------
+    # Login gate (FR-089)
+    # ------------------------------------------------------------------
+
+    def begin_login_gate(self, domain: str, portal_type: str, url: str) -> None:
+        """Signal that the bot is waiting for the user to log in manually."""
+        with self._lock:
+            self._login_event.clear()
+            self._login_decision = None
+            self._awaiting_login = True
+            self._login_context = {
+                "domain": domain,
+                "portal_type": portal_type,
+                "url": url,
+            }
+
+    def set_login_decision(self, decision: str) -> None:
+        """Set the user's login decision and unblock the bot thread.
+
+        Args:
+            decision: ``"done"`` (user logged in) or ``"skip"`` (skip this job).
+        """
+        with self._lock:
+            self._login_decision = decision
+            self._awaiting_login = False
+            self._login_context = None
+            self._login_event.set()
+
+    def wait_for_login(self) -> str:
+        """Block until a login decision is set or stop is requested.
+
+        Returns:
+            ``"done"``, ``"skip"``, or ``"stop"`` if the bot was stopped.
+        """
+        self._login_event.wait()
+        with self._lock:
+            if self._stop_flag:
+                return "stop"
+            return self._login_decision or "skip"
+
     def get_status_dict(self) -> dict:
         with self._lock:
             uptime_seconds = 0.0
@@ -149,4 +206,6 @@ class BotState:
                 "start_time": self._start_time.isoformat() if self._start_time else None,
                 "uptime_seconds": uptime_seconds,
                 "awaiting_review": self._awaiting_review,
+                "awaiting_login": self._awaiting_login,
+                "login_context": self._login_context,
             }

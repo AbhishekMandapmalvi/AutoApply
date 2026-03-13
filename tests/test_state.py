@@ -175,6 +175,8 @@ class TestGetStatusDict:
         "start_time",
         "uptime_seconds",
         "awaiting_review",
+        "awaiting_login",
+        "login_context",
     }
 
     def test_get_status_dict_structure(self, state: BotState) -> None:
