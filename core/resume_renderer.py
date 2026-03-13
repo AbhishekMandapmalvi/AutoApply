@@ -274,7 +274,6 @@ def render_resume_to_pdf(resume_md_text: str, resume_pdf_path: Path) -> None:
             # Draw bullet dot
             check_space(SIZE_BODY * LINE_HEIGHT)
             c.setFont(FONT_NORMAL, 4)
-            dot_y = y - (SIZE_BODY * 0.35)  # vertically center the dot
             c.drawString(bullet_x, y, "\u2022")
 
             draw_wrapped(bullet_text, FONT_NORMAL, SIZE_BODY, text_x, text_max_w)

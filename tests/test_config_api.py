@@ -16,9 +16,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from config.settings import AppConfig, BotConfig, LatexConfig
+from config.settings import BotConfig, LatexConfig
 from db.database import Database
-
 
 # ---------------------------------------------------------------------------
 # Helpers
