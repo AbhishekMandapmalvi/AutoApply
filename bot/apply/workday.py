@@ -11,20 +11,10 @@ Application Questions → Voluntary Disclosures → Self-Identification → Revi
 from __future__ import annotations
 
 import logging
-from pathlib import Path
-from typing import TYPE_CHECKING
 
 from bot.apply.base import ApplyResult, BaseApplier
 
-if TYPE_CHECKING:
-    from config.settings import UserProfile
-    from core.filter import ScoredJob
-
 logger = logging.getLogger(__name__)
-
-# Timeout (ms) for waiting on Workday React elements to render
-_ELEMENT_TIMEOUT = 8000
-
 
 class WorkdayApplier(BaseApplier):
     """Automate Workday job application submissions.
@@ -34,31 +24,15 @@ class WorkdayApplier(BaseApplier):
     button at the bottom of the page.
     """
 
-    def apply(
-        self,
-        job: "ScoredJob",
-        resume_pdf_path: Path | None,
-        cover_letter_text: str,
-        profile: "UserProfile",
-    ) -> ApplyResult:
-        """Submit a Workday application.
-
-        Returns:
-            ApplyResult with success/failure details.
-        """
-        try:
-            return self._do_apply(job, resume_pdf_path, cover_letter_text, profile)
-        except Exception as e:
-            logger.error("Workday apply failed for %s: %s", job.raw.company, e)
-            return ApplyResult(success=False, error_message=str(e))
+    # Override base timeouts for Workday's slow React SPA
+    ELEMENT_TIMEOUT: int = 8000
+    NAV_TIMEOUT: int = 45000
 
     def _do_apply(
         self, job, resume_pdf_path, cover_letter_text, profile
     ) -> ApplyResult:
-        page = self.page
-
         logger.info("Workday: applying to %s at %s", job.raw.title, job.raw.company)
-        page.goto(job.raw.apply_url, wait_until="domcontentloaded", timeout=45000)
+        self._safe_goto(job.raw.apply_url)
         self._random_pause(2, 4)
 
         if self._detect_captcha():
@@ -213,8 +187,6 @@ class WorkdayApplier(BaseApplier):
 
     def _fill_my_information(self, profile) -> None:
         """Fill the My Information section (name, phone, address)."""
-        page = self.page
-
         field_map = {
             '[data-automation-id="legalNameSection_firstName"]': profile.first_name,
             '[data-automation-id="legalNameSection_lastName"]': profile.last_name,
@@ -226,12 +198,7 @@ class WorkdayApplier(BaseApplier):
         }
 
         for selector, value in field_map.items():
-            if not value:
-                continue
-            el = page.query_selector(selector)
-            if el and el.is_visible() and not el.input_value():
-                self._human_type(el, value)
-                self._random_pause(0.2, 0.5)
+            self._safe_fill(selector, value)
 
         # Country dropdown
         if profile.country:
@@ -250,21 +217,11 @@ class WorkdayApplier(BaseApplier):
         if not resume_pdf_path:
             return
 
-        page = self.page
-
-        # Workday file upload input
-        file_input = page.query_selector(
-            '[data-automation-id="file-upload-input-ref"], '
-            'input[type="file"][data-automation-id*="upload"], '
-            'input[type="file"]'
-        )
-        if file_input:
-            try:
-                file_input.set_input_files(str(resume_pdf_path))
-                self._random_pause(2, 4)
-                logger.debug("Workday: resume uploaded")
-            except Exception as e:
-                logger.debug("Workday resume upload failed: %s", e)
+        self._safe_upload(resume_pdf_path, [
+            '[data-automation-id="file-upload-input-ref"]',
+            'input[type="file"][data-automation-id*="upload"]',
+            'input[type="file"]',
+        ])
 
     # ------------------------------------------------------------------
     # Application Questions
