@@ -121,7 +121,7 @@ def find_pdflatex(bundled_dir: Path | None = None) -> str | None:
 # Template directory: templates/latex/ relative to project root
 _TEMPLATE_DIR = Path(__file__).parent.parent / "templates" / "latex"
 
-AVAILABLE_TEMPLATES = ("classic", "modern", "academic", "minimal")
+AVAILABLE_TEMPLATES = ("jake", "classic", "modern", "academic", "minimal")
 
 
 def _get_jinja_env() -> jinja2.Environment:
@@ -148,16 +148,13 @@ def render_template(
         template_name: Template name (e.g., "classic"). Looks for
             templates/latex/{name}.tex.j2
         context: Dict with keys expected by the template:
-            - name: str
-            - email: str
-            - phone: str
-            - location: str (optional)
+            - name, email, phone, location, linkedin_url: str
             - summary: str (optional)
-            - experience: list[dict] with text, subsection
-            - education: list[dict] with text, subsection
-            - skills: list[dict] with text
-            - projects: list[dict] with text, subsection (optional)
-            - certifications: list[dict] with text (optional)
+            - experience: [{company, location, roles: [{title, dates, bullets: [str]}]}]
+            - education: [{institution, location, degree, dates}]
+            - skills: [{category, entries}]
+            - projects: [{name, bullets: [str]}]
+            - certifications: [{text}]
 
     Returns:
         Rendered .tex content as string.
@@ -182,26 +179,19 @@ def render_template(
     return template.render(**safe_context)
 
 
-def _escape_context(context: dict) -> dict:
-    """Deep-escape all string values in the template context."""
-    result: dict = {}
-    for key, value in context.items():
-        if isinstance(value, str):
-            result[key] = escape_latex(value)
-        elif isinstance(value, list):
-            result[key] = [_escape_entry(item) for item in value]
-        else:
-            result[key] = value
-    return result
+def _escape_context(context: dict | list | str | object) -> dict | list | str:
+    """Recursively escape all string values in the template context.
 
-
-def _escape_entry(entry: dict | str | object) -> dict | str:
-    """Escape string values in a list entry."""
-    if isinstance(entry, dict):
-        return {k: escape_latex(v) if isinstance(v, str) else v for k, v in entry.items()}
-    if isinstance(entry, str):
-        return escape_latex(entry)
-    return str(entry)
+    Handles arbitrary nesting of dicts, lists, and strings so that
+    structured contexts (e.g. experience → roles → bullets) are fully escaped.
+    """
+    if isinstance(context, dict):
+        return {k: _escape_context(v) for k, v in context.items()}
+    if isinstance(context, list):
+        return [_escape_context(item) for item in context]
+    if isinstance(context, str):
+        return escape_latex(context)
+    return context
 
 
 # ---------------------------------------------------------------------------

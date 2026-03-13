@@ -31,14 +31,13 @@
 \vspace{2pt}
 \BLOCK{endif}
 
-% Experience
-\BLOCK{if experience}
-\sectionheading{Experience}
-\BLOCK{for entry in experience}
-\BLOCK{if entry.subsection}{\small\bfseries \VAR{entry.subsection}}\\*\BLOCK{endif}
-\begin{itemize}[leftmargin=1em,topsep=0pt,itemsep=0pt,parsep=0pt]
-    \item {\small \VAR{entry.text}}
-\end{itemize}
+% Education
+\BLOCK{if education}
+\sectionheading{Education}
+\BLOCK{for entry in education}
+{\small\bfseries \VAR{entry.institution}}\BLOCK{if entry.location} \hfill {\small \VAR{entry.location}}\BLOCK{endif}\\*
+{\small \VAR{entry.degree}}\BLOCK{if entry.dates} \hfill {\small\textit{\VAR{entry.dates}}}\BLOCK{endif}
+\BLOCK{if not loop.last}\\[2pt]\BLOCK{endif}
 \BLOCK{endfor}
 \BLOCK{endif}
 
@@ -46,28 +45,37 @@
 \BLOCK{if skills}
 \sectionheading{Skills}
 {\small
-\BLOCK{for entry in skills}
-\VAR{entry.text}\BLOCK{if not loop.last}, \BLOCK{endif}
+\BLOCK{for group in skills}
+\textbf{\VAR{group.category}}: \VAR{group.entries}\BLOCK{if not loop.last}\\\BLOCK{endif}
 \BLOCK{endfor}
 }
 \BLOCK{endif}
 
-% Education
-\BLOCK{if education}
-\sectionheading{Education}
-\BLOCK{for entry in education}
-\BLOCK{if entry.subsection}{\small\bfseries \VAR{entry.subsection}} --- \BLOCK{endif}{\small \VAR{entry.text}}
-\BLOCK{if not loop.last}\\[1pt]\BLOCK{endif}
+% Experience
+\BLOCK{if experience}
+\sectionheading{Experience}
+\BLOCK{for comp in experience}
+\BLOCK{for role in comp.roles}
+{\small\bfseries \VAR{comp.company}}\BLOCK{if comp.location} \hfill {\small \VAR{comp.location}}\BLOCK{endif}\\*
+{\small\textit{\VAR{role.title}}}\BLOCK{if role.dates} \hfill {\small\textit{\VAR{role.dates}}}\BLOCK{endif}
+\begin{itemize}[leftmargin=1em,topsep=0pt,itemsep=0pt,parsep=0pt]
+\BLOCK{for bullet in role.bullets}
+    \item {\small \VAR{bullet}}
+\BLOCK{endfor}
+\end{itemize}
+\BLOCK{endfor}
 \BLOCK{endfor}
 \BLOCK{endif}
 
 % Projects
 \BLOCK{if projects}
 \sectionheading{Projects}
-\BLOCK{for entry in projects}
-\BLOCK{if entry.subsection}{\small\bfseries \VAR{entry.subsection}}\\*\BLOCK{endif}
+\BLOCK{for proj in projects}
+\BLOCK{if proj.name}{\small\bfseries \VAR{proj.name}}\\*\BLOCK{endif}
 \begin{itemize}[leftmargin=1em,topsep=0pt,itemsep=0pt,parsep=0pt]
-    \item {\small \VAR{entry.text}}
+\BLOCK{for bullet in proj.bullets}
+    \item {\small \VAR{bullet}}
+\BLOCK{endfor}
 \end{itemize}
 \BLOCK{endfor}
 \BLOCK{endif}

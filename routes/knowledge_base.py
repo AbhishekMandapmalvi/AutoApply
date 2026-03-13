@@ -513,92 +513,59 @@ def delete_preset(preset_id: int):
 # ---------------------------------------------------------------------------
 
 
-def _context_to_markdown(ctx: dict) -> str:
-    """Convert a LaTeX template context dict into Markdown for ReportLab."""
-    lines: list[str] = []
-    if ctx.get("name"):
-        lines.append(f"# {ctx['name']}")
-    contact = " | ".join(
-        v for v in [ctx.get("email"), ctx.get("phone"), ctx.get("location")] if v
-    )
-    if contact:
-        lines.append(contact)
-    lines.append("")
-
-    if ctx.get("summary"):
-        lines.append("## Summary")
-        lines.append(ctx["summary"])
-        lines.append("")
-
-    section_map = [
-        ("experience", "Experience"),
-        ("skills", "Skills"),
-        ("education", "Education"),
-        ("projects", "Projects"),
-        ("certifications", "Certifications"),
-        ("volunteer", "Volunteer"),
-    ]
-    for key, title in section_map:
-        entries = ctx.get(key, [])
-        if not entries:
-            continue
-        lines.append(f"## {title}")
-        for entry in entries:
-            sub = entry.get("subsection", "")
-            if sub:
-                lines.append(f"### {sub}")
-            text = entry.get("text", "")
-            if text:
-                lines.append(f"- {text}")
-        lines.append("")
-
-    return "\n".join(lines)
-
-
 @kb_bp.route("/api/kb/preview", methods=["POST"])
 def preview_resume():
-    """Preview a resume assembled from KB entries with a chosen template.
+    """Preview a resume assembled from KB entries via LLM generation.
+
+    The LLM is strictly instructed to use ONLY the provided KB data.
 
     Request body:
-        template: str (classic/modern/academic/minimal)
+        template: str (ignored for LLM generation, kept for compatibility)
         entry_ids: list[int] (optional — if omitted, auto-select from JD)
-        jd_text: str (optional — for auto-selection scoring)
+        jd_text: str (required — for tailoring and auto-selection scoring)
     """
     db = _get_db()
     data = request.get_json(silent=True)
     if not data:
         abort(400, description=t("errors.invalid_request"))
 
-    template = data.get("template", "classic")
     entry_ids = data.get("entry_ids")
     jd_text = data.get("jd_text", "")
 
+    if not jd_text:
+        abort(400, description=t("errors.invalid_request"))
+
+    from core.ai_engine import check_ai_available, generate_resume_from_kb
     from core.knowledge_base import KnowledgeBase
-    from core.latex_compiler import compile_resume, find_pdflatex
     from core.resume_assembler import _build_context, _select_entries
+    from core.resume_renderer import render_resume_to_pdf
     from core.resume_scorer import score_kb_entries
 
     kb = KnowledgeBase(db)
 
-    # Get profile from config
+    # Get profile and LLM config
     app_config = load_config()
+    llm_config = app_config.llm if app_config else None
+    if not check_ai_available(llm_config):
+        abort(400, description="No AI provider configured. Add an API key in Settings.")
+
     profile_cfg = app_config.profile if app_config else None
     profile = {
         "name": getattr(profile_cfg, "full_name", "") or "",
         "email": getattr(profile_cfg, "email", "") or "",
-        "phone": getattr(profile_cfg, "phone", "") or "",
+        "phone": getattr(profile_cfg, "phone_full", "") or "",
         "location": getattr(profile_cfg, "location", "") or "",
+        "linkedin_url": getattr(profile_cfg, "linkedin_url", "") or "",
     }
 
     if entry_ids:
         # Use specific entries
         entries = db.get_kb_entries_by_ids(entry_ids)
-        # Group by category
         selected: dict[str, list[dict]] = {}
         for e in entries:
             cat = e.get("category", "experience")
             selected.setdefault(cat, []).append(e)
-    elif jd_text:
+    else:
         # Auto-select via scoring
         all_entries = kb.get_all_entries(active_only=True, limit=2000)
         if not all_entries:
@@ -612,47 +579,31 @@ def preview_resume():
         if selected_result is None:
             abort(400, description=t("kb.entries_empty"))
         selected = selected_result
-    else:
-        abort(400, description=t("errors.invalid_request"))
 
-    # Build context and compile
+    # Build structured context and generate via LLM
     context = _build_context(profile, selected)
 
-    # Resolve custom template if template starts with "custom:"
-    custom_tex = None
-    if template.startswith("custom:"):
-        custom_name = template[len("custom:"):]
-        custom = db.get_custom_template_by_name(custom_name)
-        if not custom:
-            abort(404, description=t("errors.template_not_found"))
-        custom_tex = custom["tex_content"]
+    try:
+        resume_md = generate_resume_from_kb(context, jd_text, llm_config)
+    except RuntimeError as e:
+        logger.error("LLM generation failed in preview: %s", e)
+        abort(500, description=f"AI generation failed: {e}")
 
-    pdflatex = find_pdflatex()
-    if pdflatex is not None:
-        pdf_bytes = compile_resume(
-            template, context, pdflatex_path=pdflatex, custom_tex=custom_tex,
-        )
-        if pdf_bytes is None:
-            abort(500, description=t("errors.compilation_failed"))
-    else:
-        # Fallback: render via ReportLab when pdflatex is unavailable
-        from core.resume_renderer import render_resume_to_pdf
-
-        md = _context_to_markdown(context)
-        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-            tmp_path = Path(tmp.name)
-        try:
-            render_resume_to_pdf(md, tmp_path)
-            pdf_bytes = tmp_path.read_bytes()
-        finally:
-            tmp_path.unlink(missing_ok=True)
+    # Render markdown to PDF via ReportLab
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+    try:
+        render_resume_to_pdf(resume_md, tmp_path)
+        pdf_bytes = tmp_path.read_bytes()
+    finally:
+        tmp_path.unlink(missing_ok=True)
 
     from flask import Response
 
     return Response(
         pdf_bytes,
         mimetype="application/pdf",
-        headers={"Content-Disposition": f"inline; filename=preview_{template}.pdf"},
+        headers={"Content-Disposition": "inline; filename=preview_resume.pdf"},
     )
 
 

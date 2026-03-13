@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from config.settings import LatexConfig, ResumeReuseConfig
+from config.settings import ResumeReuseConfig
 from core.resume_assembler import (
     _build_context,
     _select_entries,
@@ -145,16 +145,64 @@ class TestBuildContext:
 
     def test_builds_valid_context(self, sample_profile):
         selected = {
-            "experience": [{"id": 1, "text": "Built APIs", "subsection": "TechCorp"}],
-            "skill": [{"id": 2, "text": "Python, Flask"}],
-            "education": [{"id": 3, "text": "M.S. CS", "subsection": "Stanford"}],
+            "experience": [
+                {"id": 1, "text": "Built APIs", "subsection": "Engineer — TechCorp",
+                 "role_company": "TechCorp", "role_title": "Engineer",
+                 "role_location": "SF", "role_start_date": "2022-01", "role_end_date": ""},
+            ],
+            "skill": [{"id": 2, "text": "Python, Flask", "subsection": "Languages"}],
+            "education": [
+                {"id": 3, "text": "M.S. CS", "subsection": "Stanford",
+                 "role_company": "Stanford", "role_location": "Stanford, CA",
+                 "role_start_date": "2016-09", "role_end_date": "2018-06"},
+            ],
         }
         ctx = _build_context(sample_profile, selected)
         assert ctx["name"] == "Jane Doe"
         assert ctx["email"] == "jane@example.com"
+        # Experience is now grouped by company
         assert len(ctx["experience"]) == 1
-        assert ctx["experience"][0]["text"] == "Built APIs"
-        assert ctx["skills"][0]["text"] == "Python, Flask"
+        assert ctx["experience"][0]["company"] == "TechCorp"
+        assert ctx["experience"][0]["roles"][0]["title"] == "Engineer"
+        assert "Built APIs" in ctx["experience"][0]["roles"][0]["bullets"]
+        # Skills are now grouped by category
+        assert ctx["skills"][0]["category"] == "Languages"
+        assert "Python, Flask" in ctx["skills"][0]["entries"]
+        # Education is structured
+        assert ctx["education"][0]["institution"] == "Stanford"
+
+    def test_context_experience_groups_by_company(self, sample_profile):
+        """Multiple entries at same company should be grouped together."""
+        selected = {
+            "experience": [
+                {"id": 1, "text": "Led team", "subsection": "",
+                 "role_company": "Google", "role_title": "Senior Engineer",
+                 "role_location": "MTV", "role_start_date": "2022-01", "role_end_date": ""},
+                {"id": 2, "text": "Built search", "subsection": "",
+                 "role_company": "Google", "role_title": "Engineer",
+                 "role_location": "MTV", "role_start_date": "2020-01", "role_end_date": "2021-12"},
+            ],
+            "skill": [],
+            "education": [],
+        }
+        ctx = _build_context(sample_profile, selected)
+        assert len(ctx["experience"]) == 1
+        assert ctx["experience"][0]["company"] == "Google"
+        assert len(ctx["experience"][0]["roles"]) == 2
+
+    def test_context_experience_fallback_to_subsection(self, sample_profile):
+        """Entries without role data should fall back to subsection."""
+        selected = {
+            "experience": [
+                {"id": 1, "text": "Built APIs", "subsection": "Engineer — TechCorp"},
+            ],
+            "skill": [],
+            "education": [],
+        }
+        ctx = _build_context(sample_profile, selected)
+        assert len(ctx["experience"]) == 1
+        assert ctx["experience"][0]["company"] == "TechCorp"
+        assert ctx["experience"][0]["roles"][0]["title"] == "Engineer"
 
     def test_context_uses_summary_entry(self, sample_profile):
         selected = {
@@ -177,6 +225,42 @@ class TestBuildContext:
         assert ctx["projects"] == []
         assert ctx["certifications"] == []
 
+    def test_context_skill_grouping(self, sample_profile):
+        """Skills should be grouped by subsection category."""
+        selected = {
+            "experience": [],
+            "skill": [
+                {"id": 1, "text": "Python", "subsection": "Languages"},
+                {"id": 2, "text": "Java", "subsection": "Languages"},
+                {"id": 3, "text": "Docker", "subsection": "Tools"},
+            ],
+            "education": [],
+        }
+        ctx = _build_context(sample_profile, selected)
+        assert len(ctx["skills"]) == 2
+        assert ctx["skills"][0]["category"] == "Languages"
+        assert "Python" in ctx["skills"][0]["entries"]
+        assert "Java" in ctx["skills"][0]["entries"]
+        assert ctx["skills"][1]["category"] == "Tools"
+
+    def test_context_project_grouping(self, sample_profile):
+        """Projects should be grouped by name with bullet lists."""
+        selected = {
+            "experience": [],
+            "skill": [],
+            "education": [],
+            "project": [
+                {"id": 1, "text": "Built REST API", "subsection": "AutoApply"},
+                {"id": 2, "text": "Added TF-IDF scoring", "subsection": "AutoApply"},
+                {"id": 3, "text": "Designed ML pipeline", "subsection": "MLOps Tool"},
+            ],
+        }
+        ctx = _build_context(sample_profile, selected)
+        assert len(ctx["projects"]) == 2
+        assert ctx["projects"][0]["name"] == "AutoApply"
+        assert len(ctx["projects"][0]["bullets"]) == 2
+        assert ctx["projects"][1]["name"] == "MLOps Tool"
+
 
 # ---------------------------------------------------------------------------
 # Full Assembly Tests
@@ -184,33 +268,46 @@ class TestBuildContext:
 
 
 class TestAssembleResume:
-    """Tests for assemble_resume()."""
+    """Tests for assemble_resume() — LLM-powered KB assembly."""
 
-    def test_assembly_success(self, sample_profile, mock_kb):
-        fake_pdf = b"%PDF-1.4 assembled"
+    @staticmethod
+    def _mock_llm_config():
+        """Create a mock LLM config."""
+        cfg = MagicMock()
+        cfg.provider = "anthropic"
+        cfg.api_key = "test-key"
+        cfg.model = "test-model"
+        return cfg
+
+    @staticmethod
+    def _scored_entries():
+        """Standard scored entries with enough per category."""
+        return [
+            {"id": i, "text": f"Exp {i}", "category": "experience", "subsection": f"Co {i}", "score": 0.9, "scoring_method": "tfidf"}
+            for i in range(8)
+        ] + [
+            {"id": 20 + i, "text": f"Skill {i}", "category": "skill", "score": 0.8, "scoring_method": "tfidf"}
+            for i in range(3)
+        ] + [
+            {"id": 30, "text": "M.S. CS", "category": "education", "subsection": "Stanford", "score": 0.7, "scoring_method": "tfidf"},
+        ]
+
+    def test_assembly_success(self, sample_profile, mock_kb, tmp_path):
         cfg = ResumeReuseConfig(min_experience_bullets=3, min_score=0.5)
+        llm_config = self._mock_llm_config()
+        fake_md = "# Jane Doe\n## Experience\n- Built APIs"
 
-        with patch("core.resume_assembler.score_kb_entries") as mock_score, \
-             patch("core.resume_assembler.find_pdflatex", return_value="/usr/bin/pdflatex"), \
-             patch("core.resume_assembler.compile_resume", return_value=fake_pdf):
-            # Return scored entries with enough per category
-            scored = [
-                {"id": i, "text": f"Exp {i}", "category": "experience", "subsection": f"Co {i}", "score": 0.9, "scoring_method": "tfidf"}
-                for i in range(8)
-            ] + [
-                {"id": 20 + i, "text": f"Skill {i}", "category": "skill", "score": 0.8, "scoring_method": "tfidf"}
-                for i in range(3)
-            ] + [
-                {"id": 30, "text": "M.S. CS", "category": "education", "subsection": "Stanford", "score": 0.7, "scoring_method": "tfidf"},
-            ]
-            mock_score.return_value = scored
-
-            result = assemble_resume("JD text here", sample_profile, mock_kb, cfg)
+        with patch("core.resume_assembler.score_kb_entries", return_value=self._scored_entries()), \
+             patch("core.ai_engine.check_ai_available", return_value=True), \
+             patch("core.ai_engine.generate_resume_from_kb", return_value=fake_md), \
+             patch("core.resume_renderer.render_resume_to_pdf") as mock_render:
+            result = assemble_resume("JD text here", sample_profile, mock_kb, cfg, llm_config=llm_config)
 
         assert result is not None
-        assert result["pdf_bytes"] == fake_pdf
+        assert result["resume_md"] == fake_md
+        assert result["pdf_bytes"] is not None
         assert len(result["entry_ids"]) > 0
-        assert result["template"] == "classic"
+        mock_render.assert_called_once()
 
     def test_assembly_disabled(self, sample_profile, mock_kb):
         cfg = ResumeReuseConfig(enabled=False)
@@ -220,50 +317,29 @@ class TestAssembleResume:
     def test_assembly_empty_kb(self, sample_profile):
         kb = MagicMock()
         kb.get_all_entries.return_value = []
-        result = assemble_resume("JD text", sample_profile, kb)
+        llm_config = self._mock_llm_config()
+
+        with patch("core.ai_engine.check_ai_available", return_value=True):
+            result = assemble_resume("JD text", sample_profile, kb, llm_config=llm_config)
         assert result is None
 
-    def test_assembly_no_pdflatex(self, sample_profile, mock_kb):
+    def test_assembly_no_llm_config(self, sample_profile, mock_kb):
+        """Returns None when no LLM provider is configured."""
         cfg = ResumeReuseConfig(min_experience_bullets=3, min_score=0.5)
-        scored = [
-            {"id": i, "text": f"Exp {i}", "category": "experience", "subsection": "", "score": 0.9, "scoring_method": "tfidf"}
-            for i in range(8)
-        ] + [
-            {"id": 20 + i, "text": f"Skill {i}", "category": "skill", "score": 0.8, "scoring_method": "tfidf"}
-            for i in range(3)
-        ] + [
-            {"id": 30, "text": "Edu", "category": "education", "subsection": "", "score": 0.7, "scoring_method": "tfidf"},
-        ]
-
-        with patch("core.resume_assembler.score_kb_entries", return_value=scored), \
-             patch("core.resume_assembler.find_pdflatex", return_value=None):
-            result = assemble_resume("JD text", sample_profile, mock_kb, cfg)
-
+        result = assemble_resume("JD text", sample_profile, mock_kb, cfg, llm_config=None)
         assert result is None
 
-    def test_assembly_custom_template(self, sample_profile, mock_kb):
-        fake_pdf = b"%PDF-1.4 modern"
+    def test_assembly_llm_failure(self, sample_profile, mock_kb):
+        """Returns None when LLM generation fails."""
         cfg = ResumeReuseConfig(min_experience_bullets=3, min_score=0.5)
-        lcfg = LatexConfig(template="modern")
-        scored = [
-            {"id": i, "text": f"Exp {i}", "category": "experience", "subsection": "", "score": 0.9, "scoring_method": "tfidf"}
-            for i in range(8)
-        ] + [
-            {"id": 20 + i, "text": f"Skill {i}", "category": "skill", "score": 0.8, "scoring_method": "tfidf"}
-            for i in range(3)
-        ] + [
-            {"id": 30, "text": "Edu", "category": "education", "subsection": "", "score": 0.7, "scoring_method": "tfidf"},
-        ]
+        llm_config = self._mock_llm_config()
 
-        with patch("core.resume_assembler.score_kb_entries", return_value=scored), \
-             patch("core.resume_assembler.find_pdflatex", return_value="/usr/bin/pdflatex"), \
-             patch("core.resume_assembler.compile_resume", return_value=fake_pdf) as mock_compile:
-            result = assemble_resume("JD text", sample_profile, mock_kb, cfg, lcfg)
+        with patch("core.resume_assembler.score_kb_entries", return_value=self._scored_entries()), \
+             patch("core.ai_engine.check_ai_available", return_value=True), \
+             patch("core.ai_engine.generate_resume_from_kb", side_effect=RuntimeError("API error")):
+            result = assemble_resume("JD text", sample_profile, mock_kb, cfg, llm_config=llm_config)
 
-        assert result is not None
-        assert result["template"] == "modern"
-        mock_compile.assert_called_once()
-        assert mock_compile.call_args[0][0] == "modern"
+        assert result is None
 
 
 # ---------------------------------------------------------------------------

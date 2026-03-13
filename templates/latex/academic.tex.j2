@@ -13,9 +13,6 @@
 \titleformat{\section}{\large\bfseries\scshape}{}{0em}{}[\hrule]
 \titlespacing{\section}{0pt}{14pt}{6pt}
 
-\titleformat{\subsection}{\normalsize\bfseries}{}{0em}{}
-\titlespacing{\subsection}{0pt}{8pt}{3pt}
-
 \begin{document}
 
 % Header
@@ -25,11 +22,12 @@
     \VAR{email}
     \BLOCK{if phone} \quad \VAR{phone}\BLOCK{endif}
     \BLOCK{if location} \quad \VAR{location}\BLOCK{endif}
+    \BLOCK{if linkedin_url} \quad \href{\VAR{linkedin_url}}{\VAR{linkedin_url}}\BLOCK{endif}
     }
 \end{center}
 \vspace{6pt}
 
-% Summary
+% Summary / Research Interests
 \BLOCK{if summary}
 \section{Research Interests}
 \VAR{summary}
@@ -39,30 +37,38 @@
 \BLOCK{if education}
 \section{Education}
 \BLOCK{for entry in education}
-\BLOCK{if entry.subsection}\subsection{\VAR{entry.subsection}}\BLOCK{endif}
-\VAR{entry.text}
-\BLOCK{if not loop.last}\vspace{4pt}\BLOCK{endif}
+\textbf{\VAR{entry.institution}}\BLOCK{if entry.location} \hfill \VAR{entry.location}\BLOCK{endif}\\
+\VAR{entry.degree}\BLOCK{if entry.dates} \hfill \textit{\VAR{entry.dates}}\BLOCK{endif}
+\BLOCK{if not loop.last}\vspace{6pt}\BLOCK{endif}
 \BLOCK{endfor}
 \BLOCK{endif}
 
 % Experience
 \BLOCK{if experience}
 \section{Professional Experience}
-\BLOCK{for entry in experience}
-\BLOCK{if entry.subsection}\subsection{\VAR{entry.subsection}}\BLOCK{endif}
+\BLOCK{for comp in experience}
+\BLOCK{for role in comp.roles}
+\textbf{\VAR{comp.company}}\BLOCK{if comp.location} \hfill \VAR{comp.location}\BLOCK{endif}\\
+\textit{\VAR{role.title}}\BLOCK{if role.dates} \hfill \textit{\VAR{role.dates}}\BLOCK{endif}
 \begin{itemize}[leftmargin=1.5em,topsep=0pt,itemsep=2pt]
-    \item \VAR{entry.text}
+\BLOCK{for bullet in role.bullets}
+    \item \VAR{bullet}
+\BLOCK{endfor}
 \end{itemize}
+\BLOCK{endfor}
+\BLOCK{if not loop.last}\vspace{4pt}\BLOCK{endif}
 \BLOCK{endfor}
 \BLOCK{endif}
 
 % Projects / Publications
 \BLOCK{if projects}
 \section{Selected Projects}
-\BLOCK{for entry in projects}
-\BLOCK{if entry.subsection}\subsection{\VAR{entry.subsection}}\BLOCK{endif}
+\BLOCK{for proj in projects}
+\BLOCK{if proj.name}\textbf{\VAR{proj.name}}\\\BLOCK{endif}
 \begin{itemize}[leftmargin=1.5em,topsep=0pt,itemsep=2pt]
-    \item \VAR{entry.text}
+\BLOCK{for bullet in proj.bullets}
+    \item \VAR{bullet}
+\BLOCK{endfor}
 \end{itemize}
 \BLOCK{endfor}
 \BLOCK{endif}
@@ -70,8 +76,8 @@
 % Skills
 \BLOCK{if skills}
 \section{Technical Proficiencies}
-\BLOCK{for entry in skills}
-\VAR{entry.text}\BLOCK{if not loop.last}; \BLOCK{endif}
+\BLOCK{for group in skills}
+\textbf{\VAR{group.category}}: \VAR{group.entries}\BLOCK{if not loop.last}\\[2pt]\BLOCK{endif}
 \BLOCK{endfor}
 \BLOCK{endif}
 

@@ -332,7 +332,7 @@ def _generate_docs(scored: ScoredJob, config, profile_dir: Path, db=None):
     cover_letter_text = ""
     version_meta = None
 
-    # --- Phase 1: Try KB assembly (0 API calls) ---
+    # --- Phase 1: Try KB assembly (LLM-powered with strict KB data) ---
     kb_result = _try_kb_assembly(scored, config, profile_dir)
     if kb_result is not None:
         resume_path = kb_result["resume_path"]
@@ -407,7 +407,7 @@ def _try_kb_assembly(scored: ScoredJob, config, profile_dir: Path) -> dict | Non
             profile=profile,
             kb=kb,
             reuse_config=config.resume_reuse,
-            latex_config=config.latex,
+            llm_config=config.llm,
         )
 
         if result is None:

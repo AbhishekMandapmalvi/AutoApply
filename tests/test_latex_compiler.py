@@ -61,9 +61,9 @@ class TestEscapeLaTeX:
         """Multiple special chars in one string."""
         assert escape_latex("C++ & C# @ 100%") == r"C++ \& C\# @ 100\%"
 
-    def test_escape_preserves_backslash(self):
-        """Backslash should NOT be escaped (used in LaTeX commands)."""
-        assert escape_latex(r"\textbf{test}") == r"\textbf\{test\}"
+    def test_escape_backslash(self):
+        """Backslash is escaped to \\textbackslash{}."""
+        assert escape_latex(r"\textbf{test}") == r"\textbackslash{}textbf\{test\}"
 
 
 # ---------------------------------------------------------------------------
@@ -118,51 +118,99 @@ class TestRenderTemplate:
 
     @pytest.fixture
     def sample_context(self):
-        """Minimal context for template rendering."""
+        """Minimal context for template rendering (structured format)."""
         return {
             "name": "Jane Doe",
             "email": "jane@example.com",
             "phone": "+1-555-0100",
             "location": "San Francisco, CA",
+            "linkedin_url": "",
             "summary": "Senior backend engineer with 8 years experience.",
             "experience": [
                 {
-                    "text": "Built microservices handling 10K req/s",
-                    "subsection": "Senior Engineer — TechCorp (2020-2024)",
+                    "company": "TechCorp",
+                    "location": "San Francisco, CA",
+                    "roles": [
+                        {
+                            "title": "Senior Engineer",
+                            "dates": "Jan 2020 -- Present",
+                            "bullets": [
+                                "Built microservices handling 10K req/s",
+                                "Led team of 5 engineers on platform migration",
+                            ],
+                        },
+                    ],
                 },
                 {
-                    "text": "Designed CI/CD pipeline reducing deploys by 60%",
-                    "subsection": "DevOps Lead — CloudInc (2018-2020)",
+                    "company": "CloudInc",
+                    "location": "Seattle, WA",
+                    "roles": [
+                        {
+                            "title": "DevOps Lead",
+                            "dates": "Jun 2018 -- Dec 2019",
+                            "bullets": [
+                                "Designed CI/CD pipeline reducing deploys by 60%",
+                            ],
+                        },
+                    ],
                 },
             ],
             "education": [
                 {
-                    "text": "M.S. Computer Science, 2018",
-                    "subsection": "Stanford University",
+                    "institution": "Stanford University",
+                    "location": "Stanford, CA",
+                    "degree": "M.S. Computer Science",
+                    "dates": "Sep 2016 -- Jun 2018",
                 },
             ],
             "skills": [
-                {"text": "Python, Flask, Django, PostgreSQL, Redis"},
-                {"text": "Docker, Kubernetes, AWS, Terraform"},
+                {"category": "Languages", "entries": "Python, Java, Go, SQL"},
+                {"category": "Frameworks", "entries": "Flask, Django, React"},
+                {"category": "Tools", "entries": "Docker, Kubernetes, AWS, Terraform"},
             ],
-            "projects": [],
-            "certifications": [],
+            "projects": [
+                {
+                    "name": "AutoApply",
+                    "bullets": [
+                        "Built automated job application tool with Electron + Flask",
+                        "Implemented TF-IDF scoring engine for resume tailoring",
+                    ],
+                },
+            ],
+            "certifications": [
+                {"text": "AWS Solutions Architect Associate"},
+            ],
         }
 
     def test_render_all_templates(self, sample_context):
-        """All 4 templates should render without error."""
+        """All 5 templates should render without error."""
         for name in AVAILABLE_TEMPLATES:
             tex = render_template(name, sample_context)
             assert r"\documentclass" in tex
             assert "Jane Doe" in tex
             assert "jane@example.com" in tex
 
-    def test_render_classic(self, sample_context):
+    def test_render_classic_sections(self, sample_context):
         """Classic template should have standard section headers."""
         tex = render_template("classic", sample_context)
         assert r"\section{Experience}" in tex
         assert r"\section{Education}" in tex
         assert r"\section{Skills}" in tex
+
+    def test_render_classic_company_structure(self, sample_context):
+        """Classic template should show company and role separately."""
+        tex = render_template("classic", sample_context)
+        assert "TechCorp" in tex
+        assert "Senior Engineer" in tex
+        assert "CloudInc" in tex
+        assert "DevOps Lead" in tex
+
+    def test_render_classic_grouped_skills(self, sample_context):
+        """Classic template should show skills grouped by category."""
+        tex = render_template("classic", sample_context)
+        assert "Languages" in tex
+        assert "Frameworks" in tex
+        assert "Tools" in tex
 
     def test_render_modern(self, sample_context):
         """Modern template should use accent color."""
@@ -182,6 +230,52 @@ class TestRenderTemplate:
         tex = render_template("minimal", sample_context)
         assert "10pt" in tex
 
+    def test_render_jake_company_structure(self, sample_context):
+        """Jake template should show company and role in structured format."""
+        tex = render_template("jake", sample_context)
+        assert "TechCorp" in tex
+        assert "Senior Engineer" in tex
+        assert "Stanford University" in tex
+
+    def test_render_multi_role_company(self):
+        """Templates should handle multiple roles at the same company."""
+        context = {
+            "name": "Test User",
+            "email": "test@test.com",
+            "phone": "",
+            "location": "",
+            "linkedin_url": "",
+            "summary": "",
+            "experience": [
+                {
+                    "company": "Google",
+                    "location": "Mountain View, CA",
+                    "roles": [
+                        {
+                            "title": "Senior Software Engineer",
+                            "dates": "Jan 2022 -- Present",
+                            "bullets": ["Led platform team"],
+                        },
+                        {
+                            "title": "Software Engineer",
+                            "dates": "Jun 2020 -- Dec 2021",
+                            "bullets": ["Built search features"],
+                        },
+                    ],
+                },
+            ],
+            "education": [],
+            "skills": [],
+            "projects": [],
+            "certifications": [],
+        }
+        tex = render_template("jake", context)
+        assert "Google" in tex
+        assert "Senior Software Engineer" in tex
+        assert "Software Engineer" in tex
+        assert "Led platform team" in tex
+        assert "Built search features" in tex
+
     def test_render_invalid_template(self, sample_context):
         """Invalid template name should raise ValueError."""
         with pytest.raises(ValueError, match="Unknown template"):
@@ -194,6 +288,7 @@ class TestRenderTemplate:
             "email": "test@example.com",
             "phone": "",
             "location": "",
+            "linkedin_url": "",
             "summary": "Increased revenue by 50% using C# & Python",
             "experience": [],
             "education": [],
@@ -206,6 +301,38 @@ class TestRenderTemplate:
         assert r"\%" in tex
         assert r"\#" in tex
 
+    def test_render_escapes_nested_special_chars(self):
+        """Special characters in nested structures should be escaped."""
+        context = {
+            "name": "Test",
+            "email": "t@t.com",
+            "phone": "",
+            "location": "",
+            "linkedin_url": "",
+            "summary": "",
+            "experience": [
+                {
+                    "company": "AT&T",
+                    "location": "",
+                    "roles": [
+                        {
+                            "title": "C# Developer",
+                            "dates": "",
+                            "bullets": ["Saved $1M in costs"],
+                        },
+                    ],
+                },
+            ],
+            "education": [],
+            "skills": [],
+            "projects": [],
+            "certifications": [],
+        }
+        tex = render_template("classic", context)
+        assert r"AT\&T" in tex
+        assert r"C\# Developer" in tex
+        assert r"\$1M" in tex
+
     def test_render_empty_sections(self):
         """Template should handle empty/missing optional sections."""
         context = {
@@ -213,6 +340,7 @@ class TestRenderTemplate:
             "email": "test@test.com",
             "phone": "",
             "location": "",
+            "linkedin_url": "",
             "summary": "",
             "experience": [],
             "education": [],
@@ -261,7 +389,7 @@ class TestCompileLatex:
         result.stdout = "! LaTeX Error: something went wrong"
 
         with patch("core.latex_compiler.subprocess.run", return_value=result):
-            pdf = compile_latex(r"\documentclass{article}\begin{document}Hello\end{document}", pdflatex_path="/fake/pdflatex")
+            pdf = compile_latex(r"\documentclass{article}\begin{document}Fail\end{document}", pdflatex_path="/fake/pdflatex", use_cache=False)
 
         assert pdf is None
 

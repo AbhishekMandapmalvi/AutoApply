@@ -1,19 +1,20 @@
-"""Resume assembler — score KB entries, select best, render LaTeX, compile PDF.
+"""Resume assembler — score KB entries, select best, generate via LLM, render PDF.
 
 Implements: TASK-030 M4, M9.
 
 The assembler is the core pipeline that turns Knowledge Base entries into
-a tailored resume PDF without any LLM API calls:
+a tailored resume PDF using LLM generation with strict KB-only constraints:
 
     1. Fetch all active KB entries
     2. Pre-filter entries by JD classification (M9)
     3. Score them against the job description (TF-IDF)
     4. Select top entries per category (experience, skills, education, etc.)
-    5. Build a LaTeX template context
-    6. Render and compile to PDF
+    5. Build structured context from selected entries
+    6. Send to LLM with strict "only use provided data" instructions
+    7. Render LLM markdown output to PDF via ReportLab
 
 If the KB has insufficient entries (below configured thresholds), the
-assembler returns None so the caller can fall through to LLM generation.
+assembler returns None so the caller can fall through to standard LLM generation.
 """
 
 from __future__ import annotations
@@ -23,8 +24,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from config.settings import LatexConfig, ResumeReuseConfig
-from core.latex_compiler import compile_resume, find_pdflatex
+from config.settings import ResumeReuseConfig
 from core.resume_scorer import score_kb_entries
 
 if TYPE_CHECKING:
@@ -45,26 +45,35 @@ def assemble_resume(
     profile: dict,
     kb: KnowledgeBase,
     reuse_config: ResumeReuseConfig | None = None,
-    latex_config: LatexConfig | None = None,
+    llm_config=None,
 ) -> dict | None:
     """Assemble a tailored resume from KB entries scored against a JD.
+
+    Scores KB entries, selects the best, sends them to the LLM with strict
+    instructions to use ONLY the provided data, and renders the output to PDF.
 
     Args:
         jd_text: Job description text to score against.
         profile: Dict with keys: name, email, phone, location.
         kb: KnowledgeBase instance for fetching entries.
         reuse_config: Scoring and selection configuration.
-        latex_config: LaTeX template and compilation configuration.
+        llm_config: LLMConfig with provider, api_key, model for generation.
 
     Returns:
-        Dict with keys (pdf_bytes, entry_ids, template, scoring_method)
-        or None if KB has insufficient entries for assembly.
+        Dict with keys (pdf_bytes, resume_md, entry_ids, scoring_method)
+        or None if KB has insufficient entries or LLM is unavailable.
     """
     cfg = reuse_config or ResumeReuseConfig()
-    lcfg = latex_config or LatexConfig()
 
     if not cfg.enabled:
         logger.debug("Resume reuse disabled in config")
+        return None
+
+    # Check LLM availability
+    from core.ai_engine import check_ai_available
+
+    if not check_ai_available(llm_config):
+        logger.info("No LLM configured — cannot generate KB resume")
         return None
 
     # 1. Fetch all active KB entries
@@ -95,20 +104,38 @@ def assemble_resume(
     if selected is None:
         return None
 
-    # 4. Build LaTeX template context
+    # 4. Build structured context
     context = _build_context(profile, selected)
 
-    # 5. Check pdflatex availability
-    pdflatex = find_pdflatex()
-    if pdflatex is None:
-        logger.warning("pdflatex not found — cannot compile LaTeX resume")
+    # 5. Generate resume via LLM (strict KB-only)
+    from core.ai_engine import generate_resume_from_kb
+
+    try:
+        resume_md = generate_resume_from_kb(context, jd_text, llm_config)
+    except RuntimeError as e:
+        logger.error("LLM generation failed: %s", e)
         return None
 
-    # 6. Render and compile
-    pdf_bytes = compile_resume(lcfg.template, context, pdflatex_path=pdflatex)
-    if pdf_bytes is None:
-        logger.error("LaTeX compilation failed for template '%s'", lcfg.template)
+    if not resume_md or not resume_md.strip():
+        logger.error("LLM returned empty resume")
         return None
+
+    # 6. Render markdown to PDF via ReportLab
+    import tempfile
+
+    from core.resume_renderer import render_resume_to_pdf
+
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+
+    try:
+        render_resume_to_pdf(resume_md, tmp_path)
+        pdf_bytes = tmp_path.read_bytes()
+    except Exception as e:
+        logger.error("PDF rendering failed: %s", e)
+        return None
+    finally:
+        tmp_path.unlink(missing_ok=True)
 
     # Collect entry IDs used
     entry_ids: list[int] = []
@@ -118,14 +145,14 @@ def assemble_resume(
     scoring_method = scored[0].get("scoring_method", "tfidf") if scored else "tfidf"
 
     logger.info(
-        "KB assembly success: %d entries, template=%s, %d bytes PDF",
-        len(entry_ids), lcfg.template, len(pdf_bytes),
+        "KB+LLM assembly success: %d entries, %d bytes PDF",
+        len(entry_ids), len(pdf_bytes),
     )
 
     return {
         "pdf_bytes": pdf_bytes,
+        "resume_md": resume_md,
         "entry_ids": entry_ids,
-        "template": lcfg.template,
         "scoring_method": scoring_method,
     }
 
@@ -165,12 +192,13 @@ def _select_entries(
         return None
 
     # Select top entries per category (already sorted by score)
+    # Send generous amounts — LLM will trim to fit exactly 1 page
     max_per_category = {
-        "experience": 8,
-        "skill": 6,
-        "education": 3,
-        "project": 4,
-        "certification": 3,
+        "experience": 15,
+        "skill": 20,
+        "education": 4,
+        "project": 6,
+        "certification": 5,
         "summary": 1,
     }
 
@@ -182,26 +210,182 @@ def _select_entries(
     return selected
 
 
+def _format_date(date_str: str) -> str:
+    """Format a date string like '2022-01-15' or '2022-01' to 'Jan 2022'."""
+    if not date_str:
+        return ""
+    months = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ]
+    parts = date_str.split("-")
+    if len(parts) >= 2:
+        try:
+            month_idx = int(parts[1]) - 1
+            if 0 <= month_idx < 12:
+                return f"{months[month_idx]} {parts[0]}"
+        except ValueError:
+            pass
+    return parts[0]
+
+
+def _format_date_range(start: str, end: str) -> str:
+    """Format a start–end date range for display."""
+    start_fmt = _format_date(start)
+    end_fmt = _format_date(end) if end else "Present"
+    if not end_fmt:
+        end_fmt = "Present"
+    if start_fmt and end_fmt:
+        return f"{start_fmt} -- {end_fmt}"
+    if start_fmt:
+        return start_fmt
+    return end_fmt
+
+
+def _build_experience_groups(entries: list[dict]) -> list[dict]:
+    """Group experience entries by company, then by role within each company.
+
+    Returns:
+        List of dicts: [{company, location, roles: [{title, dates, bullets}]}]
+    """
+    from collections import OrderedDict
+
+    companies: OrderedDict[str, dict] = OrderedDict()
+    for e in entries:
+        company = e.get("role_company") or ""
+        title = e.get("role_title") or ""
+        location = e.get("role_location") or ""
+        start = e.get("role_start_date") or ""
+        end = e.get("role_end_date") or ""
+
+        # Fallback: if no role data, derive from subsection
+        if not company and not title:
+            subsection = e.get("subsection") or ""
+            if " — " in subsection:
+                parts = subsection.split(" — ", 1)
+                title, company = parts[0].strip(), parts[1].strip()
+            elif subsection:
+                company = subsection
+
+        comp_key = company or "Other"
+        if comp_key not in companies:
+            companies[comp_key] = {
+                "company": company,
+                "location": location,
+                "roles": OrderedDict(),
+            }
+
+        role_key = f"{title}|{start}|{end}"
+        if role_key not in companies[comp_key]["roles"]:
+            companies[comp_key]["roles"][role_key] = {
+                "title": title,
+                "dates": _format_date_range(start, end),
+                "sort_key": start or "0000",
+                "bullets": [],
+            }
+        companies[comp_key]["roles"][role_key]["bullets"].append(e.get("text", ""))
+
+    result = []
+    for comp_data in companies.values():
+        roles_sorted = sorted(
+            comp_data["roles"].values(),
+            key=lambda r: r["sort_key"],
+            reverse=True,
+        )
+        roles = [
+            {"title": r["title"], "dates": r["dates"], "bullets": r["bullets"]}
+            for r in roles_sorted
+        ]
+        result.append({
+            "company": comp_data["company"],
+            "location": comp_data["location"],
+            "roles": roles,
+        })
+    return result
+
+
+def _build_education_entries(entries: list[dict]) -> list[dict]:
+    """Build structured education entries.
+
+    Returns:
+        List of dicts: [{institution, location, degree, dates}]
+    """
+    result = []
+    for e in entries:
+        institution = e.get("role_company") or e.get("subsection") or ""
+        location = e.get("role_location") or ""
+        degree = e.get("text") or ""
+        start = e.get("role_start_date") or ""
+        end = e.get("role_end_date") or ""
+        dates = _format_date_range(start, end) if (start or end) else ""
+        result.append({
+            "institution": institution,
+            "location": location,
+            "degree": degree,
+            "dates": dates,
+        })
+    return result
+
+
+def _build_skill_groups(entries: list[dict]) -> list[dict]:
+    """Group skill entries by subsection category.
+
+    Returns:
+        List of dicts: [{category, items}] where items is comma-joined string.
+    """
+    from collections import OrderedDict
+
+    groups: OrderedDict[str, list[str]] = OrderedDict()
+    for e in entries:
+        category = e.get("subsection") or "Technical Skills"
+        text = e.get("text") or ""
+        if text:
+            groups.setdefault(category, []).append(text)
+
+    return [
+        {"category": cat, "entries": ", ".join(items)}
+        for cat, items in groups.items()
+    ]
+
+
+def _build_project_groups(entries: list[dict]) -> list[dict]:
+    """Group project entries by project name (subsection).
+
+    Returns:
+        List of dicts: [{name, bullets}]
+    """
+    from collections import OrderedDict
+
+    projects: OrderedDict[str, list[str]] = OrderedDict()
+    for e in entries:
+        name = e.get("subsection") or ""
+        text = e.get("text") or ""
+        if text:
+            projects.setdefault(name, []).append(text)
+
+    return [
+        {"name": name, "bullets": bullets}
+        for name, bullets in projects.items()
+    ]
+
+
 def _build_context(
     profile: dict,
     selected: dict[str, list[dict]],
 ) -> dict:
-    """Build the LaTeX template context from profile and selected KB entries.
+    """Build structured resume context from profile and selected KB entries.
 
     Returns:
-        Dict compatible with compile_resume() context parameter.
+        Dict used by generate_resume_from_kb() for LLM prompt building.
+        Structure:
+            - name, email, phone, location, linkedin_url: str
+            - summary: str
+            - experience: [{company, location, roles: [{title, dates, bullets}]}]
+            - education: [{institution, location, degree, dates}]
+            - skills: [{category, entries}]
+            - projects: [{name, bullets}]
+            - certifications: [{text}]
     """
-    def _format_entries(entries: list[dict]) -> list[dict]:
-        """Format KB entries for template consumption."""
-        return [
-            {
-                "text": e.get("text", ""),
-                "subsection": e.get("subsection", ""),
-            }
-            for e in entries
-        ]
-
-    # Use summary entry text if available, else empty
     summary_entries = selected.get("summary", [])
     summary = summary_entries[0].get("text", "") if summary_entries else ""
 
@@ -210,12 +394,16 @@ def _build_context(
         "email": profile.get("email", ""),
         "phone": profile.get("phone", ""),
         "location": profile.get("location", ""),
+        "linkedin_url": profile.get("linkedin_url", ""),
         "summary": summary,
-        "experience": _format_entries(selected.get("experience", [])),
-        "education": _format_entries(selected.get("education", [])),
-        "skills": _format_entries(selected.get("skill", [])),
-        "projects": _format_entries(selected.get("project", [])),
-        "certifications": _format_entries(selected.get("certification", [])),
+        "experience": _build_experience_groups(selected.get("experience", [])),
+        "education": _build_education_entries(selected.get("education", [])),
+        "skills": _build_skill_groups(selected.get("skill", [])),
+        "projects": _build_project_groups(selected.get("project", [])),
+        "certifications": [
+            {"text": e.get("text", "")}
+            for e in selected.get("certification", [])
+        ],
     }
 
 

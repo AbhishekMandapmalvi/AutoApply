@@ -85,6 +85,68 @@ LinkedIn: {linkedin_url}
 Portfolio: {portfolio_url}
 """
 
+KB_RESUME_PROMPT = """
+You are an expert resume writer. Create a polished, ATS-optimised resume using ONLY the data provided below.
+
+STRICT RULES:
+- Use ONLY the experiences, skills, education, projects, and certifications listed below
+- Do NOT invent, fabricate, or embellish ANY information
+- Do NOT add companies, roles, skills, or achievements not present in the data
+- Do NOT guess dates, locations, or titles — use exactly what is provided
+- You MAY rephrase and reword bullets for clarity, readability, impact, and ATS optimization
+- You MAY use synonyms from the job description to better align bullet phrasing
+- You MAY combine or split related bullets from the same role for better flow
+- You MAY reorder content to best match the job description
+- You MAY omit entries that are clearly irrelevant to this specific job
+- Quantify achievements where numbers are already present in the data
+
+PAGE LENGTH RULES — THIS IS CRITICAL:
+- The resume MUST fill exactly ONE full US Letter page (no more, no less)
+- Use the highest-ranked data first, then include lower-ranked data until the page is full
+- Every experience role MUST have at least 2 bullet points — expand by rephrasing or splitting if needed
+- If space remains, add more bullet points to the most relevant roles or include additional projects
+- If too long, trim the least relevant bullets from the bottom — but keep at least 2 per role
+
+Output format — Markdown only, no preamble, no explanation:
+
+# {full_name}
+{email} | {phone} | {location}{linkedin_line}
+
+## Summary
+{summary_text}
+
+## Education
+### [Institution] | [Location]
+[Degree] | [Dates]
+
+## Skills
+**[Category]**: [comma-separated skills]
+
+## Experience
+### [Company] | [Location]
+**[Job Title]** | [Dates]
+- Achievement bullet (from provided data only)
+- At least 2 bullets per role
+
+## Projects
+### [Project Name]
+- Description bullet (from provided data only)
+
+## Certifications
+- [Certification name]
+
+Omit any section that has no data.
+
+---
+JOB DESCRIPTION:
+{job_description}
+
+---
+PROVIDED RESUME DATA (use ONLY this — do not add anything else):
+
+{kb_data}
+"""
+
 COVER_LETTER_PROMPT = """
 You are an expert career coach. Write a cover letter for this job application.
 
@@ -435,3 +497,92 @@ def generate_documents(
     }
 
     return resume_pdf_path, cl_path, version_meta
+
+
+def _format_kb_data_for_prompt(context: dict) -> str:
+    """Format structured KB context into a text block for the LLM prompt.
+
+    Takes the same context dict produced by resume_assembler._build_context()
+    and serializes it into a human-readable text block that the LLM can use.
+    """
+    lines: list[str] = []
+
+    # Education
+    for entry in context.get("education", []):
+        inst = entry.get("institution", "")
+        loc = entry.get("location", "")
+        degree = entry.get("degree", "")
+        dates = entry.get("dates", "")
+        lines.append(f"EDUCATION: {inst} | {loc} | {degree} | {dates}")
+
+    # Skills
+    for group in context.get("skills", []):
+        cat = group.get("category", "")
+        entries = group.get("entries", "")
+        lines.append(f"SKILLS ({cat}): {entries}")
+
+    # Experience
+    for comp in context.get("experience", []):
+        company = comp.get("company", "")
+        loc = comp.get("location", "")
+        for role in comp.get("roles", []):
+            title = role.get("title", "")
+            dates = role.get("dates", "")
+            lines.append(f"EXPERIENCE: {company} | {loc} | {title} | {dates}")
+            for bullet in role.get("bullets", []):
+                lines.append(f"  - {bullet}")
+
+    # Projects
+    for proj in context.get("projects", []):
+        name = proj.get("name", "")
+        lines.append(f"PROJECT: {name}")
+        for bullet in proj.get("bullets", []):
+            lines.append(f"  - {bullet}")
+
+    # Certifications
+    for entry in context.get("certifications", []):
+        lines.append(f"CERTIFICATION: {entry.get('text', '')}")
+
+    return "\n".join(lines)
+
+
+def generate_resume_from_kb(
+    context: dict,
+    jd_text: str,
+    llm_config,
+) -> str:
+    """Generate a resume markdown from structured KB data via LLM.
+
+    The LLM is strictly instructed to use ONLY the provided KB data
+    and not invent any experiences, skills, or achievements.
+
+    Args:
+        context: Structured context dict from _build_context() with
+            name, email, phone, location, summary, experience, education,
+            skills, projects, certifications.
+        jd_text: Job description to tailor against.
+        llm_config: LLMConfig with provider, api_key, model.
+
+    Returns:
+        Resume content as markdown string.
+
+    Raises:
+        RuntimeError: If LLM invocation fails.
+    """
+    kb_data = _format_kb_data_for_prompt(context)
+    summary = context.get("summary", "")
+    linkedin = context.get("linkedin_url", "")
+    linkedin_line = f" | {linkedin}" if linkedin else ""
+
+    prompt = KB_RESUME_PROMPT.format(
+        full_name=context.get("name", ""),
+        email=context.get("email", ""),
+        phone=context.get("phone", ""),
+        location=context.get("location", ""),
+        linkedin_line=linkedin_line,
+        summary_text=summary if summary else "Write a 2-3 sentence summary tailored to the job, based ONLY on the provided data.",
+        job_description=jd_text,
+        kb_data=kb_data,
+    )
+
+    return invoke_llm(prompt, llm_config)

@@ -27,6 +27,7 @@
     \VAR{email}
     \BLOCK{if phone} $|$ \VAR{phone}\BLOCK{endif}
     \BLOCK{if location} $|$ \VAR{location}\BLOCK{endif}
+    \BLOCK{if linkedin_url} $|$ \href{\VAR{linkedin_url}}{\VAR{linkedin_url}}\BLOCK{endif}
     }
 \end{center}
 \vspace{4pt}
@@ -37,43 +38,50 @@
 \VAR{summary}
 \BLOCK{endif}
 
-% Experience
-\BLOCK{if experience}
-\section{Professional Experience}
-\BLOCK{for entry in experience}
-\BLOCK{if entry.subsection}{\bfseries\color{accent} \VAR{entry.subsection}}\\[2pt]\BLOCK{endif}
-\begin{itemize}[leftmargin=1.2em,topsep=0pt,itemsep=1pt,label=\textcolor{accent}{\textbullet}]
-    \item \VAR{entry.text}
-\end{itemize}
-\BLOCK{if not loop.last}\vspace{3pt}\BLOCK{endif}
-\BLOCK{endfor}
-\BLOCK{endif}
-
 % Education
 \BLOCK{if education}
 \section{Education}
 \BLOCK{for entry in education}
-\BLOCK{if entry.subsection}{\bfseries \VAR{entry.subsection}}\\[2pt]\BLOCK{endif}
-\VAR{entry.text}
-\BLOCK{if not loop.last}\\[3pt]\BLOCK{endif}
+{\bfseries \VAR{entry.institution}}\BLOCK{if entry.location} \hfill \VAR{entry.location}\BLOCK{endif}\\
+\VAR{entry.degree}\BLOCK{if entry.dates} \hfill \textit{\VAR{entry.dates}}\BLOCK{endif}
+\BLOCK{if not loop.last}\\[4pt]\BLOCK{endif}
 \BLOCK{endfor}
 \BLOCK{endif}
 
 % Skills
 \BLOCK{if skills}
 \section{Technical Skills}
-\BLOCK{for entry in skills}
-\VAR{entry.text}\BLOCK{if not loop.last} $\cdot$ \BLOCK{endif}
+\BLOCK{for group in skills}
+{\bfseries\color{accent} \VAR{group.category}}: \VAR{group.entries}\BLOCK{if not loop.last}\\[2pt]\BLOCK{endif}
+\BLOCK{endfor}
+\BLOCK{endif}
+
+% Experience
+\BLOCK{if experience}
+\section{Professional Experience}
+\BLOCK{for comp in experience}
+\BLOCK{for role in comp.roles}
+{\bfseries\color{accent} \VAR{comp.company}}\BLOCK{if comp.location} \hfill \VAR{comp.location}\BLOCK{endif}\\
+\textit{\VAR{role.title}}\BLOCK{if role.dates} \hfill \textit{\VAR{role.dates}}\BLOCK{endif}
+\begin{itemize}[leftmargin=1.2em,topsep=0pt,itemsep=1pt,label=\textcolor{accent}{\textbullet}]
+\BLOCK{for bullet in role.bullets}
+    \item \VAR{bullet}
+\BLOCK{endfor}
+\end{itemize}
+\BLOCK{endfor}
+\BLOCK{if not loop.last}\vspace{3pt}\BLOCK{endif}
 \BLOCK{endfor}
 \BLOCK{endif}
 
 % Projects
 \BLOCK{if projects}
 \section{Projects}
-\BLOCK{for entry in projects}
-\BLOCK{if entry.subsection}{\bfseries\color{accent} \VAR{entry.subsection}}\\[2pt]\BLOCK{endif}
+\BLOCK{for proj in projects}
+\BLOCK{if proj.name}{\bfseries\color{accent} \VAR{proj.name}}\\\BLOCK{endif}
 \begin{itemize}[leftmargin=1.2em,topsep=0pt,itemsep=1pt,label=\textcolor{accent}{\textbullet}]
-    \item \VAR{entry.text}
+\BLOCK{for bullet in proj.bullets}
+    \item \VAR{bullet}
+\BLOCK{endfor}
 \end{itemize}
 \BLOCK{endfor}
 \BLOCK{endif}
