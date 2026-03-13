@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json as _json
 import logging
 import os
@@ -78,18 +79,12 @@ def _find_free_port(start: int = 5000, end: int = 5010) -> int:
     )
 
 
-def main() -> None:
-    env_port = os.environ.get("AUTOAPPLY_PORT")
-    if env_port:
-        port = int(env_port)
-    else:
-        port = _find_free_port()
-
+def _setup_data_dirs() -> Path:
+    """Create data directories and return the data dir path."""
     from config.settings import get_data_dir
 
     data_dir = get_data_dir()
     data_dir.mkdir(parents=True, exist_ok=True)
-    _configure_logging(data_dir)
 
     (data_dir / "profile" / "experiences").mkdir(parents=True, exist_ok=True)
     (data_dir / "profile" / "jobs").mkdir(parents=True, exist_ok=True)
@@ -121,21 +116,57 @@ def main() -> None:
             encoding="utf-8",
         )
 
-    from app import app, graceful_shutdown, socketio
+    return data_dir
 
-    # Register signal handlers for graceful shutdown (NFR-ME8)
-    def _signal_handler(signum, frame):
-        sig_name = signal.Signals(signum).name
-        logging.getLogger(__name__).info("Received %s, shutting down...", sig_name)
-        graceful_shutdown()
-        sys.exit(0)
 
-    signal.signal(signal.SIGINT, _signal_handler)
-    if hasattr(signal, "SIGTERM"):
-        signal.signal(signal.SIGTERM, _signal_handler)
+def _parse_args() -> argparse.Namespace:
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(description="AutoApply — Smart Job Application Bot")
+    parser.add_argument(
+        "--gui", action="store_true",
+        help="Launch with PyWebView desktop GUI",
+    )
+    parser.add_argument(
+        "--no-browser", action="store_true",
+        help="Start server without opening a browser (headless mode)",
+    )
+    return parser.parse_args()
 
-    print(f"AutoApply starting at http://localhost:{port}")
-    socketio.run(app, host="127.0.0.1", port=port, debug=False)
+
+def main() -> None:
+    args = _parse_args()
+
+    env_port = os.environ.get("AUTOAPPLY_PORT")
+    if env_port:
+        port = int(env_port)
+    else:
+        port = _find_free_port()
+
+    data_dir = _setup_data_dirs()
+    _configure_logging(data_dir)
+
+    if args.gui:
+        # PyWebView desktop mode — Flask starts in a daemon thread
+        from shell import launch_gui
+
+        launch_gui(host="127.0.0.1", port=port)
+    else:
+        # Headless server mode
+        from app import app, graceful_shutdown, socketio
+
+        # Register signal handlers for graceful shutdown (NFR-ME8)
+        def _signal_handler(signum, frame):
+            sig_name = signal.Signals(signum).name
+            logging.getLogger(__name__).info("Received %s, shutting down...", sig_name)
+            graceful_shutdown()
+            sys.exit(0)
+
+        signal.signal(signal.SIGINT, _signal_handler)
+        if hasattr(signal, "SIGTERM"):
+            signal.signal(signal.SIGTERM, _signal_handler)
+
+        print(f"AutoApply starting at http://localhost:{port}")
+        socketio.run(app, host="127.0.0.1", port=port, debug=False)
 
 
 if __name__ == "__main__":
