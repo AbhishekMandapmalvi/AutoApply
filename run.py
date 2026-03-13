@@ -145,7 +145,10 @@ def main() -> None:
     data_dir = _setup_data_dirs()
     _configure_logging(data_dir)
 
-    if args.gui:
+    # Default to GUI mode when running as frozen PyInstaller bundle
+    is_frozen = getattr(sys, "frozen", False)
+
+    if args.gui or is_frozen:
         # PyWebView desktop mode — Flask starts in a daemon thread
         from shell import launch_gui
 

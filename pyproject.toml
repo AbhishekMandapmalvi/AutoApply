@@ -1,6 +1,6 @@
 [project]
 name = "autoapply"
-version = "2.4.0"
+version = "2.4.1"
 description = "Smart job application automation bot with desktop dashboard"
 requires-python = ">=3.11"
 dependencies = [
