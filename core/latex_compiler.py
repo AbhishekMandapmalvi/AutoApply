@@ -174,24 +174,25 @@ def render_template(
     template = env.get_template(f"{template_name}.tex.j2")
 
     # Escape all text values in context
-    safe_context = _escape_context(context)
+    safe_context = _escape_context_dict(context)
 
     return template.render(**safe_context)
 
 
-def _escape_context(context: dict | list | str | object) -> dict | list | str:
-    """Recursively escape all string values in the template context.
+def _escape_context_dict(context: dict) -> dict:
+    """Escape all string values in a top-level template context dict."""
+    return {k: _escape_value(v) for k, v in context.items()}
 
-    Handles arbitrary nesting of dicts, lists, and strings so that
-    structured contexts (e.g. experience → roles → bullets) are fully escaped.
-    """
-    if isinstance(context, dict):
-        return {k: _escape_context(v) for k, v in context.items()}
-    if isinstance(context, list):
-        return [_escape_context(item) for item in context]
-    if isinstance(context, str):
-        return escape_latex(context)
-    return context
+
+def _escape_value(value: object) -> object:
+    """Recursively escape all string values in nested structures."""
+    if isinstance(value, dict):
+        return {k: _escape_value(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_escape_value(item) for item in value]
+    if isinstance(value, str):
+        return escape_latex(value)
+    return value
 
 
 # ---------------------------------------------------------------------------
@@ -404,7 +405,7 @@ def render_custom_template(
     )
     env.filters["escape_latex"] = escape_latex
     template = env.from_string(tex_source)
-    safe_context = _escape_context(context)
+    safe_context = _escape_context_dict(context)
     return template.render(**safe_context)
 
 

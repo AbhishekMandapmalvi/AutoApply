@@ -89,7 +89,7 @@ def render_resume_to_pdf(resume_md_text: str, resume_pdf_path: Path) -> None:
         """Measure text width, stripping markdown bold/italic markers."""
         plain = BOLD_RE.sub(r"\1", text)
         plain = ITALIC_RE.sub(r"\1", plain)
-        return c.stringWidth(plain, font, size)
+        return float(c.stringWidth(plain, font, size))
 
     def draw_wrapped(
         text: str, font: str, size: float, x: float, max_w: float,

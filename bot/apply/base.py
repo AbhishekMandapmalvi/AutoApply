@@ -11,7 +11,7 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from config.settings import UserProfile
@@ -148,7 +148,7 @@ class BaseApplier(ABC):
         kwargs.setdefault("timeout", self.NAV_TIMEOUT)
         self.page.goto(url, **kwargs)
 
-    def _wait_and_query(self, selector: str, timeout: int | None = None) -> object | None:
+    def _wait_and_query(self, selector: str, timeout: int | None = None) -> Any:
         """Wait for an element to appear, then return it. Returns None on timeout."""
         timeout = timeout or self.ELEMENT_TIMEOUT
         try:
