@@ -4,6 +4,17 @@ All notable changes to AutoApply are documented in this file.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.4.1] - 2026-03-13
+
+### Changed
+- **Electron to PyWebView migration (TASK-031)**: Replaced Electron+Node.js (~200MB) with PyWebView+pystray (~5MB). New `shell/` package with OS-native webview, system tray, and single-instance lock. (#85)
+- **ATS reliability improvements**: Portal authentication, UI cleanup. (#83)
+
+### Fixed
+- **Bot freezes on external LinkedIn applications** (#98): When a LinkedIn job had "Apply" (external) instead of "Easy Apply", the bot waited ~68s doing nothing. Now detects external button text instantly and returns `manual_required` immediately. (`bot/apply/linkedin.py`)
+- **PyInstaller exe launched silently** (#97): The exe started in headless server mode because `--gui` flag was required but not passed. Now auto-detects `sys.frozen` and defaults to GUI mode. (`run.py`)
+- **Windows release build failed** (#96): `zip` command not available on `windows-latest` CI runners. Now uses `7z` on Windows. (`.github/workflows/release.yml`)
+
 ## [2.3.3] - 2026-03-12
 
 ### Fixed

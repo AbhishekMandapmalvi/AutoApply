@@ -657,3 +657,11 @@ FR-027 and FR-029 marked N/A (deprecated). See rows above.
 | FR-030-70 | — | SAD §3.44 | `core/resume_scorer.py` | `test_intelligence.py::TestEffectivenessWeighting` | — | SRS §M9 | — | ✅ |
 | NFR-030-25 | — | SAD §3.42 | `db/database.py` | `test_intelligence.py::TestKBUsageLog` | — | SRS §M9 | SEC #51 | ✅ |
 | NFR-030-26 | — | SAD §3.42 | `db/database.py` | `test_intelligence.py::TestKBUsageLog` | — | SRS §M9 | SEC #46 | ✅ |
+
+### v2.4.1 Bugfixes
+
+| Req ID | User Story | Design Ref | Source Files | Unit Tests | Integ Tests | Docs | Security | Status |
+|--------|------------|------------|--------------|------------|-------------|------|----------|--------|
+| FR-FIX-09 | Issue #96 | — | `.github/workflows/release.yml` | CI release workflow | — | CHANGELOG §2.4.1 | — | ✅ |
+| FR-FIX-10 | Issue #97 | FR-090 | `run.py` | `test_run.py::TestFrozenGUIDefault` (3 tests) | — | CHANGELOG §2.4.1 | — | ✅ |
+| FR-FIX-11 | Issue #98 | FR-047 | `bot/apply/linkedin.py` | `test_appliers_coverage.py::TestLinkedInUploadResumeException::test_external_application_detected` | — | CHANGELOG §2.4.1 | — | ✅ |
