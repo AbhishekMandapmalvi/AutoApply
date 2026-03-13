@@ -82,6 +82,18 @@ M4 Assembly + Bot Integration (LLM + ReportLab pipeline):
 2. Parses date strings, calculates durations in months
 3. Aggregates by domain → returns total_years + by_domain dict
 
+**Dashboard Toggle Change (Automation Config)**:
+```
+Dashboard Toggle Change
+  → initBotToggles() event listener
+  → PUT /api/config { resume_reuse: { enabled: bool } } or { bot: { cover_letter_enabled: bool } }
+  → routes/config.py::update_config() shallow merge
+  → save_config() writes to ~/.autoapply/config.json
+  → Next bot cycle reads updated config
+  → _generate_docs() checks config.bot.cover_letter_enabled
+  → _try_kb_assembly() checks config.resume_reuse.enabled
+```
+
 ### 2.3 Layer Architecture
 
 | Layer | Responsibility | Components |
@@ -110,6 +122,8 @@ M4 Assembly + Bot Integration (LLM + ReportLab pipeline):
 | ResumeAssembler | Orchestrate KB-first resume assembly: score → select → LLM generate → ReportLab render | stdlib | Service | `core/resume_assembler.py` |
 | Bot (KB-first flow) | Try KB assembly before LLM, ingest LLM output | stdlib | Service | `bot/bot.py` (modified) |
 | Database (resume_versions ext) | resume_versions +reuse_source, +source_entry_ids | sqlite3 | Repository | `db/database.py` (modified) |
+| DefaultResumeManager | Handle upload, retrieval, and deletion of fallback resume file. Routes in `routes/config.py`. Stores to `~/.autoapply/default_resume.{ext}`, updates `profile.fallback_resume_path` | Flask, stdlib | Service | `routes/config.py` |
+| DashboardToggles | Client-side controls (`static/js/settings.js::initBotToggles()`) for Adaptive Resume and Cover Letter toggles. Auto-save via PUT /api/config on change. Load state via `loadApplyMode()` | vanilla JS | Presentation | `static/js/settings.js`, `templates/index.html` |
 
 ---
 
@@ -801,10 +815,10 @@ uploaded_documents ──1:N──▶ knowledge_base  (via knowledge_base.source
 | FR-030-26 | FR | ResumeAssembler, AI Engine, ResumeRenderer | assemble_resume() → generate_resume_from_kb() → render_resume_to_pdf() | ADR-032 |
 | FR-030-27 | FR | ResumeAssembler | _select_entries() | — |
 | FR-030-28 | FR | ResumeAssembler | _build_context(), _format_kb_data_for_prompt() | — |
-| FR-030-29 | FR | ResumeAssembler | save_assembled_resume() | — |
-| FR-030-30 | FR | ResumeAssembler, ResumeParser, KnowledgeBase | ingest_llm_resume() | ADR-032 |
-| FR-030-31 | FR | Bot (_generate_docs) | _try_kb_assembly(), _ingest_llm_output() | ADR-032 |
-| FR-030-32 | FR | Database (resume_versions) | save_resume_version() +reuse_source, +source_entry_ids | — |
+| FR-030-29 | FR | DashboardToggles, Bot | `static/js/settings.js`, `templates/index.html`, `bot/bot.py` — initBotToggles(), _generate_docs() toggle checks | ADR-032 |
+| FR-030-30 | FR | DefaultResumeManager | `routes/config.py` — POST/GET/DELETE /api/config/default-resume | IC-043, IC-044, IC-045 |
+| FR-030-31 | FR | DashboardToggles, Config UI | `templates/index.html`, `static/js/settings.js`, `static/css/main.css` — toggle controls, styling | — |
+| FR-030-32 | FR | KB Viewer, Resume Preview | `templates/index.html`, `static/js/knowledge-base.js`, `static/js/resume-preview.js` — KB screen + preview | — |
 | NFR-030-14 | NFR | ResumeAssembler | logging.getLogger(__name__) | — |
 | NFR-030-15 | NFR | Test suite (M4) | pytest | — |
 
@@ -1224,6 +1238,56 @@ Output:
 
 ---
 
+### IC-043: POST /api/config/default-resume
+
+**Purpose**: Upload a fallback resume file (PDF or DOCX) to use when KB assembly is insufficient.
+**Category**: command (filesystem + config write)
+
+**Request**:
+- Content-Type: multipart/form-data
+- Body: `file` field (PDF or DOCX, max 5 MB)
+
+**Response 200**: `{ success: true, filename: str, path: str }`
+**Response 400**: `{ error: str }` — No file, empty filename, or unsupported type
+**Response 413**: `{ error: str }` — File exceeds 5 MB
+
+**Side Effects**: Saves file to `~/.autoapply/default_resume.{ext}`, updates `config.profile.fallback_resume_path` via `save_config()`.
+**Idempotency**: No — overwrites previous default resume on each call.
+**Thread Safety**: Safe (config write serialized via save_config).
+
+---
+
+### IC-044: GET /api/config/default-resume
+
+**Purpose**: Retrieve current default resume file metadata.
+**Category**: query
+
+**Request**: None
+
+**Response 200**: `{ filename: str | null, path: str | null }`
+
+**Preconditions**: None.
+**Postconditions**: No state change.
+**Idempotency**: Yes.
+**Thread Safety**: Safe (read-only).
+
+---
+
+### IC-045: DELETE /api/config/default-resume
+
+**Purpose**: Remove the default resume file and clear the config reference.
+**Category**: command (filesystem + config write)
+
+**Request**: None
+
+**Response 200**: `{ success: true }`
+
+**Side Effects**: Deletes file from `~/.autoapply/` disk, clears `config.profile.fallback_resume_path` via `save_config()`.
+**Idempotency**: Yes (no-op if no default resume set).
+**Thread Safety**: Safe (config write serialized via save_config).
+
+---
+
 ## 7.5 ADR-032: KB-First Resume Generation
 
 **Status**: accepted
@@ -1273,10 +1337,10 @@ _generate_docs(job, profile, llm_config)
 | FR-030-26 | FR | ResumeAssembler, AI Engine, ResumeRenderer | assemble_resume() → generate_resume_from_kb() → render_resume_to_pdf() | ADR-032 |
 | FR-030-27 | FR | ResumeAssembler | _select_entries() | — |
 | FR-030-28 | FR | ResumeAssembler | _build_context(), _format_kb_data_for_prompt() | — |
-| FR-030-29 | FR | ResumeAssembler | save_assembled_resume() | — |
-| FR-030-30 | FR | ResumeAssembler, ResumeParser, KnowledgeBase | ingest_llm_resume() | ADR-032 |
-| FR-030-31 | FR | Bot (_generate_docs) | _try_kb_assembly(), _ingest_llm_output() | ADR-032 |
-| FR-030-32 | FR | Database (resume_versions) | save_resume_version() +reuse_source, +source_entry_ids | — |
+| FR-030-29 | FR | DashboardToggles, Bot | `static/js/settings.js`, `templates/index.html`, `bot/bot.py` — initBotToggles(), _generate_docs() toggle checks | ADR-032 |
+| FR-030-30 | FR | DefaultResumeManager | `routes/config.py` — POST/GET/DELETE /api/config/default-resume | IC-043, IC-044, IC-045 |
+| FR-030-31 | FR | DashboardToggles, Config UI | `templates/index.html`, `static/js/settings.js`, `static/css/main.css` — toggle controls, styling | — |
+| FR-030-32 | FR | KB Viewer, Resume Preview | `templates/index.html`, `static/js/knowledge-base.js`, `static/js/resume-preview.js` — KB screen + preview | — |
 | NFR-030-14 | NFR | ResumeAssembler | logging.getLogger(__name__) | — |
 | NFR-030-15 | NFR | Test suite (M4) | pytest | — |
 

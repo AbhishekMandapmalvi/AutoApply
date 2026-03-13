@@ -144,7 +144,7 @@ User clicks "Preview Resume" from KB viewer
 | `core/resume_scorer.py` | TF-IDF + ONNX embedding scoring algorithms |
 | `core/resume_assembler.py` | Select KB entries, send to LLM, render PDF via ReportLab |
 | `core/latex_compiler.py` | **DEPRECATED** — TinyTeX wrapper, not used in active pipeline |
-| `templates/latex/*.tex.j2` | **DEPRECATED** — LaTeX templates exist on disk but template picker removed from UI |
+| `templates/latex/*.tex.j2` | **DEPRECATED** — LaTeX templates exist on disk but template picker removed from UI. `jake.tex.j2` deleted in M4; remaining: classic, modern, academic, minimal |
 | `electron/scripts/bundle-tinytex.js` | **DEPRECATED** — TinyTeX bundling no longer needed |
 | `routes/knowledge_base.py` | API endpoints: upload, list, CRUD, import |
 | `static/js/knowledge-base.js` | Frontend: upload UI, KB viewer, entry editor |
@@ -170,6 +170,12 @@ User clicks "Preview Resume" from KB viewer
 | `static/locales/es.json` | ~25 new i18n keys (Spanish) |
 | `pyproject.toml` | Add `jinja2`, `PyPDF2`, `python-docx`; optional `onnxruntime` + `tokenizers` |
 | `electron/scripts/bundle-python.js` | ~~Add TinyTeX bundling step~~ (no longer needed) |
+| `routes/config.py` | (M4) Add `POST/GET/DELETE /api/config/default-resume` endpoints for default resume upload |
+| `config/settings.py` | (M4) Add `bot.cover_letter_enabled` to `BotConfig`; change `LatexConfig.template` default from "jake" to "classic" |
+| `templates/index.html` | (M4) Dashboard automation toggles (Adaptive Resume, Cover Letter); default resume upload UI; KB page section reorder; preview popup with overlay |
+| `static/js/settings.js` | (M4) `initBotToggles()`, `loadApplyMode()` toggle state loading, `uploadDefaultResume()`, `removeDefaultResume()`, `loadDefaultResume()` |
+| `core/latex_compiler.py` | (M4) Remove "jake" from `AVAILABLE_TEMPLATES` |
+| `tests/test_latex_compiler.py` | (M4) Update tests to use "classic" instead of "jake" |
 
 ---
 
@@ -743,6 +749,10 @@ Each milestone is a standalone PR with tests, i18n, and production-readiness bui
 7. `assemble_resume()` takes `llm_config` (not `latex_config`) — LLM generates exactly 1 page, min 2 bullets per role, may rephrase/use synonyms from JD
 8. Frontend: `loadTemplates()` removed from JS initialization, `loadKBDocuments()` added, Resume Templates section removed from UI
 9. Tests: ~15 tests (assembly, bot integration, preview endpoint, ReportLab rendering)
+10. **Dashboard Automation Toggles**: "Adaptive Resume" and "Cover Letter" checkboxes added to Dashboard bot control card. Auto-save on toggle via `PUT /api/config` (no Save button). `initBotToggles()` in `settings.js` binds change events; `loadApplyMode()` extended to load toggle states. `bot.cover_letter_enabled` config field added to `BotConfig`. When Cover Letter off: `generate_documents(skip_cover_letter=True)` skips LLM call. When Adaptive Resume off: `_try_kb_assembly()` returns `None`, bot uses fallback.
+11. **Default Resume Upload**: 3 new endpoints in `routes/config.py`: `POST/GET/DELETE /api/config/default-resume`. Accepts PDF/DOCX up to 5 MB, saves to `~/.autoapply/default_resume.{ext}`. Updates `config.profile.fallback_resume_path`. Dashboard UI: filename display + Upload button + Remove (X) button. `uploadDefaultResume()`, `removeDefaultResume()`, `loadDefaultResume()` in `settings.js`.
+12. **KB Page UI Restructure**: Reordered sections: Stats → ATS + Smart Resume Assembly → Resume Builder + Documents → KB Entries. Upload control moved inside "Uploaded Documents" card. Resume Templates section removed (LaTeX deprecated). Preview popup: fixed overlay, z-index 1000, dark bg, Close + Download buttons.
+13. **Jake Template Removal**: Deleted `templates/latex/jake.tex.j2`. Removed "jake" from `AVAILABLE_TEMPLATES` in `latex_compiler.py`. Changed `LatexConfig.template` default from "jake" to "classic". Updated tests to use "classic" instead of "jake".
 
 ### Milestone 5: Upload UI + KB Viewer + Preview
 **Scope**: Frontend for document upload, KB browsing, and resume preview.

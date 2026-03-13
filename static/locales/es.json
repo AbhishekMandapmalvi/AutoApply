@@ -186,7 +186,8 @@
     "clear_feed": "Limpiar",
     "close_browser": "Cerrar Navegador",
     "add_tag": "Agregar",
-    "approve_and_apply": "Aprobar y Aplicar"
+    "approve_and_apply": "Aprobar y Aplicar",
+    "upload": "Subir"
   },
 
   "bot": {
@@ -286,6 +287,13 @@
     "platform_login_hint": "Abre un navegador para iniciar sesión en tus plataformas de empleo. Las sesiones se guardan entre reinicios.",
     "open_linkedin_login": "Abrir Inicio de Sesión en LinkedIn",
     "open_indeed_login": "Abrir Inicio de Sesión en Indeed",
+    "section_automation": "Opciones de Automatización",
+    "automation_description": "Controla cómo el bot genera documentos para cada solicitud.",
+    "adaptive_resume": "Currículum Adaptativo",
+    "adaptive_resume_hint": "Adapta el currículum a cada empleo usando las entradas de la Base de Conocimientos. Si está desactivado, usa tu currículum predeterminado.",
+    "cover_letter": "Carta de Presentación",
+    "cover_letter_hint": "Genera una carta de presentación personalizada para cada solicitud. Si está desactivado, no se adjunta carta.",
+    "default_resume": "Currículum Predeterminado:",
     "section_schedule": "Programación",
     "schedule_hint": "Iniciar y detener el bot automáticamente según un horario. El bot solo se ejecuta durante la ventana configurada.",
     "schedule_active": "Activo",

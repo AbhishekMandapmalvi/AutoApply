@@ -132,7 +132,7 @@ class ResumeReuseConfig(BaseModel):
 
 class LatexConfig(BaseModel):
     """Configuration for LaTeX resume compilation."""
-    template: str = "jake"  # template name in templates/latex/
+    template: str = "classic"  # template name in templates/latex/
     font_family: str = "helvetica"  # helvetica, times, palatino
     font_size: int = 11  # 10, 11, 12
     margin: str = "0.75in"

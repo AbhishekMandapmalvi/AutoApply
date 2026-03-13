@@ -82,6 +82,9 @@ Job seekers using AutoApply in automated mode who apply to many similar position
 | US-111 | Active Seeker | have the bot try KB assembly first before calling the LLM | I save API costs on every application where KB is sufficient | P0 | L | M4 |
 | US-112 | Active Seeker | have LLM-generated resumes automatically ingested back into KB | the system improves with every application | P1 | M | M4 |
 | US-113 | Power User | see whether each resume was KB-assembled or LLM-generated | I can track the system's self-sufficiency over time | P2 | S | M4 |
+| US-135 | Active Seeker | toggle Adaptive Resume on/off from the Dashboard | I can control whether the bot tailors my resume per job or uses my default resume | P0 | M | M4 |
+| US-136 | Active Seeker | upload a default resume (PDF/DOCX) from the Dashboard | the bot has a fallback when Adaptive Resume is off or LLM fails | P0 | M | M4 |
+| US-137 | Power User | have the KB page organized with tools on top and entries below | I can quickly access ATS scoring and resume generation | P1 | M | M4 |
 
 ### M5 — Upload UI + KB Viewer
 
@@ -153,6 +156,27 @@ Job seekers using AutoApply in automated mode who apply to many similar position
 - Given insufficient KB entries, When assembly fails, Then system falls through to LLM generation
 - Given LLM generates a resume, When generation completes, Then output is ingested into KB
 
+#### US-135: Dashboard Automation Toggles (M4)
+- Given the Dashboard is shown, When loaded, Then "Adaptive Resume" checkbox reflects `resume_reuse.enabled` config
+- Given the Dashboard is shown, When loaded, Then "Cover Letter" checkbox reflects `bot.cover_letter_enabled` config
+- Given user toggles Adaptive Resume off, When toggled, Then PUT /api/config saves immediately (no Save button needed)
+- Given Adaptive Resume is off, When bot generates docs, Then `fallback_resume_path` is used instead of KB assembly
+- Given Cover Letter is off, When bot generates docs, Then LLM cover letter generation is skipped entirely
+
+#### US-136: Default Resume Upload (M4)
+- Given Dashboard upload control, When no file uploaded, Then display shows "None"
+- Given a PDF/DOCX file up to 5 MB, When POST /api/config/default-resume, Then file saved to ~/.autoapply/default_resume.{ext}
+- Given file uploaded, When config updated, Then `fallback_resume_path` points to saved file
+- Given GET /api/config/default-resume, When called, Then returns current filename
+- Given DELETE /api/config/default-resume, When called, Then file removed and config cleared
+- Given a file is uploaded, When displayed, Then a Remove (X) button is visible
+
+#### US-137: KB Page UI Improvements (M4)
+- Given the KB page, When displayed, Then layout order is: Stats → ATS + Smart Resume Assembly → Resume Builder + Documents → KB Entries
+- Given the upload control, When KB page displayed, Then upload is inside "Uploaded Documents" card
+- Given the KB page, When displayed, Then Resume Templates section is removed (LaTeX deprecated)
+- Given preview popup, When opened, Then it covers full viewport with dark overlay, Close and Download buttons
+
 #### US-115: KB Viewer & Editor (M5)
 - Given KB entries exist, When user opens KB viewer, Then all entries shown with category/text/tags
 - Given an entry, When user edits text or tags, Then changes are persisted immediately
@@ -201,7 +225,7 @@ Job seekers using AutoApply in automated mode who apply to many similar position
 | M1 — Foundation | DB schema, document parser, KB CRUD, LLM extraction, resume parser, experience calculator, config models | Delivered (PR #39) |
 | M2 — Scoring | TF-IDF cosine similarity, JD analyzer (keywords, n-grams, synonyms), ONNX embedding interface | Delivered (PR #45) |
 | M3 — LaTeX Engine | **SUPERSEDED** — original LaTeX approach (pdflatex, Jinja2 templates, TinyTeX) replaced by LLM + ReportLab pipeline in M4 | Superseded |
-| M4 — Assembly + Bot | Resume assembler (LLM content selection with strict KB-only constraints + ReportLab PDF rendering), KB-first bot flow, post-LLM ingestion, version tracking | Delivered (PR #49) |
+| M4 — Assembly + Bot | Resume assembler (LLM content selection with strict KB-only constraints + ReportLab PDF rendering), KB-first bot flow, post-LLM ingestion, version tracking, Dashboard automation toggles (Adaptive Resume + Cover Letter), default resume upload/management, KB page UI reorganization | Delivered (PR #49) |
 | M5 — Upload UI | 8 REST endpoints, KB viewer/editor, upload zone, resume preview modal | Delivered (PR #51) |
 | M6 — ATS Scoring | 5-component composite scorer, 7 ATS platform profiles, keyword gap analysis | Delivered (PR #53) |
 | M7 — Manual Builder | Drag-and-drop builder, resume presets CRUD, one-page mode, auto-fill from JD | Delivered (PR #54) |
@@ -264,7 +288,7 @@ Job seekers using AutoApply in automated mode who apply to many similar position
 | M1 — Foundation | US-101, US-102, US-103, US-104 | #35, #36, #37, #38 | #39 |
 | M2 — Scoring | US-105, US-106, US-107 | #44 | #45 |
 | M3 — LaTeX Engine (SUPERSEDED) | US-108, ~~US-109~~, US-110 | #46 | #47 (superseded by M4) |
-| M4 — Assembly + Bot | US-111, US-112, US-113 | #48 | #49 |
+| M4 — Assembly + Bot | US-111, US-112, US-113, US-135, US-136, US-137 | #48 | #49 |
 | M5 — Upload UI | US-114, US-115, US-116, US-117 | #50 | #51 |
 | M6 — ATS Scoring | US-118, US-119, US-120 | #52 | #53 |
 | M7 — Manual Builder | US-121, US-122, US-123, US-124 | #58 | #54 |
@@ -272,14 +296,14 @@ Job seekers using AutoApply in automated mode who apply to many similar position
 | M9 — Intelligence | US-128, US-129, US-130, US-131 | #60 | #56 |
 | M10 — Migration | US-132, US-133, US-134 | #61 | #57 |
 
-**Total**: 34 user stories across 10 milestones, 3 personas, all delivered.
+**Total**: 37 user stories across 10 milestones, 4 personas, all delivered.
 
 ---
 
 ## Product Requirements Document -- GATE 2 OUTPUT
 
 **Document**: PRD-TASK-030-smart-resume-reuse
-**User Stories**: 34 (US-101 to US-134)
+**User Stories**: 37 (US-101 to US-137)
 **Personas**: 4 (Active Seeker, Career Switcher, Power User, New User)
 **Success Metrics**: 6 measurable outcomes
 **MoSCoW**: P0 (60%), P1 (30%), P2 (10%)

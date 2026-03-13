@@ -877,6 +877,9 @@ This feature extends the existing AutoApply bot. Currently, every job applicatio
 | core/resume_assembler | `assemble_resume(jd_text, db, llm_config)` | Called by bot (M4) | bot/bot.py |
 | bot/bot | `_generate_docs()` (modified) | Called by bot loop | bot/bot.py |
 | db/database | `save_resume_version(..., reuse_source, source_entry_ids)` | Called by bot (M4) | bot/bot.py |
+| routes/config | `upload_default_resume()` — POST /api/config/default-resume | Called by Dashboard UI | static/js/dashboard.js |
+| routes/config | `get_default_resume()` — GET /api/config/default-resume | Called by Dashboard UI | static/js/dashboard.js |
+| routes/config | `delete_default_resume()` — DELETE /api/config/default-resume | Called by Dashboard UI | static/js/dashboard.js |
 
 ---
 
@@ -1507,6 +1510,55 @@ The system SHALL auto-migrate `.md` resume files into KB entries using `parse_re
 - **AC-076-4 (positive)**: Mixed backslash and special chars produce correct output.
 - **AC-076-5 (negative)**: Single backslash does not produce doubled `\textbackslash{}`.
 
+#### FR-030-77: Dashboard Automation Toggles
+
+**Priority**: HIGH
+**Description**: The Dashboard bot control card SHALL include toggles for "Adaptive Resume" and "Cover Letter" that persist to config immediately on change.
+
+**Acceptance Criteria**:
+- **AC-077-1 (positive)**: "Adaptive Resume" checkbox controls `resume_reuse.enabled` via PUT /api/config.
+- **AC-077-2 (positive)**: "Cover Letter" checkbox controls `bot.cover_letter_enabled` via PUT /api/config.
+- **AC-077-3 (positive)**: Toggle state loads from GET /api/config when Dashboard screen is shown.
+- **AC-077-4 (positive)**: When Adaptive Resume is off, `_try_kb_assembly()` returns None (bot uses fallback).
+- **AC-077-5 (positive)**: When Cover Letter is off, `generate_documents()` is called with `skip_cover_letter=True`.
+- **AC-077-6 (positive)**: i18n keys `settings.adaptive_resume` and `settings.cover_letter` in en.json and es.json.
+
+#### FR-030-78: Default Resume Upload API
+
+**Priority**: HIGH
+**Description**: The system SHALL provide endpoints to upload, retrieve, and delete a default/fallback resume file.
+
+**Acceptance Criteria**:
+- **AC-078-1 (positive)**: POST /api/config/default-resume accepts multipart file upload (PDF or DOCX, max 5 MB).
+- **AC-078-2 (positive)**: File saved to `~/.autoapply/default_resume.{ext}`, path stored in `profile.fallback_resume_path`.
+- **AC-078-3 (positive)**: GET /api/config/default-resume returns `{filename, path}` or `{filename: null, path: null}`.
+- **AC-078-4 (positive)**: DELETE /api/config/default-resume removes file from disk and clears config path.
+- **AC-078-5 (negative)**: Rejects unsupported file types with 400 error.
+- **AC-078-6 (negative)**: Rejects files > 5 MB with 400 error.
+
+#### FR-030-79: Default Resume Dashboard UI
+
+**Priority**: MEDIUM
+**Description**: The Dashboard SHALL show the current default resume filename with upload and remove controls.
+
+**Acceptance Criteria**:
+- **AC-079-1 (positive)**: "Default Resume: {filename}" label shown in bot-toggles area.
+- **AC-079-2 (positive)**: Upload button triggers file picker (PDF/DOCX only).
+- **AC-079-3 (positive)**: After upload, filename updates and remove (X) button appears.
+- **AC-079-4 (positive)**: Remove button calls DELETE endpoint and resets display to "None".
+- **AC-079-5 (positive)**: State loads via GET /api/config/default-resume on dashboard switch.
+
+#### FR-030-80: KB Page Layout Restructure
+
+**Priority**: LOW
+**Description**: The Knowledge Base page SHALL organize sections with tools above the entries database.
+
+**Acceptance Criteria**:
+- **AC-080-1 (positive)**: Page layout: Stats cards → ATS + Smart Resume Assembly → Resume Builder + Documents → KB Entries.
+- **AC-080-2 (positive)**: Upload control inside "Uploaded Documents" card (not in toolbar).
+- **AC-080-3 (positive)**: Resume Templates section removed.
+- **AC-080-4 (positive)**: Preview popup uses fixed overlay (z-index 1000) with dark background, Close and Download PDF buttons.
+
 ### 14.2 Non-Functional Requirements
 
 #### NFR-030-27: Structured Logging (M10)
@@ -1525,15 +1577,19 @@ M10 SHALL include ≥25 unit tests covering all new functions, error paths, and 
 | FR-030-74 | SAD §3.46 | `core/kb_migrator.py` | `test_migration.py::TestRunMigration` |
 | FR-030-75 | SAD §3.46 | `core/kb_migrator.py` | `test_migration.py::TestCategoryGuessing` |
 | FR-030-76 | SAD §3.47 | `core/latex_compiler.py` | `test_migration.py::TestLatexEscapingHardening` |
+| FR-030-77 | Derived | `static/js/dashboard.js`, `routes/config.py` | `test_config_routes.py::TestDashboardToggles` |
+| FR-030-78 | Derived | `routes/config.py` | `test_config_routes.py::TestDefaultResumeAPI` |
+| FR-030-79 | Derived | `static/js/dashboard.js`, `templates/index.html` | manual |
+| FR-030-80 | Derived | `static/js/knowledge-base.js`, `templates/index.html` | manual |
 
 ---
 
 ## Software Requirements Specification -- GATE 3 OUTPUT
 
 **Document**: SRS-TASK-030-smart-resume-reuse
-**FRs**: 76 functional requirements (12 M1 + 7 M2 + 7 M3 + 6 M4 + 10 M5 + 6 M6 + 6 M7 + 8 M8 + 8 M9 + 6 M10)
+**FRs**: 80 functional requirements (12 M1 + 7 M2 + 7 M3 + 6 M4 + 10 M5 + 6 M6 + 6 M7 + 8 M8 + 8 M9 + 10 M10)
 **NFRs**: 28 non-functional requirements (6 M1 + 4 M2 + 3 M3 + 2 M4 + 3 M5 + 2 M6 + 2 M7 + 2 M8 + 2 M9 + 2 M10)
-**ACs**: 241 total acceptance criteria (207 positive + 34 negative)
+**ACs**: 263 total acceptance criteria (227 positive + 36 negative)
 **Quality Checklist**: 48/48 items passed (100%)
 
 ### Handoff Routing
