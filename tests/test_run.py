@@ -1,14 +1,16 @@
-"""Unit tests for run.py port configuration.
+"""Unit tests for run.py port configuration and GUI mode detection.
 
 Requirement traceability:
     FR-028  AUTOAPPLY_PORT environment variable and port auto-detection
+    FR-090  PyWebView desktop shell launch (GUI mode default for frozen builds)
 """
 
 from __future__ import annotations
 
 import os
 import socket
-from unittest.mock import patch
+import sys
+from unittest.mock import MagicMock, patch
 
 from run import _find_free_port
 
@@ -63,3 +65,59 @@ class TestPortAutoDetection:
         finally:
             for s in socks:
                 s.close()
+
+
+class TestFrozenGUIDefault:
+    """Validates FR-090 / Issue #97: PyInstaller exe defaults to GUI mode."""
+
+    @patch("run._setup_data_dirs")
+    @patch("run._configure_logging")
+    @patch("run._parse_args")
+    def test_frozen_launches_gui(self, mock_args, mock_logging, mock_dirs):
+        """AC-097-1: When sys.frozen is True, launch_gui is called."""
+        mock_args.return_value = MagicMock(gui=False, no_browser=False)
+        mock_dirs.return_value = MagicMock()
+
+        with patch.object(sys, "frozen", True, create=True), \
+             patch("run._find_free_port", return_value=5000), \
+             patch("shell.launch_gui") as mock_launch:
+            from run import main
+            main()
+            mock_launch.assert_called_once_with(host="127.0.0.1", port=5000)
+
+    @patch("run._setup_data_dirs")
+    @patch("run._configure_logging")
+    @patch("run._parse_args")
+    def test_gui_flag_launches_gui(self, mock_args, mock_logging, mock_dirs):
+        """AC-097-2: When --gui flag is passed, launch_gui is called."""
+        mock_args.return_value = MagicMock(gui=True, no_browser=False)
+        mock_dirs.return_value = MagicMock()
+
+        with patch("run._find_free_port", return_value=5000), \
+             patch("shell.launch_gui") as mock_launch:
+            from run import main
+            main()
+            mock_launch.assert_called_once_with(host="127.0.0.1", port=5000)
+
+    @patch("run._setup_data_dirs")
+    @patch("run._configure_logging")
+    @patch("run._parse_args")
+    def test_not_frozen_no_flag_runs_headless(self, mock_args, mock_logging, mock_dirs):
+        """AC-097-3: Without sys.frozen or --gui, runs headless server."""
+        mock_args.return_value = MagicMock(gui=False, no_browser=False)
+        mock_dirs.return_value = MagicMock()
+
+        # Ensure sys.frozen is not set
+        frozen_backup = getattr(sys, "frozen", None)
+        if hasattr(sys, "frozen"):
+            delattr(sys, "frozen")
+
+        try:
+            with patch("run._find_free_port", return_value=5000), \
+                 patch("app.socketio") as mock_sio:
+                from run import main
+                main()
+                mock_sio.run.assert_called_once()
+        finally:
+            if frozen_backup is not None:
+                sys.frozen = frozen_backup
