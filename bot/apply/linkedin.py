@@ -19,14 +19,36 @@ class LinkedInApplier(BaseApplier):
         self, job, resume_pdf_path, cover_letter_text, profile
     ) -> ApplyResult:
         logger.info("LinkedIn: applying to %s at %s", job.raw.title, job.raw.company)
-        self._safe_goto(job.raw.apply_url)
-        self._random_pause(1, 3)
+
+        # Skip navigation if _apply_to_job already navigated to this page
+        if not self.page.url.startswith(job.raw.apply_url.rstrip("/")):
+            self._safe_goto(job.raw.apply_url)
+            self._random_pause(1, 3)
 
         if self._detect_captcha():
             return ApplyResult(
                 success=False, captcha_detected=True,
                 error_message="CAPTCHA detected",
             )
+
+        # Detect external application links early — skip without waiting
+        external_btn = self.page.query_selector(
+            "button[aria-label*='Apply now'], "
+            "a.jobs-apply-button[href]:not([href*='linkedin.com']), "
+            "button.jobs-apply-button span.artdeco-button__text"
+        )
+        if external_btn:
+            btn_text = external_btn.inner_text().strip().lower()
+            # "Easy Apply" = native, anything else ("Apply", "Apply now") = external
+            if "easy apply" not in btn_text:
+                logger.info(
+                    "LinkedIn: external application detected ('%s') for %s — skipping",
+                    btn_text, job.raw.title,
+                )
+                return ApplyResult(
+                    success=False, manual_required=True,
+                    error_message=f"External application ('{btn_text}') — not Easy Apply",
+                )
 
         # Find and click Easy Apply button with explicit wait
         easy_apply_btn = self._wait_and_query(

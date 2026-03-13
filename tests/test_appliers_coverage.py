@@ -62,6 +62,13 @@ def _make_scored_job(apply_url, platform):
                      pass_filter=True, skip_reason=None)
 
 
+def _make_easy_apply_text_btn():
+    """Create a mock for the artdeco-button__text element that says 'Easy Apply'."""
+    btn = MagicMock()
+    btn.inner_text.return_value = "Easy Apply"
+    return btn
+
+
 def _make_page(url="https://example.com"):
     page = MagicMock()
     page.url = url
@@ -133,6 +140,9 @@ class TestLinkedInUploadResumeException:
         """Test multi-step modal with Next button before Submit."""
         page = _make_page("https://www.linkedin.com/jobs/view/123/")
         easy_btn = MagicMock()
+        # Mock for external button detection — return "Easy Apply" text
+        easy_apply_text_btn = MagicMock()
+        easy_apply_text_btn.inner_text.return_value = "  Easy Apply  "
         submit_btn = MagicMock()
         submit_btn.is_visible.return_value = True
         next_btn = MagicMock()
@@ -143,6 +153,8 @@ class TestLinkedInUploadResumeException:
 
         def qs(selector):
             call_count["n"] += 1
+            if "artdeco-button__text" in selector:
+                return easy_apply_text_btn
             if "Easy Apply" in selector or "jobs-apply-button" in selector:
                 return easy_btn
             if "Submit" in selector:
@@ -167,15 +179,19 @@ class TestLinkedInUploadResumeException:
         """Test CAPTCHA detected inside modal step."""
         page = _make_page("https://www.linkedin.com/jobs/view/123/")
         easy_btn = MagicMock()
+        easy_apply_text_btn = MagicMock()
+        easy_apply_text_btn.inner_text.return_value = "Easy Apply"
 
         step = {"n": 0}
 
         def qs(selector):
             step["n"] += 1
-            if step["n"] <= 2 and ("Easy Apply" in selector or "jobs-apply-button" in selector):
+            if "artdeco-button__text" in selector:
+                return easy_apply_text_btn
+            if step["n"] <= 3 and ("Easy Apply" in selector or "jobs-apply-button" in selector):
                 return easy_btn
             # After clicking Easy Apply, CAPTCHA appears
-            if step["n"] > 2:
+            if step["n"] > 3:
                 return MagicMock()  # CAPTCHA element
             return None
 
@@ -189,7 +205,8 @@ class TestLinkedInUploadResumeException:
     @patch("bot.apply.base.time.sleep")
     def test_exception_returns_failure(self, _sleep):
         """Lines 45-47: exception in _do_apply returns ApplyResult."""
-        page = _make_page("https://www.linkedin.com/jobs/view/123/")
+        # Use a different page URL so navigation is attempted
+        page = _make_page("https://www.linkedin.com/feed/")
         page.goto.side_effect = Exception("Network error")
         applier = LinkedInApplier(page)
         job = _make_scored_job("https://www.linkedin.com/jobs/view/123/", "linkedin")
@@ -210,6 +227,26 @@ class TestLinkedInUploadResumeException:
         assert "Easy Apply" in result.error_message
 
     @patch("bot.apply.base.time.sleep")
+    def test_external_application_detected(self, _sleep):
+        """External application button ('Apply') detected — skip immediately."""
+        page = _make_page("https://www.linkedin.com/jobs/view/123/")
+        external_btn = MagicMock()
+        external_btn.inner_text.return_value = "Apply"
+
+        def qs(selector):
+            if "artdeco-button__text" in selector:
+                return external_btn
+            return None
+
+        page.query_selector.side_effect = qs
+        applier = LinkedInApplier(page)
+        job = _make_scored_job("https://www.linkedin.com/jobs/view/123/", "linkedin")
+        result = applier.apply(job, None, "", _make_profile())
+        assert result.success is False
+        assert result.manual_required is True
+        assert "External application" in result.error_message
+
+    @patch("bot.apply.base.time.sleep")
     def test_submit_with_confirmation_close(self, _sleep):
         """Lines 117-126: submit found, confirmation modal, close button clicked."""
         page = _make_page("https://www.linkedin.com/jobs/view/123/")
@@ -220,6 +257,8 @@ class TestLinkedInUploadResumeException:
         close_btn = MagicMock()
 
         def qs(selector):
+            if "artdeco-button__text" in selector:
+                return _make_easy_apply_text_btn()
             if "Easy Apply" in selector or "jobs-apply-button" in selector:
                 return easy_btn
             if "captcha" in selector or "recaptcha" in selector or "sitekey" in selector:
@@ -245,6 +284,8 @@ class TestLinkedInUploadResumeException:
         easy_btn = MagicMock()
 
         def qs(selector):
+            if "artdeco-button__text" in selector:
+                return _make_easy_apply_text_btn()
             if "Easy Apply" in selector or "jobs-apply-button" in selector:
                 return easy_btn
             if "captcha" in selector or "recaptcha" in selector or "sitekey" in selector:
@@ -318,6 +359,8 @@ class TestLinkedInUploadResumeException:
         fi = MagicMock()
 
         def qs(selector):
+            if "artdeco-button__text" in selector:
+                return _make_easy_apply_text_btn()
             if "Easy Apply" in selector or "jobs-apply-button" in selector:
                 return easy_btn
             if "captcha" in selector or "recaptcha" in selector or "sitekey" in selector:
@@ -345,6 +388,8 @@ class TestLinkedInUploadResumeException:
         loop_entered = {"v": False}
 
         def qs(selector):
+            if "artdeco-button__text" in selector:
+                return _make_easy_apply_text_btn()
             # Easy Apply button found
             if "Easy Apply" in selector or "jobs-apply-button" in selector:
                 if not loop_entered["v"]:
@@ -382,6 +427,8 @@ class TestLinkedInUploadResumeException:
         step = {"n": 0}
 
         def qs(selector):
+            if "artdeco-button__text" in selector:
+                return _make_easy_apply_text_btn()
             if "Easy Apply" in selector or "jobs-apply-button" in selector:
                 return easy_btn
             if "captcha" in selector or "recaptcha" in selector or "sitekey" in selector:
