@@ -12,7 +12,7 @@
 ## 1. Purpose and Scope
 
 ### 1.1 Purpose
-This SRS specifies the functional and non-functional requirements for Milestones 1–4 (Foundation, Scoring, LaTeX Compilation, Resume Assembly + Bot Integration) of the Smart Resume Reuse feature (TASK-030). The audience is the System Engineer, Backend Developer, Unit Tester, Integration Tester, Security Engineer, and Release Engineer.
+This SRS specifies the functional and non-functional requirements for Milestones 1–4 (Foundation, Scoring, ~~LaTeX Compilation~~ [DEPRECATED], Resume Assembly via LLM + ReportLab + Bot Integration) of the Smart Resume Reuse feature (TASK-030). The audience is the System Engineer, Backend Developer, Unit Tester, Integration Tester, Security Engineer, and Release Engineer.
 
 ### 1.2 Scope
 **In scope (M1)**:
@@ -32,18 +32,21 @@ This SRS specifies the functional and non-functional requirements for Milestones
 - ONNX embedding interface (optional, mocked in tests)
 - Score blending: 0.3 * TF-IDF + 0.7 * ONNX when available, TF-IDF only otherwise
 
-**In scope (M3)**:
-- LaTeX special character escaping for safe template rendering
-- pdflatex binary discovery (bundled TinyTeX, system PATH, common install locations)
-- Jinja2-based LaTeX template rendering with custom delimiters (`\VAR{}`, `\BLOCK{}`)
-- PDF compilation via pdflatex subprocess with configurable timeout
-- Four built-in resume templates (classic, modern, academic, minimal)
-- TinyTeX bundling script for cross-platform distribution (Windows, macOS, Linux)
-- `compile_resume()` convenience function combining template rendering and PDF compilation
+**In scope (M3)** [SUPERSEDED by M4 LLM + ReportLab pipeline]:
+- ~~LaTeX special character escaping for safe template rendering~~
+- ~~pdflatex binary discovery (bundled TinyTeX, system PATH, common install locations)~~
+- ~~Jinja2-based LaTeX template rendering with custom delimiters (`\VAR{}`, `\BLOCK{}`)~~
+- ~~PDF compilation via pdflatex subprocess with configurable timeout~~
+- ~~Four built-in resume templates (classic, modern, academic, minimal)~~
+- ~~TinyTeX bundling script for cross-platform distribution (Windows, macOS, Linux)~~
+- ~~`compile_resume()` convenience function combining template rendering and PDF compilation~~
+- **M4 replacement**: LLM-based resume generation from KB entries with strict KB-only prompt, rendered to PDF via ReportLab (stateless, no external binary required)
 
 **In scope (M4)**:
-- Resume assembly from KB entries scored against a JD (0 API calls when KB has sufficient entries)
+- Resume assembly from KB entries scored against a JD: TF-IDF scoring → entry selection → LLM generation with strict KB-only prompt → ReportLab PDF rendering
 - Entry selection with configurable per-category minimums (e.g., min 3 experience, 1 summary)
+- LLM-based resume text generation from selected KB entries (uses `llm_config`, NOT `latex_config`)
+- ReportLab PDF rendering as PRIMARY renderer (stateless, no external binary dependency)
 - Bot `_generate_docs` KB-first flow: attempt KB assembly, fall back to LLM if insufficient entries
 - Post-LLM ingestion: auto-parse LLM-generated resume into KB entries for future reuse
 - `resume_versions.reuse_source` column tracking origin (`kb_assembly` or `llm_generated`)
@@ -82,7 +85,7 @@ This feature extends the existing AutoApply bot. Currently, every job applicatio
 - Windows 10+, macOS 12+, Linux (Ubuntu 22.04+)
 - Python 3.10+ (Flask backend inside Electron shell)
 - SQLite 3.35+ (WAL mode, 5s busy timeout)
-- Optional dependencies: PyPDF2 3.0.1 (PDF), python-docx 1.1.2 (DOCX), Jinja2 3.1.6 (templates)
+- Optional dependencies: PyPDF2 3.0.1 (PDF), python-docx 1.1.2 (DOCX), Jinja2 3.1.6 (templates, deprecated for resume assembly), ReportLab (primary PDF renderer)
 
 ### 2.4 Assumptions
 | # | Assumption | Risk if Wrong | Mitigation |
@@ -484,11 +487,11 @@ This feature extends the existing AutoApply bot. Currently, every job applicatio
 
 ---
 
-### FR-030-20: LaTeX Special Character Escaping
+### FR-030-20: [DEPRECATED - M4 Redesign] LaTeX Special Character Escaping
 
-**Description**: The system shall escape LaTeX special characters (`& % $ # _ { } ~ ^`) in user-provided text before template rendering, converting them to their safe LaTeX equivalents (e.g., `&` → `\&`, `~` → `\textasciitilde{}`).
+**Description**: ~~The system shall escape LaTeX special characters (`& % $ # _ { } ~ ^`) in user-provided text before template rendering, converting them to their safe LaTeX equivalents (e.g., `&` → `\&`, `~` → `\textasciitilde{}`).~~ Superseded by LLM + ReportLab pipeline in M4. LaTeX compilation is no longer used for resume generation.
 
-**Priority**: P0 (M3 ship-blocking)
+**Priority**: ~~P0 (M3 ship-blocking)~~ N/A (deprecated)
 **Source**: Derived from M3 LaTeX compilation requirement
 **Dependencies**: None
 
@@ -505,11 +508,11 @@ This feature extends the existing AutoApply bot. Currently, every job applicatio
 
 ---
 
-### FR-030-21: pdflatex Binary Discovery
+### FR-030-21: [DEPRECATED - M4 Redesign] pdflatex Binary Discovery
 
-**Description**: The system shall discover the `pdflatex` binary by searching in order: (1) bundled TinyTeX directory, (2) system PATH, (3) common installation locations per OS (e.g., `/usr/local/texlive`, `C:\texlive`, `/Library/TeX`).
+**Description**: ~~The system shall discover the `pdflatex` binary by searching in order: (1) bundled TinyTeX directory, (2) system PATH, (3) common installation locations per OS (e.g., `/usr/local/texlive`, `C:\texlive`, `/Library/TeX`).~~ Superseded by ReportLab PDF rendering in M4. No external binary discovery needed.
 
-**Priority**: P0 (M3 ship-blocking)
+**Priority**: ~~P0 (M3 ship-blocking)~~ N/A (deprecated)
 **Source**: Derived from M3 LaTeX compilation requirement
 **Dependencies**: None
 
@@ -524,11 +527,11 @@ This feature extends the existing AutoApply bot. Currently, every job applicatio
 
 ---
 
-### FR-030-22: Jinja2 LaTeX Template Rendering
+### FR-030-22: [DEPRECATED - M4 Redesign] Jinja2 LaTeX Template Rendering
 
-**Description**: The system shall render LaTeX templates using Jinja2 with custom delimiters (`\VAR{...}` for variables, `\BLOCK{...}` for blocks) to avoid conflicts with LaTeX's native brace syntax. Templates receive a context dict with resume sections, contact info, and formatting options.
+**Description**: ~~The system shall render LaTeX templates using Jinja2 with custom delimiters (`\VAR{...}` for variables, `\BLOCK{...}` for blocks) to avoid conflicts with LaTeX's native brace syntax. Templates receive a context dict with resume sections, contact info, and formatting options.~~ Superseded by LLM text generation + ReportLab PDF rendering in M4.
 
-**Priority**: P0 (M3 ship-blocking)
+**Priority**: ~~P0 (M3 ship-blocking)~~ N/A (deprecated)
 **Source**: Derived from M3 LaTeX compilation requirement
 **Dependencies**: FR-030-20 (escaping)
 
@@ -544,11 +547,11 @@ This feature extends the existing AutoApply bot. Currently, every job applicatio
 
 ---
 
-### FR-030-23: PDF Compilation via pdflatex
+### FR-030-23: [DEPRECATED - M4 Redesign] PDF Compilation via pdflatex
 
-**Description**: The system shall compile rendered LaTeX source into a PDF by invoking `pdflatex` as a subprocess with `-interaction=nonstopmode`, a configurable timeout (default 30s), and a temporary working directory. The compiled PDF is returned as a file path.
+**Description**: ~~The system shall compile rendered LaTeX source into a PDF by invoking `pdflatex` as a subprocess with `-interaction=nonstopmode`, a configurable timeout (default 30s), and a temporary working directory. The compiled PDF is returned as a file path.~~ Superseded by ReportLab `render_resume_to_pdf()` in M4. No subprocess compilation needed.
 
-**Priority**: P0 (M3 ship-blocking)
+**Priority**: ~~P0 (M3 ship-blocking)~~ N/A (deprecated)
 **Source**: Derived from M3 LaTeX compilation requirement
 **Dependencies**: FR-030-21 (binary discovery), FR-030-22 (template rendering)
 
@@ -564,11 +567,11 @@ This feature extends the existing AutoApply bot. Currently, every job applicatio
 
 ---
 
-### FR-030-24: Built-in Resume Templates
+### FR-030-24: [DEPRECATED - M4 Redesign] Built-in Resume Templates
 
-**Description**: The system shall provide four built-in LaTeX resume templates: `classic` (traditional single-column), `modern` (two-column with accent colors), `academic` (CV-style with publications section), and `minimal` (clean whitespace-focused). Each template accepts the same context dict interface.
+**Description**: ~~The system shall provide four built-in LaTeX resume templates: `classic` (traditional single-column), `modern` (two-column with accent colors), `academic` (CV-style with publications section), and `minimal` (clean whitespace-focused). Each template accepts the same context dict interface.~~ Superseded by LLM-generated resume content rendered via ReportLab in M4. LaTeX templates are no longer used for resume assembly.
 
-**Priority**: P1
+**Priority**: ~~P1~~ N/A (deprecated)
 **Source**: US-106 from PRD
 **Dependencies**: FR-030-22 (template rendering)
 
@@ -581,11 +584,11 @@ This feature extends the existing AutoApply bot. Currently, every job applicatio
 
 ---
 
-### FR-030-25: TinyTeX Bundling Script
+### FR-030-25: [DEPRECATED - M4 Redesign] TinyTeX Bundling Script
 
-**Description**: The system shall provide a bundling script that downloads and packages TinyTeX (minimal TeX Live distribution) for Windows, macOS, and Linux, including only the LaTeX packages required for resume compilation (e.g., `geometry`, `hyperref`, `enumitem`, `fontenc`, `inputenc`).
+**Description**: ~~The system shall provide a bundling script that downloads and packages TinyTeX (minimal TeX Live distribution) for Windows, macOS, and Linux, including only the LaTeX packages required for resume compilation (e.g., `geometry`, `hyperref`, `enumitem`, `fontenc`, `inputenc`).~~ Superseded by ReportLab in M4. No external TeX distribution required.
 
-**Priority**: P2
+**Priority**: ~~P2~~ N/A (deprecated)
 **Source**: Derived from distribution requirement
 **Dependencies**: FR-030-21 (binary discovery expects bundled TinyTeX)
 
@@ -600,11 +603,11 @@ This feature extends the existing AutoApply bot. Currently, every job applicatio
 
 ---
 
-### FR-030-26: compile_resume Convenience Function
+### FR-030-26: [DEPRECATED - M4 Redesign] compile_resume Convenience Function
 
-**Description**: The system shall provide a `compile_resume()` convenience function that combines template rendering (FR-030-22) and PDF compilation (FR-030-23) into a single call, accepting a template name, context dict, and optional output path.
+**Description**: ~~The system shall provide a `compile_resume()` convenience function that combines template rendering (FR-030-22) and PDF compilation (FR-030-23) into a single call, accepting a template name, context dict, and optional output path.~~ Superseded by `assemble_resume()` in M4, which uses LLM generation + ReportLab rendering.
 
-**Priority**: P0 (M3 ship-blocking)
+**Priority**: ~~P0 (M3 ship-blocking)~~ N/A (deprecated)
 **Source**: Derived from M3 integration requirement
 **Dependencies**: FR-030-22, FR-030-23
 
@@ -622,18 +625,18 @@ This feature extends the existing AutoApply bot. Currently, every job applicatio
 
 ### FR-030-27: Resume Assembly from KB Entries
 
-**Description**: The system shall assemble a complete resume by selecting and organizing KB entries scored against a job description, requiring 0 LLM API calls. The assembler retrieves all active KB entries, scores them via `score_kb_entries()`, selects top entries per category respecting configurable minimums, and produces a structured resume context dict suitable for LaTeX template rendering via `compile_resume()`.
+**Description**: The system shall assemble a complete resume by selecting KB entries scored against a job description via TF-IDF, then generating resume text via LLM with a strict KB-only prompt, and rendering the result to PDF via ReportLab. The assembler retrieves all active KB entries, scores them via `score_kb_entries()`, selects top entries per category respecting configurable minimums, sends selected entries to `generate_resume_from_kb()` for LLM-based text generation, and renders the output to PDF via `render_resume_to_pdf()`. The function signature is `assemble_resume(jd_text, db, llm_config)` (takes `llm_config`, NOT `latex_config`).
 
 **Priority**: P0 (M4 ship-blocking)
 **Source**: US-102, US-106 from PRD
-**Dependencies**: FR-030-04 (KB CRUD), FR-030-13 (TF-IDF scoring), FR-030-26 (compile_resume)
+**Dependencies**: FR-030-04 (KB CRUD), FR-030-13 (TF-IDF scoring)
 
 **Acceptance Criteria**:
 
-- **AC-030-27-1**: Given a JD text and KB with sufficient entries, When `assemble_resume(jd_text, db, config)` is called, Then a resume context dict is returned with sections: summary, experience, skills, education, certifications, projects.
-- **AC-030-27-2**: Given assembled context, When the context is passed to `compile_resume()`, Then a valid PDF is produced without errors.
-- **AC-030-27-3**: Given the assembly process, Then 0 LLM API calls are made.
-- **AC-030-27-4**: Given a KB with entries across all categories, When assembled, Then entries are sorted by score descending within each section.
+- **AC-030-27-1**: Given a JD text and KB with sufficient entries, When `assemble_resume(jd_text, db, llm_config)` is called, Then selected KB entries are passed to LLM for resume text generation and the result is rendered to PDF via ReportLab.
+- **AC-030-27-2**: Given assembled resume text, When passed to `render_resume_to_pdf()`, Then a valid PDF file is produced without errors (ReportLab is the PRIMARY renderer, not a fallback).
+- **AC-030-27-3**: Given the assembly process, Then the LLM prompt enforces strict KB-only content (no fabrication beyond what KB entries provide).
+- **AC-030-27-4**: Given a KB with entries across all categories, When assembled, Then entries are sorted by score descending within each section before being sent to LLM.
 - **AC-030-27-5**: Given the assembly result, Then it includes a `selected_entry_ids` list containing the IDs of all KB entries used.
 
 **Negative Cases**:
@@ -809,33 +812,33 @@ This feature extends the existing AutoApply bot. Currently, every job applicatio
 **Priority**: P0
 **Validation Method**: Code review + grep for print() in new modules
 
-### NFR-030-11: Template Rendering Latency (M3)
+### NFR-030-11: [DEPRECATED - M4 Redesign] Template Rendering Latency (M3)
 
-**Description**: Jinja2 LaTeX template rendering (excluding PDF compilation) shall complete within 50ms for any built-in template with a standard context dict.
-**Metric**: p95 latency < 50ms for template rendering
-**Priority**: P1
-**Validation Method**: Unit test measuring wall-clock time of `render_latex_template()` over 100 iterations
+**Description**: ~~Jinja2 LaTeX template rendering (excluding PDF compilation) shall complete within 50ms for any built-in template with a standard context dict.~~ Superseded by ReportLab rendering in M4. ReportLab is stateless and instant; no performance concern.
+**Metric**: ~~p95 latency < 50ms for template rendering~~ N/A
+**Priority**: ~~P1~~ N/A (deprecated)
+**Validation Method**: ~~Unit test measuring wall-clock time of `render_latex_template()` over 100 iterations~~ N/A
 
-### NFR-030-12: PDF Compilation Timeout (M3)
+### NFR-030-12: [DEPRECATED - M4 Redesign] PDF Compilation Timeout (M3)
 
-**Description**: PDF compilation via pdflatex shall enforce a maximum timeout of 30 seconds (configurable via LatexConfig). If compilation exceeds the timeout, the subprocess is killed and a RuntimeError is raised.
-**Metric**: Compilation killed and error raised within 1s of timeout expiry
-**Priority**: P0
-**Validation Method**: Unit test with mock subprocess that simulates hang
+**Description**: ~~PDF compilation via pdflatex shall enforce a maximum timeout of 30 seconds (configurable via LatexConfig). If compilation exceeds the timeout, the subprocess is killed and a RuntimeError is raised.~~ Superseded by ReportLab in M4. ReportLab rendering is in-process and stateless; no subprocess timeout needed.
+**Metric**: ~~Compilation killed and error raised within 1s of timeout expiry~~ N/A
+**Priority**: ~~P0~~ N/A (deprecated)
+**Validation Method**: ~~Unit test with mock subprocess that simulates hang~~ N/A
 
-### NFR-030-13: LaTeX Escaping Robustness (M3)
+### NFR-030-13: [DEPRECATED - M4 Redesign] LaTeX Escaping Robustness (M3)
 
-**Description**: The `escape_latex()` function shall handle `None`, empty strings, and non-string inputs gracefully, returning an empty string without raising exceptions.
-**Metric**: Zero exceptions for None, empty, int, float, or bool inputs
-**Priority**: P0
-**Validation Method**: Unit test with None, "", 0, 3.14, True inputs
+**Description**: ~~The `escape_latex()` function shall handle `None`, empty strings, and non-string inputs gracefully, returning an empty string without raising exceptions.~~ Superseded by LLM + ReportLab pipeline in M4. No LaTeX escaping needed.
+**Metric**: ~~Zero exceptions for None, empty, int, float, or bool inputs~~ N/A
+**Priority**: ~~P0~~ N/A (deprecated)
+**Validation Method**: ~~Unit test with None, "", 0, 3.14, True inputs~~ N/A
 
 ### NFR-030-14: KB Assembly Latency (M4)
 
-**Description**: KB-based resume assembly (entry retrieval, scoring, selection, and context dict construction) shall complete within 2 seconds, excluding pdflatex PDF compilation time.
+**Description**: KB-based resume assembly (entry retrieval, scoring, selection, and context dict construction) shall complete within 2 seconds, excluding LLM generation and ReportLab PDF rendering time.
 **Metric**: p95 latency < 2s for assembly of 500-entry KB against a single JD
 **Priority**: P1
-**Validation Method**: Unit test with 500 pre-inserted KB entries, measure wall-clock time of `assemble_resume()` excluding `compile_resume()`
+**Validation Method**: Unit test with 500 pre-inserted KB entries, measure wall-clock time of `assemble_resume()` excluding LLM and PDF rendering
 
 ### NFR-030-15: Backward Compatibility (M4)
 
@@ -848,7 +851,7 @@ This feature extends the existing AutoApply bot. Currently, every job applicatio
 
 ## 5. Interface Requirements
 
-### 5.1 Internal Interfaces (M1 — no external/UI interfaces, M2 — internal scoring APIs, M3 — LaTeX compilation APIs, M4 — assembly + bot integration APIs)
+### 5.1 Internal Interfaces (M1 — no external/UI interfaces, M2 — internal scoring APIs, M3 — DEPRECATED LaTeX APIs, M4 — LLM + ReportLab assembly + bot integration APIs)
 
 | Module | Function | Direction | Consumers |
 |--------|----------|-----------|-----------|
@@ -859,17 +862,19 @@ This feature extends the existing AutoApply bot. Currently, every job applicatio
 | core/resume_parser | `parse_resume_md(md_text)` | Called by KnowledgeBase | core/knowledge_base |
 | core/experience_calculator | `calculate_experience(db)` | Called by assembler (M4) | core/resume_assembler |
 | core/ai_engine | `invoke_llm(prompt, config)` | Called by KnowledgeBase | core/knowledge_base |
+| core/ai_engine | `generate_resume_from_kb(entries, jd_text, llm_config)` | Called by assembler (M4) | core/resume_assembler |
 | db/database | KB CRUD methods | Called by KnowledgeBase | core/knowledge_base |
 | core/resume_scorer | `score_kb_entries(jd_text, entries, config)` | Called by assembler (M4) | core/resume_assembler |
 | core/resume_scorer | `compute_tfidf_score(jd_text, entry_text)` | Utility | Any module |
 | core/jd_analyzer | `analyze_jd(text)` | Called by ResumeScorer | core/resume_scorer |
 | core/jd_analyzer | `normalize_term(term)` | Called by ResumeScorer | core/resume_scorer |
-| core/latex_compiler | `escape_latex(text)` | Utility | Any module needing LaTeX-safe text |
-| core/latex_compiler | `find_pdflatex()` | Called by compile_pdf | core/latex_compiler |
-| core/latex_compiler | `render_latex_template(template_name, context)` | Called by compile_resume | core/latex_compiler |
-| core/latex_compiler | `compile_pdf(latex_source, timeout)` | Called by compile_resume | core/latex_compiler |
-| core/latex_compiler | `compile_resume(template_name, context, output_path)` | Called by assembler (M4) | core/resume_assembler |
-| core/resume_assembler | `assemble_resume(jd_text, db, config)` | Called by bot (M4) | bot/bot.py |
+| ~~core/latex_compiler~~ | ~~`escape_latex(text)`~~ | ~~Utility~~ | [DEPRECATED - M4 Redesign] |
+| ~~core/latex_compiler~~ | ~~`find_pdflatex()`~~ | ~~Called by compile_pdf~~ | [DEPRECATED - M4 Redesign] |
+| ~~core/latex_compiler~~ | ~~`render_latex_template(template_name, context)`~~ | ~~Called by compile_resume~~ | [DEPRECATED - M4 Redesign] |
+| ~~core/latex_compiler~~ | ~~`compile_pdf(latex_source, timeout)`~~ | ~~Called by compile_resume~~ | [DEPRECATED - M4 Redesign] |
+| ~~core/latex_compiler~~ | ~~`compile_resume(template_name, context, output_path)`~~ | ~~Called by assembler (M4)~~ | [DEPRECATED - M4 Redesign] |
+| core/resume_renderer | `render_resume_to_pdf(resume_text, output_path)` | Called by assembler (M4) | core/resume_assembler |
+| core/resume_assembler | `assemble_resume(jd_text, db, llm_config)` | Called by bot (M4) | bot/bot.py |
 | bot/bot | `_generate_docs()` (modified) | Called by bot loop | bot/bot.py |
 | db/database | `save_resume_version(..., reuse_source, source_entry_ids)` | Called by bot (M4) | bot/bot.py |
 
@@ -897,7 +902,7 @@ Existing databases auto-migrated via `_migrate()` — adds new tables and column
 
 ## 7. Out of Scope
 
-- **LaTeX compilation**: Deferred to M3 — requires pdflatex/TinyTeX bundling.
+- **LaTeX compilation**: Originally planned for M3, now SUPERSEDED by LLM + ReportLab pipeline in M4. LatexConfig exists in code but is DEPRECATED and not used in assembly.
 - **Bot integration and resume assembly**: Covered in M4.
 - **Frontend UI and API endpoints**: Deferred to M5 — M1-M4 are backend only.
 - **ATS scoring**: Deferred to M6.
@@ -913,7 +918,8 @@ Existing databases auto-migrated via `_migrate()` — adds new tables and column
 |-----------|------|--------|---------------------|
 | PyPDF2 3.0.1 | Runtime (optional) | Available | PDF extraction fails with clear RuntimeError |
 | python-docx 1.1.2 | Runtime (optional) | Available | DOCX extraction fails with clear RuntimeError |
-| Jinja2 3.1.6 | Runtime | Available | Required for M3 LaTeX templates |
+| Jinja2 3.1.6 | Runtime | Available | ~~Required for M3 LaTeX templates~~ [DEPRECATED - M4 Redesign] |
+| ReportLab | Runtime | Available | PRIMARY PDF renderer for M4 resume assembly |
 | Cloud LLM API (any provider) | Runtime | Available | Extraction falls through gracefully |
 
 ### Internal Dependencies
@@ -960,14 +966,14 @@ Existing databases auto-migrated via `_migrate()` — adds new tables and column
 | FR-030-17 | Derived | Design: ResumeScorer → Code: core/resume_scorer.py → Test: test_resume_scorer.py |
 | FR-030-18 | US-102 | Design: ResumeScorer → Code: core/resume_scorer.py → Test: test_resume_scorer.py |
 | FR-030-19 | Derived | Design: JDAnalyzer → Code: core/jd_analyzer.py → Test: test_resume_scorer.py |
-| FR-030-20 | Derived | Design: LatexCompiler → Code: core/latex_compiler.py → Test: test_latex_compiler.py |
-| FR-030-21 | Derived | Design: LatexCompiler → Code: core/latex_compiler.py → Test: test_latex_compiler.py |
-| FR-030-22 | Derived | Design: LatexCompiler → Code: core/latex_compiler.py → Test: test_latex_compiler.py |
-| FR-030-23 | Derived | Design: LatexCompiler → Code: core/latex_compiler.py → Test: test_latex_compiler.py |
-| FR-030-24 | US-106 | Design: LatexCompiler → Code: core/latex_compiler.py, templates/*.tex → Test: test_latex_compiler.py |
-| FR-030-25 | Derived | Design: Distribution → Code: electron/scripts/bundle-tinytex.js → Test: manual |
-| FR-030-26 | Derived | Design: LatexCompiler → Code: core/latex_compiler.py → Test: test_latex_compiler.py |
-| FR-030-27 | US-102, US-106 | Design: ResumeAssembler → Code: core/resume_assembler.py → Test: test_resume_assembler.py |
+| FR-030-20 | Derived | [DEPRECATED - M4 Redesign] ~~Design: LatexCompiler → Code: core/latex_compiler.py → Test: test_latex_compiler.py~~ |
+| FR-030-21 | Derived | [DEPRECATED - M4 Redesign] ~~Design: LatexCompiler → Code: core/latex_compiler.py → Test: test_latex_compiler.py~~ |
+| FR-030-22 | Derived | [DEPRECATED - M4 Redesign] ~~Design: LatexCompiler → Code: core/latex_compiler.py → Test: test_latex_compiler.py~~ |
+| FR-030-23 | Derived | [DEPRECATED - M4 Redesign] ~~Design: LatexCompiler → Code: core/latex_compiler.py → Test: test_latex_compiler.py~~ |
+| FR-030-24 | US-106 | [DEPRECATED - M4 Redesign] ~~Design: LatexCompiler → Code: core/latex_compiler.py, templates/*.tex → Test: test_latex_compiler.py~~ |
+| FR-030-25 | Derived | [DEPRECATED - M4 Redesign] ~~Design: Distribution → Code: electron/scripts/bundle-tinytex.js → Test: manual~~ |
+| FR-030-26 | Derived | [DEPRECATED - M4 Redesign] ~~Design: LatexCompiler → Code: core/latex_compiler.py → Test: test_latex_compiler.py~~ |
+| FR-030-27 | US-102, US-106 | Design: ResumeAssembler → Code: core/resume_assembler.py, core/ai_engine.py, core/resume_renderer.py → Test: test_resume_assembler.py |
 | FR-030-28 | US-102 | Design: ResumeAssembler → Code: core/resume_assembler.py → Test: test_resume_assembler.py |
 | FR-030-29 | US-102 | Design: BotIntegration → Code: bot/bot.py → Test: test_bot_loop.py |
 | FR-030-30 | US-105 | Design: BotIntegration → Code: bot/bot.py, core/knowledge_base.py → Test: test_bot_loop.py |

@@ -62,13 +62,18 @@ Job seekers using AutoApply in automated mode who apply to many similar position
 | US-106 | Career Switcher | have the system understand that "Python" and "python3" are the same skill | scoring doesn't miss matches due to naming variations | P1 | M | M2 |
 | US-107 | Power User | have optional ONNX-based semantic matching for deeper relevance | scoring goes beyond keyword matching when available | P2 | S | M2 |
 
-### M3 — LaTeX Engine
+### M3 — LaTeX Engine (SUPERSEDED by M4 LLM + ReportLab pipeline)
+
+> **Note**: M3's LaTeX-based approach was superseded during M4 development.
+> Resume generation now uses an LLM with strict KB-only data constraints for
+> content selection and formatting, with ReportLab as the primary PDF renderer.
+> The user stories below are fulfilled by the LLM + ReportLab pipeline instead.
 
 | ID | As a... | I want to... | So that... | Priority | Size | Milestone |
 |----|---------|-------------|------------|----------|------|-----------|
-| US-108 | Active Seeker | have resumes compiled as pixel-perfect PDFs via LaTeX | my resumes look professional and pass ATS parsing | P0 | L | M3 |
-| US-109 | Power User | choose from multiple resume templates (classic, modern, academic, minimal) | I can match the style to the industry/company | P1 | M | M3 |
-| US-110 | Active Seeker | have special characters (%, $, &, \) properly escaped in LaTeX | my resume compiles without errors regardless of content | P0 | S | M3 |
+| US-108 | Active Seeker | have resumes rendered as professional PDFs via ReportLab | my resumes look professional and pass ATS parsing | P0 | L | M3→M4 |
+| US-109 | ~~Power User~~ | ~~choose from multiple resume templates~~ | ~~I can match the style to the industry/company~~ | ~~P1~~ | ~~M~~ | ~~M3~~ |
+| US-110 | Active Seeker | have resume content safely rendered without encoding errors | my resume generates without errors regardless of content | P0 | S | M3→M4 |
 
 ### M4 — Assembly + Bot Integration
 
@@ -127,7 +132,7 @@ Job seekers using AutoApply in automated mode who apply to many similar position
 |----|---------|-------------|------------|----------|------|-----------|
 | US-132 | New User | have my existing .txt experience files auto-migrated into KB on first startup | I don't need to re-upload content I already have | P0 | M | M10 |
 | US-133 | New User | have my existing .md resume files auto-migrated into KB | previously generated resumes feed the KB immediately | P1 | M | M10 |
-| US-134 | Active Seeker | have LaTeX handle backslashes in my content without breaking compilation | resumes with file paths or special content compile correctly | P0 | S | M10 |
+| US-134 | Active Seeker | have the PDF renderer handle special characters in my content without breaking | resumes with file paths or special content render correctly | P0 | S | M10 |
 
 ### Acceptance Criteria
 
@@ -139,9 +144,9 @@ Job seekers using AutoApply in automated mode who apply to many similar position
 - Given a JD and KB entries, When scored, Then entries ranked by TF-IDF cosine similarity
 - Given synonym aliases exist, When "python3" appears in JD, Then "Python" entries score higher
 
-#### US-108: LaTeX Compilation (M3)
-- Given rendered LaTeX content, When compiled, Then a valid PDF is produced
-- Given pdflatex is not installed, When compilation attempted, Then ReportLab fallback is used
+#### US-108: PDF Rendering (M3→M4, superseded)
+- Given LLM-structured resume content, When rendered via ReportLab, Then a valid PDF is produced
+- Given KB entries selected by LLM, When assembled, Then only KB data appears in the output (strict constraint)
 
 #### US-111: KB-First Bot Flow (M4)
 - Given a JD and populated KB, When bot generates docs, Then KB assembly is tried first
@@ -161,7 +166,7 @@ Job seekers using AutoApply in automated mode who apply to many similar position
 - Given a built resume, When user clicks save preset, Then preset saved with name and entry IDs
 
 #### US-125: PDF Cache (M8)
-- Given identical LaTeX content, When compiled twice, Then second compile returns cached PDF
+- Given identical resume content, When rendered twice, Then second render returns cached PDF
 - Given cache exceeds 200 entries, When new entry added, Then oldest entry evicted (LRU)
 
 #### US-128: Outcome Feedback (M9)
@@ -195,26 +200,26 @@ Job seekers using AutoApply in automated mode who apply to many similar position
 |-----------|-------|--------|
 | M1 — Foundation | DB schema, document parser, KB CRUD, LLM extraction, resume parser, experience calculator, config models | Delivered (PR #39) |
 | M2 — Scoring | TF-IDF cosine similarity, JD analyzer (keywords, n-grams, synonyms), ONNX embedding interface | Delivered (PR #45) |
-| M3 — LaTeX Engine | pdflatex discovery, 4 Jinja2 templates, special char escaping, TinyTeX bundler | Delivered (PR #47) |
-| M4 — Assembly + Bot | Resume assembler (score→select→render→compile), KB-first bot flow, post-LLM ingestion, version tracking | Delivered (PR #49) |
-| M5 — Upload UI | 8 REST endpoints, KB viewer/editor, upload zone, resume preview modal, template picker | Delivered (PR #51) |
+| M3 — LaTeX Engine | **SUPERSEDED** — original LaTeX approach (pdflatex, Jinja2 templates, TinyTeX) replaced by LLM + ReportLab pipeline in M4 | Superseded |
+| M4 — Assembly + Bot | Resume assembler (LLM content selection with strict KB-only constraints + ReportLab PDF rendering), KB-first bot flow, post-LLM ingestion, version tracking | Delivered (PR #49) |
+| M5 — Upload UI | 8 REST endpoints, KB viewer/editor, upload zone, resume preview modal | Delivered (PR #51) |
 | M6 — ATS Scoring | 5-component composite scorer, 7 ATS platform profiles, keyword gap analysis | Delivered (PR #53) |
 | M7 — Manual Builder | Drag-and-drop builder, resume presets CRUD, one-page mode, auto-fill from JD | Delivered (PR #54) |
 | M8 — Performance | PDF compilation cache (SHA256 LRU), JD classifier (9 job types), async document upload | Delivered (PR #55) |
 | M9 — Intelligence | Outcome-based learning, cover letter KB assembly, effectiveness weighting, reuse stats | Delivered (PR #56) |
-| M10 — Migration | Auto-migrate .txt/.md files, LaTeX backslash hardening, category guessing heuristics | Delivered (PR #57) |
+| M10 — Migration | Auto-migrate .txt/.md files, special character handling, category guessing heuristics | Delivered (PR #57) |
 
 ### Out of Scope
 - OCR for scanned PDF images (user can re-upload as TXT)
 - Multi-user / cloud deployment (desktop app only)
-- Resume formatting beyond 4 LaTeX templates
-- Cover letter LaTeX templates (CL uses text-only assembly)
+- LaTeX-based PDF compilation (superseded by LLM + ReportLab pipeline)
+- Cover letter PDF templates (CL uses text-only assembly)
 
 ---
 
 ## 6. Prioritization (MoSCoW — Full Feature)
 
-- **Must have** (P0, 60%): Document upload + extraction, KB CRUD, TF-IDF scoring, LaTeX compilation, KB-first bot flow, KB viewer UI, ATS scoring, auto-migration — *the core value proposition*
+- **Must have** (P0, 60%): Document upload + extraction, KB CRUD, TF-IDF scoring, LLM-powered resume assembly with strict KB-only constraints, ReportLab PDF rendering, KB-first bot flow, KB viewer UI, ATS scoring, auto-migration — *the core value proposition*
 - **Should have** (P1, 30%): Manual builder, presets, PDF cache, JD classifier, outcome learning, effectiveness weighting, cover letter assembly — *significant quality-of-life improvements*
 - **Could have** (P2, 10%): ONNX embeddings, reuse stats analytics, config fine-tuning — *nice-to-have for power users*
 - **Won't have**: Cloud sync, multi-user, OCR, custom template editor — *future features*
@@ -226,7 +231,7 @@ Job seekers using AutoApply in automated mode who apply to many similar position
 - Must maintain backward compatibility with existing config.json
 - LLM extraction must work with all 4 supported providers (Anthropic, OpenAI, Google, DeepSeek)
 - New dependencies must be pinned versions
-- LaTeX compilation must fall back to ReportLab when pdflatex unavailable
+- ReportLab is the primary PDF renderer (no LaTeX/pdflatex dependency)
 - All user-facing strings must go through i18n (t() backend, data-i18n frontend)
 - All UI components must meet WCAG 2.1 AA accessibility
 
@@ -238,7 +243,7 @@ Job seekers using AutoApply in automated mode who apply to many similar position
 | PyPDF2 can't extract from scanned PDFs | M | L | Log warning, user can re-upload as TXT | Accepted |
 | Dedup too aggressive (different contexts) | L | M | Dedup on (category, text) — subsection differs OK | Resolved |
 | TF-IDF misses semantic similarity | M | M | ONNX embedding blending (optional), synonym normalization | Mitigated — synonym map + tech terms |
-| LaTeX compilation fails on edge cases | L | M | ReportLab fallback, escape_latex() for 10 special chars | Resolved — placeholder technique for backslash |
+| ~~LaTeX compilation fails on edge cases~~ | ~~L~~ | ~~M~~ | ~~ReportLab fallback, escape_latex()~~ | Eliminated — LaTeX removed; ReportLab is primary renderer |
 | KB pollution from low-quality LLM output | L | M | Dedup constraint, min_score threshold during assembly | Mitigated |
 | Async upload thread leaks | L | H | Daemon threads, threading.Lock, finally cleanup | Resolved |
 
@@ -247,7 +252,7 @@ Job seekers using AutoApply in automated mode who apply to many similar position
 | # | Question | Needed By | Status |
 |---|---------|-----------|--------|
 | 1 | ONNX embedding model size acceptable for distribution? | M2 | Resolved — ONNX is optional, TF-IDF is default. Stub interface ready for future implementation. |
-| 2 | TinyTeX bundle size for Electron packaging? | M3 | Resolved — bundle-tinytex.js downloads platform-specific minimal install (~100MB). Not included in base package. |
+| 2 | ~~TinyTeX bundle size for Electron packaging?~~ | ~~M3~~ | Eliminated — LaTeX pipeline superseded; ReportLab (pure Python) has no external binary dependency. |
 | 3 | Should effectiveness_score decay over time? | M9 | Open — currently uses all-time ratio. Could add recency weighting in future. |
 
 ---
@@ -258,7 +263,7 @@ Job seekers using AutoApply in automated mode who apply to many similar position
 |-----------|-------------|--------|-----|
 | M1 — Foundation | US-101, US-102, US-103, US-104 | #35, #36, #37, #38 | #39 |
 | M2 — Scoring | US-105, US-106, US-107 | #44 | #45 |
-| M3 — LaTeX Engine | US-108, US-109, US-110 | #46 | #47 |
+| M3 — LaTeX Engine (SUPERSEDED) | US-108, ~~US-109~~, US-110 | #46 | #47 (superseded by M4) |
 | M4 — Assembly + Bot | US-111, US-112, US-113 | #48 | #49 |
 | M5 — Upload UI | US-114, US-115, US-116, US-117 | #50 | #51 |
 | M6 — ATS Scoring | US-118, US-119, US-120 | #52 | #53 |
@@ -278,7 +283,7 @@ Job seekers using AutoApply in automated mode who apply to many similar position
 **Personas**: 4 (Active Seeker, Career Switcher, Power User, New User)
 **Success Metrics**: 6 measurable outcomes
 **MoSCoW**: P0 (60%), P1 (30%), P2 (10%)
-**Risks**: 7 identified, 5 resolved, 1 accepted, 1 mitigated
+**Risks**: 7 identified, 4 resolved, 1 eliminated, 1 accepted, 1 mitigated
 **Open Questions**: 2 resolved, 1 open (non-blocking)
 
 ### Handoff Routing

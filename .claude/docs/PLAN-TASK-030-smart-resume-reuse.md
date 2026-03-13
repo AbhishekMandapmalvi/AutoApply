@@ -1,4 +1,4 @@
-# Smart Resume Reuse with LaTeX Knowledge Base — Implementation Plan (TASK-030)
+# Smart Resume Reuse with LLM + ReportLab Knowledge Base — Implementation Plan (TASK-030)
 
 **Status**: DRAFT v0.2 — refined pipeline with document upload + LLM extraction
 **Date**: 2026-03-11
@@ -13,10 +13,10 @@ Currently, the bot generates a new resume via cloud LLM for **every** job applic
 1. User uploads raw career documents (PDF, DOCX, TXT, MD) — resumes, project descriptions, anything
 2. Cloud LLM processes each upload **once** → extracts clean, professional bullet points categorized by resume section type and job type
 3. Knowledge base stores these polished entries locally in SQLite
-4. When a new job arrives, system scores KB entries against JD, assembles the best into a LaTeX template, compiles PDF on-the-fly
+4. When a new job arrives, system scores KB entries against JD, sends best entries to LLM with strict "only use provided data" instructions, renders PDF via ReportLab
 5. No PDFs are stored — only KB entry IDs. Resumes are rendered on demand from IDs.
 
-**Cost model**: LLM is called once per document upload (not per application). After the initial upload, all resume assembly is **free and instant**.
+**Cost model**: LLM is called once per document upload for extraction, and once per resume assembly for generation. The LLM is constrained to use ONLY KB data — no hallucinated experiences.
 
 ---
 
@@ -47,10 +47,10 @@ Currently, the bot generates a new resume via cloud LLM for **every** job applic
           ┌────────────┼────────────┐
           │            │            │
      ┌────▼────┐  ┌───▼────┐  ┌───▼────┐
-     │ Score   │  │Assemble│  │ Render │
-     │ vs JD   │  │ LaTeX  │  │  PDF   │
-     │(TF-IDF/ │  │template│  │(TinyTeX│
-     │ ONNX)   │  │+ Jinja2│  │pdflatex│
+     │ Score   │  │Send to │  │ Render │
+     │ vs JD   │  │ LLM    │  │  PDF   │
+     │(TF-IDF/ │  │(strict │  │(Report │
+     │ ONNX)   │  │prompt) │  │  Lab)  │
      └─────────┘  └────────┘  └────────┘
 ```
 
@@ -100,33 +100,37 @@ New JD arrives (passed score_job filter)
   │     ├─→ ONNX embeddings (if available, precomputed)
   │     └─→ TF-IDF cosine similarity (always, fallback)
   │
-  ├─→ 2. Select entries for resume
-  │     ├─→ Summary: best-scoring summary for this job type
-  │     ├─→ Experience: top 3-4 bullets per relevant subsection
-  │     ├─→ Skills: relevant skill groups (union, deduplicated)
-  │     ├─→ Projects: top 1-2 if relevant
-  │     ├─→ Education: all entries (personal facts)
-  │     └─→ Certifications: relevant ones
+  ├─→ 2. Select entries for resume (with limits)
+  │     ├─→ Experience: top 15 entries
+  │     ├─→ Skills: top 20 entries
+  │     ├─→ Education: top 4 entries
+  │     ├─→ Projects: top 6 entries
+  │     ├─→ Certifications: top 5 entries
+  │     └─→ Summary/contact/volunteer/awards: all matching
   │
   ├─→ 3. Check: enough content for a complete resume?
-  │     ├─→ YES: Assemble LaTeX, compile PDF (0 API calls)
-  │     └─→ NO: Fall through to cloud LLM generation
-  │           └─→ LLM output is parsed and ingested into KB
+  │     ├─→ YES: Send selected entries to LLM with strict prompt
+  │     │     ├─→ LLM returns markdown (1 page, min 2 bullets/role)
+  │     │     ├─→ LLM may rephrase/use synonyms from JD, but ONLY uses provided data
+  │     │     └─→ ReportLab renders markdown → PDF (Jake Gutierrez style)
+  │     └─→ NO: Fall through to cloud LLM generation (legacy path)
   │
   └─→ 4. Record which KB entry IDs were used (not the PDF)
 ```
 
-### C. Resume Viewing Flow (on demand)
+### C. Resume Viewing / Preview Flow (on demand)
 
 ```
-User clicks "View Resume" on an application
+User clicks "Preview Resume" from KB viewer
   │
-  ├─→ Look up stored KB entry IDs for that application
-  ├─→ Fetch entries from knowledge_base table
-  ├─→ Render into LaTeX template via Jinja2
-  ├─→ Compile to ephemeral PDF via TinyTeX
-  ├─→ Serve PDF to browser
-  └─→ Delete temp files after response
+  ├─→ Frontend sends POST /api/kb/preview
+  ├─→ Backend: generate_resume_from_kb() selects entries via TF-IDF scoring
+  ├─→ Backend: sends selected entries to LLM with strict "only use provided data" prompt
+  ├─→ Backend: LLM returns markdown → render_resume_to_pdf() via ReportLab
+  │     └─→ Jake Gutierrez style: 22pt centered name, 9.5pt body,
+  │         11pt section headers with rules, two-column subheadings
+  ├─→ Returns PDF blob to frontend
+  └─→ Frontend displays in iframe/embed viewer
 ```
 
 ---
@@ -138,41 +142,34 @@ User clicks "View Resume" on an application
 | `core/document_parser.py` | Extract text from PDF/DOCX/TXT/MD uploads |
 | `core/knowledge_base.py` | KnowledgeBase class: CRUD, query, migration, LLM extraction |
 | `core/resume_scorer.py` | TF-IDF + ONNX embedding scoring algorithms |
-| `core/resume_assembler.py` | Select KB entries, render LaTeX, compile PDF |
-| `core/latex_compiler.py` | TinyTeX wrapper: find binary, compile .tex → .pdf |
-| `templates/latex/resume_classic.tex.j2` | Classic resume template (default) |
-| `templates/latex/resume_modern.tex.j2` | Modern resume template (color accents) |
-| `templates/latex/resume_academic.tex.j2` | Academic resume template (serif) |
-| `templates/latex/resume_minimal.tex.j2` | Minimal resume template (ultra-clean) |
-| `static/img/tpl-classic.png` | Template thumbnail for picker UI |
-| `static/img/tpl-modern.png` | Template thumbnail |
-| `static/img/tpl-academic.png` | Template thumbnail |
-| `static/img/tpl-minimal.png` | Template thumbnail |
-| `electron/scripts/bundle-tinytex.js` | Download + bundle TinyTeX in Electron build |
+| `core/resume_assembler.py` | Select KB entries, send to LLM, render PDF via ReportLab |
+| `core/latex_compiler.py` | **DEPRECATED** — TinyTeX wrapper, not used in active pipeline |
+| `templates/latex/*.tex.j2` | **DEPRECATED** — LaTeX templates exist on disk but template picker removed from UI |
+| `electron/scripts/bundle-tinytex.js` | **DEPRECATED** — TinyTeX bundling no longer needed |
 | `routes/knowledge_base.py` | API endpoints: upload, list, CRUD, import |
 | `static/js/knowledge-base.js` | Frontend: upload UI, KB viewer, entry editor |
 | `tests/test_document_parser.py` | ~8 tests: PDF/DOCX/TXT extraction |
 | `tests/test_knowledge_base.py` | ~18 tests: CRUD, dedup, LLM extraction, migration |
 | `tests/test_resume_scorer.py` | ~13 tests: TF-IDF, ONNX mock |
-| `tests/test_resume_assembler.py` | ~12 tests: assembly, LaTeX output, compilation |
+| `tests/test_resume_assembler.py` | ~12 tests: assembly, LLM prompt, ReportLab rendering |
 | `tests/test_latex_compiler.py` | ~5 tests: binary detection, compilation |
 
 ## Modified Files
 
 | File | Change |
 |------|--------|
-| `config/settings.py` | Add `ResumeReuseConfig`, `LatexConfig` models |
+| `config/settings.py` | Add `ResumeReuseConfig`, `LatexConfig` (deprecated) models |
 | `bot/bot.py` | Modify `_generate_docs()` — try KB assembly before LLM; ingest LLM output to KB |
 | `core/ai_engine.py` | Add `EXTRACTION_PROMPT`, `extract_kb_entries()` function |
 | `db/database.py` | Add `knowledge_base` + `uploaded_documents` tables; add `reuse_source`/`source_entry_ids` to `resume_versions` |
-| `routes/resumes.py` | On-the-fly LaTeX compilation for PDF endpoint; never serve stored PDF for KB-assembled resumes |
+| `routes/resumes.py` | On-the-fly ReportLab rendering for PDF endpoint; never serve stored PDF for KB-assembled resumes |
 | `routes/analytics.py` | Add `/api/analytics/reuse-stats` endpoint |
 | `templates/index.html` | Upload UI, KB viewer section, reuse settings |
-| `static/js/settings.js` | Load/save reuse + LaTeX config |
+| `static/js/settings.js` | Load/save reuse config (LaTeX config removed from UI) |
 | `static/locales/en.json` | ~25 new i18n keys |
 | `static/locales/es.json` | ~25 new i18n keys (Spanish) |
 | `pyproject.toml` | Add `jinja2`, `PyPDF2`, `python-docx`; optional `onnxruntime` + `tokenizers` |
-| `electron/scripts/bundle-python.js` | Add TinyTeX bundling step |
+| `electron/scripts/bundle-python.js` | ~~Add TinyTeX bundling step~~ (no longer needed) |
 
 ---
 
@@ -347,9 +344,10 @@ def assemble_resume(
     kb: KnowledgeBase,
     profile: UserProfile,
     reuse_config: ResumeReuseConfig,
-    latex_config: LatexConfig,
+    llm_config: LLMConfig,
 ) -> AssemblyResult | None:
-    """Score KB, select entries, compile LaTeX PDF. Returns None if not enough content."""
+    """Score KB, select entries, send to LLM, render PDF via ReportLab.
+    Returns None if not enough content."""
 
     # 1. Score all active KB entries against JD
     scored = kb.score_against_jd(jd_text, reuse_config.scoring_method)
@@ -357,23 +355,27 @@ def assemble_resume(
     # 2. Filter by min_score
     above_threshold = [s for s in scored if s.score >= reuse_config.min_score]
 
-    # 3. Select entries per category
+    # 3. Select entries per category (with limits)
     selected = _select_entries(above_threshold, reuse_config)
+    # Limits: experience=15, skill=20, education=4, project=6, certification=5
 
     # 4. Check completeness
     experience_count = sum(1 for s in selected if s.category == "experience")
     if experience_count < reuse_config.min_experience_bullets:
         return None  # not enough content, fall through to LLM
 
-    # 5. Render LaTeX template
-    tex_content = _render_latex(selected, profile, latex_config)
+    # 5. Send selected entries to LLM with strict prompt
+    #    - "Only use provided data — no hallucinated experiences"
+    #    - "Exactly 1 page, minimum 2 bullets per role"
+    #    - "May rephrase and use synonyms from JD"
+    markdown_resume = generate_resume_from_kb(selected, jd_text, llm_config)
 
-    # 6. Compile to PDF
-    pdf_path = compile_latex(tex_content)
+    # 6. Render markdown to PDF via ReportLab (Jake Gutierrez style)
+    pdf_bytes = render_resume_to_pdf(markdown_resume)
 
     # 7. Return result with entry IDs for storage
     return AssemblyResult(
-        pdf_path=pdf_path,
+        pdf_bytes=pdf_bytes,
         source_entry_ids=[s.id for s in selected],
         avg_score=mean(s.score for s in selected),
     )
@@ -398,7 +400,7 @@ def _generate_docs(scored, config, profile_dir):
             kb=kb,
             profile=config.profile,
             reuse_config=config.resume_reuse,
-            latex_config=config.latex,
+            llm_config=config.llm,
         )
         if result:
             logger.info("KB assembly: score=%.2f, %d entries used",
@@ -433,17 +435,27 @@ def serve_resume_pdf(vid):
     version = db.get_resume_version(vid)
 
     if version.get("reuse_source") == "kb_assembled":
-        # Render on-the-fly from KB entry IDs
+        # Render on-the-fly from KB entry IDs via LLM + ReportLab
         entry_ids = json.loads(version["source_entry_ids"])
         entries = kb.get_entries_by_ids(entry_ids)
-        tex_content = render_latex(entries, profile, latex_config)
-        pdf_path = compile_latex(tex_content)  # temp file
-        response = send_file(pdf_path, mimetype="application/pdf")
-        # Clean up temp after response
-        return response
+        markdown = generate_resume_from_kb(entries, jd_text, llm_config)
+        pdf_bytes = render_resume_to_pdf(markdown)  # ReportLab
+        return Response(pdf_bytes, mimetype="application/pdf")
     else:
         # Legacy: serve stored PDF file
         return send_file(version["resume_pdf_path"])
+```
+
+**Preview endpoint** (current implementation):
+
+```
+POST /api/kb/preview
+  Body: { jd_text: str | null }
+  Backend:
+    1. generate_resume_from_kb() — TF-IDF scoring → LLM with strict prompt
+    2. render_resume_to_pdf() — ReportLab renderer (Jake Gutierrez style)
+  Response:
+    Content-Type: application/pdf (binary blob)
 ```
 
 ---
@@ -487,13 +499,23 @@ POST   /api/kb/reprocess/<doc_id> — Re-run LLM extraction on a document
 - Slider/number: Min score threshold (0.0-1.0)
 - Number: Min experience bullets
 - Dropdown: Scoring method (Auto / TF-IDF Only)
-- Collapsible "LaTeX": template, font, size, margin
+- ~~Collapsible "LaTeX": template, font, size, margin~~ (removed — no template picker in UI)
 
 ---
 
-## 11. LaTeX Template Gallery + Live Preview
+## 11. ~~LaTeX Template Gallery + Live Preview~~ DEPRECATED
 
-### Template System
+> **DEPRECATED**: The LaTeX template gallery and live preview with template picker have been
+> replaced by the LLM + ReportLab pipeline. The ReportLab renderer uses a single fixed style
+> matching the Jake Gutierrez resume template (22pt centered name, 9.5pt body, 11pt section
+> headers with rules, two-column subheadings). Template files still exist on disk in
+> `templates/latex/` but are not used in the active pipeline. `loadTemplates()` has been
+> removed from JS initialization. The template picker UI has been removed from `index.html`.
+>
+> The preview endpoint is now `POST /api/kb/preview` which calls `generate_resume_from_kb()`
+> then `render_resume_to_pdf()` and returns a PDF blob directly.
+
+### Template System (DEPRECATED — retained for reference)
 
 Users can choose from multiple resume styles. Each template is a `.tex.j2` file in `templates/latex/` that receives the same data context (entries, profile, config) but renders differently.
 
@@ -565,27 +587,20 @@ User opens "Resume Preview" (from KB viewer, settings, or application detail)
         3. Entry toggle: checkbox each KB entry → re-request with updated IDs
 ```
 
-#### Preview API
+#### Preview API (DEPRECATED — replaced by POST /api/kb/preview)
 
 ```
-POST /api/resumes/preview
+# DEPRECATED — was:
+POST /api/resumes/preview    (LaTeX template picker + entry toggle)
+GET  /api/resumes/templates  (template list with thumbnails)
+
+# CURRENT:
+POST /api/kb/preview
   Body:
-    template: str           — template name ("classic", "modern", etc.)
-    entry_ids: list[int]    — specific KB entries to include (manual mode)
-    jd_text: str | null     — if provided + auto_select=true, auto-pick entries
-    auto_select: bool       — let scoring engine pick entries for this JD
-    latex_config: object    — font_family, font_size, margin overrides
+    jd_text: str | null     — optional JD for scoring-based entry selection
   Response:
     Content-Type: application/pdf
-    (binary PDF stream)
-
-GET /api/resumes/templates
-  Response:
-    [
-      {"name": "classic", "label": "Classic", "description": "Clean single-column...", "thumbnail": "/static/img/tpl-classic.png"},
-      {"name": "modern", "label": "Modern", "description": "Sans-serif, color accents...", "thumbnail": "/static/img/tpl-modern.png"},
-      ...
-    ]
+    (binary PDF blob from LLM markdown → ReportLab)
 ```
 
 #### Preview UI (Frontend)
@@ -701,8 +716,15 @@ Each milestone is a standalone PR with tests, i18n, and production-readiness bui
 4. Score blending: 0.3*TF-IDF + 0.7*ONNX (when available), pure TF-IDF fallback
 5. Tests: ~15 tests (TF-IDF scoring, keyword extraction, ONNX mock, blending)
 
-### Milestone 3: LaTeX Engine — Templates + Compiler
-**Scope**: LaTeX template rendering + PDF compilation. No scoring integration.
+### Milestone 3: LaTeX Engine — Templates + Compiler — DEPRECATED
+> **DEPRECATED**: M3 was completed but the LaTeX pipeline has been superseded by the
+> LLM + ReportLab pipeline in M4. The LaTeX compiler code (`core/latex_compiler.py`)
+> and templates (`templates/latex/*.tex.j2`) still exist on disk but are not used in
+> the active resume generation flow. TinyTeX bundling is no longer required for
+> distribution. Tests in `tests/test_latex_compiler.py` still pass but cover
+> deprecated functionality.
+
+**Scope**: ~~LaTeX template rendering + PDF compilation.~~ (superseded by LLM + ReportLab)
 1. `core/latex_compiler.py` — Find pdflatex (bundled TinyTeX → system PATH), compile .tex → .pdf
 2. `templates/latex/` — 4 Jinja2 LaTeX templates: classic, modern, academic, minimal
 3. `electron/scripts/bundle-tinytex.js` — Download + bundle TinyTeX per platform
@@ -711,22 +733,24 @@ Each milestone is a standalone PR with tests, i18n, and production-readiness bui
 6. Tests: ~8 tests (binary detection, compilation, error handling, template rendering)
 
 ### Milestone 4: Resume Assembly + Bot Integration
-**Scope**: Connect scoring + LaTeX + bot loop. The core "smart reuse" flow.
-1. `core/resume_assembler.py` — Score KB → select entries → render LaTeX → compile PDF
+**Scope**: Connect scoring + LLM + ReportLab + bot loop. The core "smart reuse" flow.
+1. `core/resume_assembler.py` — Score KB → select entries (experience=15, skill=20, education=4, project=6, certification=5) → send to LLM with strict "only use provided data" prompt → LLM returns markdown → ReportLab renders PDF
 2. `bot/bot.py` — Modify `_generate_docs()`: try KB assembly first, fall through to LLM
 3. `core/ai_engine.py` — Post-generation ingestion: parse LLM output → insert into KB
 4. `db/database.py` — Add `reuse_source`, `source_entry_ids` columns to `resume_versions`
-5. `routes/resumes.py` — On-the-fly LaTeX compilation for `GET /api/resumes/<id>/pdf`
-6. ReportLab fallback when pdflatex unavailable
-7. Tests: ~15 tests (assembly, bot integration, fallback, ingestion)
+5. `routes/knowledge_base.py` — `POST /api/kb/preview` endpoint: `generate_resume_from_kb()` → `render_resume_to_pdf()` → returns PDF blob
+6. ReportLab renderer: Jake Gutierrez style (22pt centered name, 9.5pt body, 11pt section headers with rules, two-column subheadings)
+7. `assemble_resume()` takes `llm_config` (not `latex_config`) — LLM generates exactly 1 page, min 2 bullets per role, may rephrase/use synonyms from JD
+8. Frontend: `loadTemplates()` removed from JS initialization, `loadKBDocuments()` added, Resume Templates section removed from UI
+9. Tests: ~15 tests (assembly, bot integration, preview endpoint, ReportLab rendering)
 
 ### Milestone 5: Upload UI + KB Viewer + Preview
 **Scope**: Frontend for document upload, KB browsing, and resume preview.
 1. `routes/knowledge_base.py` — Blueprint: upload, CRUD, search endpoints
-2. `static/js/knowledge-base.js` — Upload zone + KB table viewer (filter, search, edit, delete)
-3. `static/js/resume-preview.js` — Preview modal: template picker, entry toggles, live PDF render
-4. `templates/index.html` — Upload zone section, KB tab, settings section, preview modal
-5. `static/js/settings.js` — Reuse config + LaTeX config + template selector with thumbnails
+2. `static/js/knowledge-base.js` — Upload zone + KB table viewer (filter, search, edit, delete) + `loadKBDocuments()` on init
+3. `static/js/resume-preview.js` — Preview modal: PDF render via `POST /api/kb/preview` (no template picker)
+4. `templates/index.html` — Upload zone section, KB tab, settings section, preview modal (no template picker)
+5. `static/js/settings.js` — Reuse config only (LaTeX config and template selector removed)
 6. `static/locales/en.json` + `es.json` — ~30 new i18n keys
 7. ARIA labels, keyboard navigation, focus management on all new UI
 8. Tests: ~12 tests (upload API, CRUD endpoints, preview endpoint)
@@ -781,13 +805,13 @@ Each milestone is a standalone PR with tests, i18n, and production-readiness bui
 |----------|----------|
 | Empty knowledge base | Falls through to LLM generation |
 | LLM extraction fails on upload | Store raw text, retry later, show error to user |
-| pdflatex not found | Falls back to ReportLab renderer |
-| LaTeX compilation error | Falls back to ReportLab renderer |
+| pdflatex not found | N/A — ReportLab is the primary renderer (no LaTeX dependency) |
+| ReportLab rendering error | Returns error to user with details; no silent failure |
 | Not enough matching entries | Falls through to LLM generation |
 | ONNX not installed | TF-IDF only |
 | Uploaded file unreadable | Show error, don't crash |
 
-**ReportLab kept as fallback** — `render_resume_to_pdf()` not removed.
+**ReportLab is the primary renderer** — `render_resume_to_pdf()` is the sole PDF generation path. LaTeX compiler code exists but is deprecated.
 
 ---
 
@@ -795,7 +819,8 @@ Each milestone is a standalone PR with tests, i18n, and production-readiness bui
 
 | Component | Size | Required? |
 |-----------|------|-----------|
-| TinyTeX bundle | ~100 MB | Bundled |
+| ~~TinyTeX bundle~~ | ~~100 MB~~ | No longer bundled (LaTeX deprecated) |
+| ReportLab | ~3 MB | Required (primary PDF renderer) |
 | Jinja2 | ~1 MB | Required |
 | PyPDF2 | ~1 MB | Required |
 | python-docx | ~2 MB | Required |
@@ -804,7 +829,7 @@ Each milestone is a standalone PR with tests, i18n, and production-readiness bui
 | `tokenizers` | ~5 MB | Optional |
 | MiniLM ONNX model | ~80 MB | Auto-download |
 
-**Default bundle**: ~555-605 MB (+105 MB from current).
+**Default bundle**: ~455-505 MB (~100 MB less than original plan — no TinyTeX).
 **With ONNX**: additional ~135 MB user-downloaded.
 
 ---
@@ -817,41 +842,41 @@ Each milestone is a standalone PR with tests, i18n, and production-readiness bui
 4. Manual: upload a PDF resume, verify KB populated with entries
 5. Manual: upload a .txt experience file, verify extraction
 6. Manual: run bot with similar JD, verify KB assembly triggers
-7. Manual: click "View Resume" on KB-assembled application, verify on-the-fly PDF
+7. Manual: click "Preview Resume" from KB viewer, verify PDF rendered via ReportLab
 8. Manual: disable reuse, verify LLM generation still works + ingests to KB
-9. Manual: remove pdflatex, verify ReportLab fallback
+9. Manual: verify ReportLab PDF matches Jake Gutierrez style (22pt name, 9.5pt body, section rules)
 
 ---
 
 ## 19. Performance & Efficiency Optimizations
 
-### 19.1 PDF Compilation Cache
+### 19.1 PDF Rendering Cache
 
-LaTeX compilation is the heaviest operation (~1-3s). Cache compiled PDFs by content hash.
+LLM generation is the heaviest operation (~2-5s per call). Cache rendered PDFs by content hash of the LLM markdown output.
 
 ```python
-# core/latex_compiler.py
+# core/resume_assembler.py
 import hashlib
 
 PDF_CACHE_DIR = Path("~/.autoapply/cache/pdf/").expanduser()
 
-def compile_latex_cached(tex_content: str, timeout: int = 30) -> Path:
-    """Compile LaTeX with content-hash caching. Returns cached PDF if available."""
-    content_hash = hashlib.sha256(tex_content.encode()).hexdigest()[:16]
+def render_cached(markdown_content: str) -> bytes:
+    """Render markdown to PDF with content-hash caching. Returns cached PDF if available."""
+    content_hash = hashlib.sha256(markdown_content.encode()).hexdigest()[:16]
     cached_pdf = PDF_CACHE_DIR / f"{content_hash}.pdf"
     if cached_pdf.exists():
         logger.debug("PDF cache hit: %s", content_hash)
-        return cached_pdf
-    pdf_path = compile_latex(tex_content, PDF_CACHE_DIR, timeout)
-    pdf_path.rename(cached_pdf)
-    return cached_pdf
+        return cached_pdf.read_bytes()
+    pdf_bytes = render_resume_to_pdf(markdown_content)
+    cached_pdf.write_bytes(pdf_bytes)
+    return pdf_bytes
 ```
 
-**Cache invalidation**: Same entry IDs + same template + same config = same hash → cache hit. Changing any entry, template, or font busts the cache naturally.
+**Cache invalidation**: Same LLM markdown output = same hash → cache hit. Different JD or different KB entries produce different LLM output, busting the cache naturally.
 
 **Cache cleanup**: LRU eviction — keep last 200 PDFs (~100MB), delete oldest on overflow. Run cleanup on app startup.
 
-**Impact**: Preview clicks after the first are **instant** (<10ms). Viewing previously assembled resumes is instant. Bot applying to similar jobs with same KB entries gets a cache hit.
+**Impact**: ReportLab rendering is already fast (~50ms), but caching avoids redundant LLM calls when the same resume is previewed multiple times.
 
 ### 19.2 Precomputed Embedding Index
 
@@ -908,20 +933,20 @@ def classify_jd(jd_text: str) -> str:
 
 ### 19.4 Smart Page-Length Optimization
 
-A resume that's too short (half page) or too long (2 pages) hurts. The assembler should target exactly 1 page.
+A resume that's too short (half page) or too long (2 pages) hurts. The LLM prompt explicitly requires exactly 1 page, and the assembler enforces selection limits.
 
 ```python
-def _select_entries(scored_entries, reuse_config, latex_config):
-    """Select entries that fit on exactly one page."""
-    # Estimate content length based on LaTeX line counts:
-    #   - Summary: ~3 lines
-    #   - Each experience bullet: ~2 lines
-    #   - Skills section: ~2 lines
-    #   - Education: ~1-2 lines per entry
-    #   - Section headers + spacing: ~2 lines each
+def _select_entries(scored_entries, reuse_config):
+    """Select entries within category limits for 1-page resume."""
+    # Category limits enforce content volume:
+    #   - Experience: max 15 entries
+    #   - Skills: max 20 entries
+    #   - Education: max 4 entries
+    #   - Projects: max 6 entries
+    #   - Certifications: max 5 entries
     #
-    # One page at 11pt with 0.75in margins ≈ 45-50 content lines
-    MAX_LINES = 48  # conservative target
+    # LLM prompt requires exactly 1 page, min 2 bullets per role
+    MAX_LINES = 48  # conservative target (used for estimation only)
 
     selected = []
     line_count = 0

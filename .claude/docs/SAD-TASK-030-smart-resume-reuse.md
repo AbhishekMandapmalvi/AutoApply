@@ -1,9 +1,9 @@
 # System Architecture Document
 
 **Document ID**: SAD-TASK-030-smart-resume-reuse
-**Version**: 1.0
-**Date**: 2026-03-11
-**Status**: approved
+**Version**: 1.1
+**Date**: 2026-03-12
+**Status**: approved (updated: LaTeX pipeline deprecated in favor of LLM + ReportLab)
 **Author**: Claude (System Engineer)
 **SRS Reference**: SRS-TASK-030-smart-resume-reuse
 
@@ -11,7 +11,7 @@
 
 ## 1. Executive Summary
 
-This architecture defines the Smart Resume Reuse feature across four milestones: M1 (Knowledge Base foundation), M2 (TF-IDF scoring), M3 (LaTeX compilation), and M4 (Resume Assembly + Bot Integration). The design introduces 8 new Python modules, 3 new SQLite tables, 2 new config models, and extends the existing Database class with 15 new methods. M4 adds the assembly pipeline that ties M1-M3 together: score KB entries against a JD, select top entries per section, render via LaTeX (with ReportLab fallback), and integrate into the bot's document generation flow with a KB-first strategy and LLM fallback with ingestion. All components follow the existing layer architecture and integrate via the established patterns (SQLite, Pydantic, structured logging).
+This architecture defines the Smart Resume Reuse feature across four milestones: M1 (Knowledge Base foundation), M2 (TF-IDF scoring), M3 (LaTeX compilation — DEPRECATED, not used in active pipeline), and M4 (Resume Assembly + Bot Integration). The design introduces 8 new Python modules, 3 new SQLite tables, 2 new config models, and extends the existing Database class with 15 new methods. M4 adds the assembly pipeline that ties M1-M2 together with an LLM + ReportLab rendering approach: score KB entries against a JD via TF-IDF, select top entries per section, send selected entries to the LLM with a strict "only use provided data" prompt, receive markdown back, and render to PDF via ReportLab. The LaTeX compilation path (M3) is deprecated and not used in the active assembly pipeline. All components follow the existing layer architecture and integrate via the established patterns (SQLite, Pydantic, structured logging).
 
 ## 2. Architecture Overview
 
@@ -39,11 +39,11 @@ This architecture defines the Smart Resume Reuse feature across four milestones:
                  └──────────────┘
 
                  ┌──────────────┐
-                 │ Config Models│  (ResumeReuseConfig, LatexConfig)
+                 │ Config Models│  (ResumeReuseConfig, LatexConfig [DEPRECATED])
                  │ [Pydantic]   │
                  └──────────────┘
 
-M4 Assembly + Bot Integration:
+M4 Assembly + Bot Integration (LLM + ReportLab pipeline):
 
 ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐
 │ Bot (bot.py)     │─────▶│ ResumeAssembler  │─────▶│ ResumeScorer     │
@@ -53,11 +53,13 @@ M4 Assembly + Bot Integration:
 └─────────────────┘               │
                           ┌───────┼────────┐
                           ▼       ▼        ▼
-                 ┌──────────┐ ┌────────┐ ┌──────────────┐
-                 │ LaTeX    │ │ReportLab│ │ KnowledgeBase│
-                 │ Compiler │ │Renderer │ │ (KB read +   │
-                 │ [M3]     │ │[fallback]│ │  ingestion)  │
-                 └──────────┘ └────────┘ └──────────────┘
+                 ┌──────────┐ ┌──────────┐ ┌──────────────┐
+                 │ AI Engine│ │ Resume   │ │ KnowledgeBase│
+                 │ (LLM     │ │ Renderer │ │ (KB read +   │
+                 │ generate)│ │[ReportLab]│ │  ingestion)  │
+                 └──────────┘ └──────────┘ └──────────────┘
+
+    NOTE: LaTeX Compiler (M3) is DEPRECATED — not used in active pipeline.
 ```
 
 ### 2.2 Data Flow
@@ -87,7 +89,7 @@ M4 Assembly + Bot Integration:
 | Service | Business logic, orchestration | `KnowledgeBase`, `calculate_experience()`, `ResumeAssembler`, Bot KB-first flow |
 | Domain | Pure data parsing, no I/O | `parse_resume_md()`, `_parse_date()`, `_select_entries()`, `_build_context()`, config models |
 | Repository | Data access | `Database` (KB CRUD methods, resume_versions extension) |
-| Infrastructure | External calls, filesystem | `extract_text()`, `invoke_llm()`, `compile_latex()`, `save_assembled_resume()` |
+| Infrastructure | External calls, filesystem | `extract_text()`, `invoke_llm()`, `render_resume_to_pdf()`, `save_assembled_resume()` |
 
 ### 2.4 Component Catalog
 
@@ -99,11 +101,13 @@ M4 Assembly + Bot Integration:
 | ExperienceCalculator | Calculate years of experience from roles | datetime, stdlib | Domain | `core/experience_calculator.py` |
 | Database (extended) | SQLite CRUD for KB, documents, roles | sqlite3 | Repository | `db/database.py` |
 | ResumeReuseConfig | Resume reuse settings | Pydantic | Domain | `config/settings.py` |
-| LatexConfig | LaTeX compilation settings | Pydantic | Domain | `config/settings.py` |
-| LatexCompiler | LaTeX escaping, template rendering, PDF compilation | Jinja2, subprocess | Infrastructure | `core/latex_compiler.py` |
-| LaTeX Templates | 4 resume templates with custom Jinja2 delimiters | Jinja2 (.tex.j2) | Infrastructure | `templates/latex/*.tex.j2` |
-| TinyTeX Bundler | Platform-specific TinyTeX download and packaging | Node.js | Infrastructure | `electron/scripts/bundle-tinytex.js` |
-| ResumeAssembler | Orchestrate KB-first resume assembly pipeline | stdlib | Service | `core/resume_assembler.py` |
+| LatexConfig | **DEPRECATED** — LaTeX compilation settings (not used in active pipeline) | Pydantic | Domain | `config/settings.py` |
+| LatexCompiler | **DEPRECATED** — LaTeX escaping, template rendering, PDF compilation | Jinja2, subprocess | Infrastructure | `core/latex_compiler.py` |
+| LaTeX Templates | **DEPRECATED** — 4 resume templates with custom Jinja2 delimiters | Jinja2 (.tex.j2) | Infrastructure | `templates/latex/*.tex.j2` |
+| TinyTeX Bundler | **DEPRECATED** — Platform-specific TinyTeX download and packaging | Node.js | Infrastructure | `electron/scripts/bundle-tinytex.js` |
+| AI Engine (KB resume) | LLM-based resume generation from KB context with strict data-only prompt | invoke_llm | Infrastructure | `core/ai_engine.py` |
+| ResumeRenderer | Render markdown resume to PDF via ReportLab (Helvetica, 22pt name, 9.5pt body, 11pt section headers) | ReportLab | Infrastructure | `core/resume_renderer.py` |
+| ResumeAssembler | Orchestrate KB-first resume assembly: score → select → LLM generate → ReportLab render | stdlib | Service | `core/resume_assembler.py` |
 | Bot (KB-first flow) | Try KB assembly before LLM, ingest LLM output | stdlib | Service | `bot/bot.py` (modified) |
 | Database (resume_versions ext) | resume_versions +reuse_source, +source_entry_ids | sqlite3 | Repository | `db/database.py` (modified) |
 
@@ -386,7 +390,9 @@ Output: `float` in [0.0, 1.0]
 
 ---
 
-### 3.15 latex_compiler.escape_latex() (M3)
+### 3.15 latex_compiler.escape_latex() (M3) — DEPRECATED
+
+> **DEPRECATED**: LaTeX compilation is not used in the active assembly pipeline. The primary rendering path is LLM + ReportLab (see §3.20). This interface contract is retained for reference only.
 
 **Purpose**: Escape special LaTeX characters in user-supplied text to prevent compilation errors.
 **Category**: query (pure function)
@@ -411,7 +417,9 @@ Output:
 
 ---
 
-### 3.16 latex_compiler.find_pdflatex() (M3)
+### 3.16 latex_compiler.find_pdflatex() (M3) — DEPRECATED
+
+> **DEPRECATED**: LaTeX compilation is not used in the active assembly pipeline. See §3.20.
 
 **Purpose**: Discover pdflatex binary — first check bundled TinyTeX directory, then system PATH.
 **Category**: query (filesystem read)
@@ -441,7 +449,9 @@ Output:
 
 ---
 
-### 3.17 latex_compiler.render_template() (M3)
+### 3.17 latex_compiler.render_template() (M3) — DEPRECATED
+
+> **DEPRECATED**: LaTeX compilation is not used in the active assembly pipeline. See §3.20.
 
 **Purpose**: Render a Jinja2 LaTeX template with the given context using custom delimiters.
 **Category**: query (filesystem read + string rendering)
@@ -483,7 +493,9 @@ Errors:
 
 ---
 
-### 3.18 latex_compiler.compile_latex() (M3)
+### 3.18 latex_compiler.compile_latex() (M3) — DEPRECATED
+
+> **DEPRECATED**: LaTeX compilation is not used in the active assembly pipeline. See §3.20.
 
 **Purpose**: Compile raw LaTeX source into PDF bytes by invoking pdflatex in a temporary directory.
 **Category**: command (subprocess + filesystem I/O)
@@ -524,7 +536,9 @@ Errors:
 
 ---
 
-### 3.19 latex_compiler.compile_resume() (M3)
+### 3.19 latex_compiler.compile_resume() (M3) — DEPRECATED
+
+> **DEPRECATED**: LaTeX compilation is not used in the active assembly pipeline. See §3.20.
 
 **Purpose**: High-level convenience function: render a template with context and compile to PDF bytes.
 **Category**: command (combines render_template + compile_latex)
@@ -684,10 +698,10 @@ uploaded_documents ──1:N──▶ knowledge_base  (via knowledge_base.source
 | resume_reuse.min_experience_bullets | int | 6 | config.json | Minimum experience entries for KB assembly |
 | resume_reuse.scoring_method | str | "auto" | config.json | "tfidf", "onnx", or "auto" |
 | resume_reuse.cover_letter_strategy | str | "generate" | config.json | "generate" or "template" |
-| latex.template | str | "classic" | config.json | LaTeX template name |
-| latex.font_family | str | "helvetica" | config.json | Font family |
-| latex.font_size | int | 11 | config.json | Font size in points |
-| latex.margin | str | "0.75in" | config.json | Page margins |
+| latex.template | str | "classic" | config.json | **DEPRECATED** — LaTeX template name (not used in active pipeline) |
+| latex.font_family | str | "helvetica" | config.json | **DEPRECATED** — Font family (not used in active pipeline) |
+| latex.font_size | int | 11 | config.json | **DEPRECATED** — Font size in points (not used in active pipeline) |
+| latex.margin | str | "0.75in" | config.json | **DEPRECATED** — Page margins (not used in active pipeline) |
 
 **Hierarchy**: Pydantic defaults → config.json overrides
 **Validation**: At AppConfig load time via Pydantic validators.
@@ -775,18 +789,18 @@ uploaded_documents ──1:N──▶ knowledge_base  (via knowledge_base.source
 | NFR-030-08 | NFR | Test suite (M2) | pytest | — |
 | NFR-030-09 | NFR | pyproject.toml | No new deps for M2 | ADR-029 |
 | NFR-030-10 | NFR | ResumeScorer, JDAnalyzer | logging.getLogger(__name__) | — |
-| FR-030-20 | FR | LatexCompiler | escape_latex() | — |
-| FR-030-21 | FR | LatexCompiler | find_pdflatex() | — |
-| FR-030-22 | FR | LatexCompiler | render_template(), compile_latex() | ADR-031 |
-| FR-030-23 | FR | LatexCompiler | compile_resume() | — |
-| FR-030-24 | FR | LaTeX Templates | classic.tex.j2, modern.tex.j2, compact.tex.j2, academic.tex.j2 | ADR-031 |
-| FR-030-25 | FR | TinyTeX Bundler | bundle-tinytex.js | — |
+| FR-030-20 | FR | LatexCompiler | escape_latex() | — | **DEPRECATED** |
+| FR-030-21 | FR | LatexCompiler | find_pdflatex() | — | **DEPRECATED** |
+| FR-030-22 | FR | LatexCompiler | render_template(), compile_latex() | ADR-031 (SUPERSEDED) | **DEPRECATED** |
+| FR-030-23 | FR | LatexCompiler | compile_resume() | — | **DEPRECATED** |
+| FR-030-24 | FR | LaTeX Templates | classic.tex.j2, modern.tex.j2, compact.tex.j2, academic.tex.j2 | ADR-031 (SUPERSEDED) | **DEPRECATED** |
+| FR-030-25 | FR | TinyTeX Bundler | bundle-tinytex.js | — | **DEPRECATED** |
 | NFR-030-11 | NFR | LatexCompiler | compile_latex() timeout, temp dir cleanup | — |
 | NFR-030-12 | NFR | LatexCompiler | logging.getLogger(__name__) | — |
 | NFR-030-13 | NFR | Test suite (M3) | pytest | — |
-| FR-030-26 | FR | ResumeAssembler | assemble_resume() | ADR-032 |
+| FR-030-26 | FR | ResumeAssembler, AI Engine, ResumeRenderer | assemble_resume() → generate_resume_from_kb() → render_resume_to_pdf() | ADR-032 |
 | FR-030-27 | FR | ResumeAssembler | _select_entries() | — |
-| FR-030-28 | FR | ResumeAssembler | _build_context() | — |
+| FR-030-28 | FR | ResumeAssembler | _build_context(), _format_kb_data_for_prompt() | — |
 | FR-030-29 | FR | ResumeAssembler | save_assembled_resume() | — |
 | FR-030-30 | FR | ResumeAssembler, ResumeParser, KnowledgeBase | ingest_llm_resume() | ADR-032 |
 | FR-030-31 | FR | Bot (_generate_docs) | _try_kb_assembly(), _ingest_llm_output() | ADR-032 |
@@ -794,7 +808,7 @@ uploaded_documents ──1:N──▶ knowledge_base  (via knowledge_base.source
 | NFR-030-14 | NFR | ResumeAssembler | logging.getLogger(__name__) | — |
 | NFR-030-15 | NFR | Test suite (M4) | pytest | — |
 
-**Completeness**: 32/32 FRs mapped, 15/15 NFRs mapped. Zero gaps.
+**Completeness**: 32/32 FRs mapped (FR-030-20 through FR-030-25 DEPRECATED), 15/15 NFRs mapped. Zero gaps.
 
 ---
 
@@ -881,13 +895,15 @@ uploaded_documents ──1:N──▶ knowledge_base  (via knowledge_base.source
 
 ---
 
-### M3 Implementation Tasks
+### M3 Implementation Tasks — DEPRECATED
+
+> **NOTE**: M3 (LaTeX compilation) was implemented but is DEPRECATED. The active assembly pipeline uses LLM + ReportLab (see §3.20). M3 code remains in the codebase but is not called by the active pipeline.
 
 | Order | Task ID | Description | Depends On | Size | Risk | FR Coverage |
 |-------|---------|------------|------------|------|------|-------------|
-| 12 | IMPL-012 | LaTeX compiler module | IMPL-003 | M | Medium | FR-030-20, FR-030-21, FR-030-22, FR-030-23 |
-| 13 | IMPL-013 | LaTeX resume templates | IMPL-012 | M | Low | FR-030-24 |
-| 14 | IMPL-014 | TinyTeX bundling script | — | S | Medium | FR-030-25 |
+| 12 | IMPL-012 | LaTeX compiler module **(DEPRECATED)** | IMPL-003 | M | Medium | FR-030-20, FR-030-21, FR-030-22, FR-030-23 |
+| 13 | IMPL-013 | LaTeX resume templates **(DEPRECATED)** | IMPL-012 | M | Low | FR-030-24 |
+| 14 | IMPL-014 | TinyTeX bundling script **(DEPRECATED)** | — | S | Medium | FR-030-25 |
 
 #### IMPL-012: LaTeX Compiler Module
 - **Creates**: `core/latex_compiler.py`
@@ -965,7 +981,7 @@ uploaded_documents ──1:N──▶ knowledge_base  (via knowledge_base.source
 
 ### ADR-031: Custom Jinja2 Delimiters for LaTeX Templates
 
-**Status**: accepted
+**Status**: SUPERSEDED — LaTeX compilation is deprecated in favor of LLM + ReportLab pipeline. This ADR is retained for historical reference only.
 **Context**: LaTeX uses `{` and `}` extensively for grouping arguments (e.g., `\textbf{bold}`, `\begin{document}`). Jinja2's default delimiters (`{{ }}`, `{% %}`, `{# #}`) conflict with LaTeX braces, making templates unreadable and error-prone. Every LaTeX brace would need escaping or raw blocks, defeating the purpose of templating.
 
 **Decision**: Use custom Jinja2 delimiters that start with `\` (a LaTeX command prefix) to feel natural in LaTeX source:
@@ -1020,8 +1036,8 @@ env = jinja2.Environment(
 
 ### 3.20 resume_assembler.assemble_resume() (M4)
 
-**Purpose**: Orchestrate KB-first resume assembly: score entries against JD, select top entries per section, build template context, render via LaTeX (or ReportLab fallback). Returns assembled resume dict or None if insufficient KB entries.
-**Category**: command (reads KB, writes PDF)
+**Purpose**: Orchestrate KB-first resume assembly: score entries against JD, select top entries per section, build structured context, send to LLM with strict "only use provided data" prompt, receive markdown, render to PDF via ReportLab. Returns assembled resume dict or None if insufficient KB entries.
+**Category**: command (reads KB, calls LLM, writes PDF)
 
 **Signature**:
 
@@ -1032,34 +1048,46 @@ Input Parameters:
 | profile | dict | yes | Keys: full_name, email, phone, location | User profile from config |
 | kb | KnowledgeBase | yes | Must have initialized DB | Knowledge base instance |
 | reuse_config | ResumeReuseConfig or None | no | default: None (uses defaults) | Resume reuse settings (min_score, min_experience_bullets, scoring_method) |
-| latex_config | LatexConfig or None | no | default: None (uses defaults) | LaTeX template/font settings |
+| llm_config | LLMConfig | yes | provider + api_key + model | LLM configuration for resume generation |
 
 Output:
 | Field | Type | Nullable | Description |
 |-------|------|----------|-------------|
-| (return) | dict or None | yes | None if insufficient KB entries. Otherwise dict with keys: `pdf_bytes` (bytes), `entry_ids` (list[int]), `scoring_method` (str), `template` (str), `sections` (dict[str, int] — count of entries per section) |
+| (return) | dict or None | yes | None if insufficient KB entries or AI unavailable. Otherwise dict with keys: `pdf_bytes` (bytes), `resume_md` (str), `entry_ids` (list[int]), `scoring_method` (str) |
 
 Errors:
 | Error Condition | Error Type | HTTP Status |
 |----------------|------------|-------------|
 | Empty jd_text | (no error) returns None | N/A |
 | Fewer entries than min_experience_bullets | (no error) returns None, logs INFO | N/A |
-| LaTeX compilation failure | (no error) falls back to ReportLab, logs WARNING | N/A |
+| AI not configured | (no error) returns None via `check_ai_available()` | N/A |
+| LLM generation failure | (no error) returns None, logs ERROR | N/A |
 
 **Pipeline**:
-1. Fetch all active KB entries via `kb.get_all_entries(active_only=True)`
-2. Score entries via `score_kb_entries(jd_text, entries, reuse_config)`
-3. Call `_select_entries(scored, reuse_config)` → grouped entries or None
-4. If None (insufficient), return None
-5. Call `_build_context(profile, selected)` → template context dict
-6. Try LaTeX: `compile_resume(template, context, pdflatex_path)` → pdf_bytes
-7. If LaTeX returns None, fall back to `render_resume_to_pdf(context)` (ReportLab)
-8. Return result dict with pdf_bytes, entry_ids, scoring_method, template, sections
+1. Validate LLM availability via `check_ai_available(llm_config)`
+2. Fetch all active KB entries via `kb.get_all_entries(active_only=True)`
+3. Score entries via `score_kb_entries(jd_text, entries, reuse_config)`
+4. Call `_select_entries(scored, reuse_config)` → grouped entries or None
+5. If None (insufficient), return None
+6. Call `_build_context(profile, selected)` → structured context dict (experience grouped by company/role, skills by category)
+7. Call `_format_kb_data_for_prompt(context)` → serialized KB data string for LLM
+8. Call `generate_resume_from_kb(context, jd_text, llm_config)` → resume markdown (LLM prompt requires exactly 1 page, min 2 bullets per role, allows rephrasing/synonyms from JD, strict "only use provided data")
+9. Call `render_resume_to_pdf(resume_md, tmp_path)` → pdf_bytes via ReportLab (Helvetica font, 22pt name centered, 9.5pt body, 11pt section headers uppercase with rules, two-column layout for company/dates)
+10. Return result dict with pdf_bytes, resume_md, entry_ids, scoring_method
 
-**Preconditions**: KB populated with entries; profile has required contact fields.
+**Selection Limits** (applied in step 4):
+| Category | Max Entries |
+|----------|------------|
+| experience | 15 |
+| skill | 20 |
+| education | 4 |
+| project | 6 |
+| certification | 5 |
+
+**Preconditions**: KB populated with entries; profile has required contact fields; LLM configured.
 **Postconditions**: No DB mutation (read-only assembly). PDF bytes in memory.
-**Side Effects**: pdflatex subprocess if LaTeX available.
-**Idempotency**: Yes (same inputs → same output, assuming KB unchanged).
+**Side Effects**: LLM API call for resume generation.
+**Idempotency**: Yes (same inputs → same output, assuming KB unchanged and LLM deterministic).
 **Thread Safety**: Safe (reads only; temp dirs isolated per call).
 
 ---
@@ -1087,9 +1115,9 @@ Output:
 |----------|------------|-------|
 | experience | 15 | Grouped by subsection (role), top entries per role |
 | skill | 20 | Flat list, highest scored first |
-| education | 5 | All included up to limit |
+| education | 4 | All included up to limit |
 | certification | 5 | All included up to limit |
-| project | 5 | All included up to limit |
+| project | 6 | All included up to limit |
 | summary | 1 | Best-scoring summary entry |
 
 **Preconditions**: Input entries already scored and filtered.
@@ -1102,7 +1130,7 @@ Output:
 
 ### 3.22 resume_assembler._build_context() (M4)
 
-**Purpose**: Transform user profile + selected KB entries into a template context dict suitable for LaTeX or ReportLab rendering.
+**Purpose**: Transform user profile + selected KB entries into a structured context dict for LLM prompt construction (experience grouped by company/role, skills by category).
 **Category**: query (pure function)
 
 **Signature**:
@@ -1207,13 +1235,14 @@ Output:
 ```
 _generate_docs(job, profile, llm_config)
     │
-    ├──▶ _try_kb_assembly(jd_text, profile, kb, reuse_config, latex_config)
+    ├──▶ _try_kb_assembly(jd_text, profile, kb, reuse_config, llm_config)
     │        │
-    │        ├── assemble_resume() returns dict → use KB-assembled PDF ✓
+    │        ├── assemble_resume() → score KB → select → LLM generate (strict prompt) → ReportLab render
+    │        │     returns dict with pdf_bytes, resume_md, entry_ids, scoring_method → use KB-assembled PDF ✓
     │        │     save_assembled_resume()
     │        │     record resume_version with reuse_source="kb"
     │        │
-    │        └── assemble_resume() returns None → insufficient KB entries
+    │        └── assemble_resume() returns None → insufficient KB entries or AI unavailable
     │
     └──▶ (fallback) Full LLM generation via invoke_llm()
               │
@@ -1241,9 +1270,9 @@ _generate_docs(job, profile, llm_config)
 
 | Requirement | Type | Design Component(s) | Interface(s) | ADR |
 |-------------|------|---------------------|---------------|-----|
-| FR-030-26 | FR | ResumeAssembler | assemble_resume() | ADR-032 |
+| FR-030-26 | FR | ResumeAssembler, AI Engine, ResumeRenderer | assemble_resume() → generate_resume_from_kb() → render_resume_to_pdf() | ADR-032 |
 | FR-030-27 | FR | ResumeAssembler | _select_entries() | — |
-| FR-030-28 | FR | ResumeAssembler | _build_context() | — |
+| FR-030-28 | FR | ResumeAssembler | _build_context(), _format_kb_data_for_prompt() | — |
 | FR-030-29 | FR | ResumeAssembler | save_assembled_resume() | — |
 | FR-030-30 | FR | ResumeAssembler, ResumeParser, KnowledgeBase | ingest_llm_resume() | ADR-032 |
 | FR-030-31 | FR | Bot (_generate_docs) | _try_kb_assembly(), _ingest_llm_output() | ADR-032 |
@@ -1257,23 +1286,23 @@ _generate_docs(job, profile, llm_config)
 
 | Order | Task ID | Description | Depends On | Size | Risk | FR Coverage |
 |-------|---------|------------|------------|------|------|-------------|
-| 15 | IMPL-015 | Resume assembler module | IMPL-006, IMPL-010, IMPL-012 | L | Medium | FR-030-26, FR-030-27, FR-030-28, FR-030-29, FR-030-30 |
+| 15 | IMPL-015 | Resume assembler module (LLM + ReportLab) | IMPL-006, IMPL-010 | L | Medium | FR-030-26, FR-030-27, FR-030-28, FR-030-29, FR-030-30 |
 | 16 | IMPL-016 | Bot KB-first flow | IMPL-015 | M | Medium | FR-030-31 |
 | 17 | IMPL-017 | DB resume_versions extension | IMPL-001 | S | Low | FR-030-32 |
 
 #### IMPL-015: Resume Assembler Module
 - **Creates**: `core/resume_assembler.py`
-- **Contains**: `assemble_resume()`, `_select_entries()`, `_build_context()`, `save_assembled_resume()`, `ingest_llm_resume()`
-- **Dependencies**: `core/knowledge_base.py` (M1), `core/resume_scorer.py` (M2), `core/latex_compiler.py` (M3), `core/resume_parser.py` (M1), `core/resume_renderer.py` (existing ReportLab fallback)
-- **Pipeline**: score → select → build context → compile (LaTeX or ReportLab) → return
-- **Section limits**: experience(15), skill(20), education(5), certification(5), project(5), summary(1)
-- **Fallback chain**: LaTeX compile → ReportLab render → return None (logged ERROR)
-- **Tests**: `tests/test_resume_assembler.py` — assembly pipeline (mocked KB + scorer), entry selection (min_experience guard, section limits, grouping), context building (all section types), save (filename sanitization, dir creation), LLM ingestion (dedup, empty input), fallback to ReportLab
-- **Done when**: All 5 interface contracts (§3.20–§3.24) satisfied; selection enforces min_experience_bullets; context matches LaTeX template schema; save produces valid filenames; ingest_llm_resume grows KB
+- **Contains**: `assemble_resume()`, `_select_entries()`, `_build_context()`, `_format_kb_data_for_prompt()`, `save_assembled_resume()`, `ingest_llm_resume()`
+- **Dependencies**: `core/knowledge_base.py` (M1), `core/resume_scorer.py` (M2), `core/ai_engine.py` (`generate_resume_from_kb`, `check_ai_available`), `core/resume_renderer.py` (`render_resume_to_pdf` — ReportLab), `core/resume_parser.py` (M1)
+- **Pipeline**: score → select → build context → LLM generate (strict KB-only prompt) → ReportLab render → return
+- **Section limits**: experience(15), skill(20), education(4), certification(5), project(6), summary(1)
+- **LLM prompt constraints**: exactly 1 page, min 2 bullets per role, allows rephrasing/synonyms from JD, strict "only use provided data"
+- **Tests**: `tests/test_resume_assembler.py` — assembly pipeline (mocked KB + scorer + LLM), entry selection (min_experience guard, section limits, grouping), context building (all section types), save (filename sanitization, dir creation), LLM ingestion (dedup, empty input)
+- **Done when**: All 5 interface contracts (§3.20-§3.24) satisfied; selection enforces min_experience_bullets; context suitable for LLM prompt; save produces valid filenames; ingest_llm_resume grows KB
 
 #### IMPL-016: Bot KB-First Flow
 - **Modifies**: `bot/bot.py` — `_generate_docs()` method
-- **Adds**: `_try_kb_assembly(jd_text, profile, kb, reuse_config, latex_config)` — calls `assemble_resume()`, saves PDF, returns result or None
+- **Adds**: `_try_kb_assembly(jd_text, profile, kb, reuse_config, llm_config)` — calls `assemble_resume()`, saves PDF, returns result or None
 - **Adds**: `_ingest_llm_output(resume_md, kb)` — calls `ingest_llm_resume()` after LLM fallback generation
 - **Flow**: `_generate_docs()` calls `_try_kb_assembly()` first; if None, falls through to existing LLM path; after LLM path, calls `_ingest_llm_output()` to grow KB
 - **Config gate**: Only attempts KB assembly if `reuse_config.enabled` is True (default: True)
@@ -1309,7 +1338,7 @@ _generate_docs(job, profile, llm_config)
 | GET | /api/kb/documents | List uploaded documents | FR-030-37 |
 | POST | /api/kb/preview | Preview assembled resume as PDF | FR-030-41 |
 
-**Dependencies**: `app_state.db`, `core.i18n.t()`, `core.knowledge_base.KnowledgeBase`, `core.resume_assembler`, `core.resume_scorer`, `core.latex_compiler`.
+**Dependencies**: `app_state.db`, `core.i18n.t()`, `core.knowledge_base.KnowledgeBase`, `core.resume_assembler`, `core.resume_scorer`, `core.ai_engine`, `core.resume_renderer`.
 
 ### §3.26 Component: KB Frontend Module (`static/js/knowledge-base.js`)
 
