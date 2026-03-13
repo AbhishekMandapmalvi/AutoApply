@@ -85,7 +85,7 @@ class TestLinkedInUploadResumeException:
         fi.set_input_files.side_effect = Exception("Upload failed")
         page.query_selector.return_value = fi
         applier = LinkedInApplier(page)
-        applier._upload_resume(Path("/tmp/resume.pdf"))
+        applier._safe_upload(Path("/tmp/resume.pdf"), "input[type='file']")
         # No exception raised
 
     @patch("bot.apply.base.time.sleep")
@@ -93,7 +93,7 @@ class TestLinkedInUploadResumeException:
         page = _make_page()
         page.query_selector.return_value = None
         applier = LinkedInApplier(page)
-        applier._upload_resume(Path("/tmp/resume.pdf"))
+        applier._safe_upload(Path("/tmp/resume.pdf"), "input[type='file']")
         # No exception raised
 
     @patch("bot.apply.base.time.sleep")
@@ -288,7 +288,7 @@ class TestLinkedInUploadResumeException:
 
         page.query_selector.side_effect = qs
         applier = LinkedInApplier(page)
-        applier._upload_resume(Path("/tmp/resume.pdf"))
+        applier._safe_upload(Path("/tmp/resume.pdf"), "input[type='file']")
         fi.set_input_files.assert_called_once_with(str(Path("/tmp/resume.pdf")))
 
     @patch("bot.apply.base.time.sleep")
@@ -439,14 +439,14 @@ class TestIndeedRanOutOfSteps:
         fi.set_input_files.side_effect = Exception("Upload failed")
         page.query_selector.return_value = fi
         applier = IndeedApplier(page)
-        applier._upload_resume(Path("/tmp/resume.pdf"))
+        applier._safe_upload(Path("/tmp/resume.pdf"), "input[type='file']")
 
     @patch("bot.apply.base.time.sleep")
     def test_upload_resume_no_input(self, _sleep):
         page = _make_page()
         page.query_selector.return_value = None
         applier = IndeedApplier(page)
-        applier._upload_resume(Path("/tmp/resume.pdf"))
+        applier._safe_upload(Path("/tmp/resume.pdf"), "input[type='file']")
 
     @patch("bot.apply.base.time.sleep")
     def test_fill_form_skips_prefilled(self, _sleep):
@@ -647,7 +647,7 @@ class TestIndeedRanOutOfSteps:
 
         page.query_selector.side_effect = qs
         applier = IndeedApplier(page)
-        applier._upload_resume(Path("/tmp/resume.pdf"))
+        applier._safe_upload(Path("/tmp/resume.pdf"), "input[type='file']")
         fi.set_input_files.assert_called_once_with(str(Path("/tmp/resume.pdf")))
 
     @patch("bot.apply.base.time.sleep")
@@ -754,14 +754,14 @@ class TestGreenhouseFormFieldsBranches:
         fi.set_input_files.side_effect = Exception("Upload failed")
         page.query_selector.return_value = fi
         applier = GreenhouseApplier(page)
-        applier._upload_resume(Path("/tmp/resume.pdf"))
+        applier._safe_upload(Path("/tmp/resume.pdf"), "input[type='file']")
 
     @patch("bot.apply.base.time.sleep")
     def test_resume_upload_no_input(self, _sleep):
         page = _make_page()
         page.query_selector.return_value = None
         applier = GreenhouseApplier(page)
-        applier._upload_resume(Path("/tmp/resume.pdf"))
+        applier._safe_upload(Path("/tmp/resume.pdf"), "input[type='file']")
 
     @patch("bot.apply.base.time.sleep")
     def test_cover_letter_empty_noop(self, _sleep):
@@ -873,14 +873,14 @@ class TestLeverFormFieldsBranches:
         fi.set_input_files.side_effect = Exception("Upload failed")
         page.query_selector.return_value = fi
         applier = LeverApplier(page)
-        applier._upload_resume(Path("/tmp/resume.pdf"))
+        applier._safe_upload(Path("/tmp/resume.pdf"), "input[type='file']")
 
     @patch("bot.apply.base.time.sleep")
     def test_resume_upload_no_input(self, _sleep):
         page = _make_page()
         page.query_selector.return_value = None
         applier = LeverApplier(page)
-        applier._upload_resume(Path("/tmp/resume.pdf"))
+        applier._safe_upload(Path("/tmp/resume.pdf"), "input[type='file']")
 
     @patch("bot.apply.base.time.sleep")
     def test_cover_letter_empty_noop(self, _sleep):
@@ -1399,4 +1399,4 @@ class TestAshbyResumeUploadException:
 
         page.query_selector.side_effect = qs
         applier = AshbyApplier(page)
-        applier._upload_resume(Path("/tmp/resume.pdf"))
+        applier._safe_upload(Path("/tmp/resume.pdf"), "input[type='file']")

@@ -22,7 +22,7 @@ dependencies = [
     "python-docx==1.1.2",
     "pywebview==5.3.2",
     "pystray==0.19.5",
-    "Pillow==11.2.1",
+    "Pillow==12.1.1",
 ]
 
 [project.optional-dependencies]
