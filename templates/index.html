@@ -643,46 +643,6 @@
     <!-- Stats cards -->
     <div id="kb-stats" class="kb-stats-grid" role="region" aria-label="Knowledge Base statistics" aria-live="polite"></div>
 
-    <!-- Top toolbar: Upload + Filter/Search in one row -->
-    <div class="kb-toolbar">
-      <div class="kb-toolbar-upload">
-        <input type="file" id="kb-upload-input" accept=".pdf,.docx,.txt,.md"
-               aria-label="Choose document to upload" class="form-input">
-        <button type="button" class="btn btn-primary" onclick="uploadKBDocument()"
-                data-i18n="kb.upload_title">Upload</button>
-        <div id="kb-upload-status" class="kb-upload-status" aria-live="polite"></div>
-      </div>
-      <div class="kb-toolbar-filter">
-        <select id="kb-filter-category" class="form-input"
-                onchange="filterKBCategory(this.value)"
-                aria-label="Filter by category">
-          <option value="all" data-i18n="kb.filter_all">All Categories</option>
-          <option value="experience" data-i18n="kb.category_experience">Experience</option>
-          <option value="skill" data-i18n="kb.category_skill">Skills</option>
-          <option value="education" data-i18n="kb.category_education">Education</option>
-          <option value="project" data-i18n="kb.category_project">Projects</option>
-          <option value="certification" data-i18n="kb.category_certification">Certifications</option>
-          <option value="summary" data-i18n="kb.category_summary">Summary</option>
-        </select>
-        <input type="text" id="kb-search-input" class="form-input"
-               placeholder="Search entries..." aria-label="Search KB entries"
-               oninput="searchKB(this.value)">
-      </div>
-    </div>
-
-    <!-- Entries list -->
-    <div id="kb-entries-list" role="region" aria-label="Knowledge Base entries" aria-live="polite">
-    </div>
-
-    <!-- Pagination -->
-    <div id="kb-pagination" class="resume-pagination" role="navigation" aria-label="KB entries pagination">
-    </div>
-
-    <!-- Edit overlay -->
-    <div id="kb-edit-overlay" class="resume-detail-overlay hidden" role="dialog" aria-label="Edit KB entry">
-      <div class="kb-edit-content resume-detail-body"></div>
-    </div>
-
     <!-- Tools row: ATS + Resume Assembly side by side -->
     <div class="kb-tools-grid">
       <div class="card">
@@ -715,22 +675,17 @@
 
       <div class="card">
         <h3 data-i18n="reuse.settings_title">Smart Resume Assembly</h3>
+        <p style="font-size:0.85em; color:var(--text-muted); margin-bottom:8px;">
+          AI generates a tailored resume using only your Knowledge Base data. No information is invented.
+        </p>
         <div class="kb-tool-form">
-          <label>Template
-            <select id="kb-preview-template" class="form-input" aria-label="Resume template">
-              <option value="classic">Classic</option>
-              <option value="modern">Modern</option>
-              <option value="academic">Academic</option>
-              <option value="minimal">Minimal</option>
-            </select>
-          </label>
           <label>Job Description
             <textarea id="kb-preview-jd" class="form-input" rows="3"
-                      placeholder="Paste a job description..."
-                      aria-label="Job description for resume preview"></textarea>
+                      placeholder="Paste a job description to generate a tailored resume..."
+                      aria-label="Job description for resume generation"></textarea>
           </label>
           <div>
-            <button type="button" class="btn btn-primary btn-sm" onclick="previewKBResume()">Preview Resume</button>
+            <button type="button" class="btn btn-primary btn-sm" onclick="previewKBResume()">Generate Resume</button>
             <span id="kb-preview-status" aria-live="polite"></span>
           </div>
         </div>
@@ -740,119 +695,6 @@
     <!-- Preview overlay -->
     <div id="kb-preview-overlay" class="resume-detail-overlay hidden" role="dialog" aria-label="Resume preview">
       <div class="kb-preview-content resume-detail-body"></div>
-    </div>
-
-    <!-- Template Management -->
-    <div class="card" style="margin-bottom:16px;">
-      <h3 data-i18n="reuse.templates_title">Resume Templates</h3>
-
-      <!-- Rules / Help — collapsible -->
-      <details style="margin-bottom:12px; border:1px solid var(--border-color); border-radius:6px; padding:8px 12px;">
-        <summary style="cursor:pointer; font-weight:600;">How to create a custom template</summary>
-        <div style="margin-top:8px; font-size:0.9em; line-height:1.6;">
-          <p>Upload any <code>.tex</code> file (e.g. from Overleaf). To inject your KB data, use these <strong>special delimiters</strong> instead of standard LaTeX commands:</p>
-
-          <table style="width:100%; border-collapse:collapse; margin:8px 0;">
-            <thead><tr style="border-bottom:2px solid var(--border-color); text-align:left;">
-              <th style="padding:4px 8px;">Syntax</th><th style="padding:4px 8px;">Purpose</th>
-            </tr></thead>
-            <tbody>
-              <tr style="border-bottom:1px solid var(--border-color);">
-                <td style="padding:4px 8px;"><code>\VAR{name}</code></td>
-                <td style="padding:4px 8px;">Insert a variable (name, email, phone, location, summary)</td>
-              </tr>
-              <tr style="border-bottom:1px solid var(--border-color);">
-                <td style="padding:4px 8px;"><code>\BLOCK{if experience}...\BLOCK{endif}</code></td>
-                <td style="padding:4px 8px;">Conditional section — only render if data exists</td>
-              </tr>
-              <tr style="border-bottom:1px solid var(--border-color);">
-                <td style="padding:4px 8px;"><code>\BLOCK{for entry in experience}...\BLOCK{endfor}</code></td>
-                <td style="padding:4px 8px;">Loop over entries in a section</td>
-              </tr>
-              <tr style="border-bottom:1px solid var(--border-color);">
-                <td style="padding:4px 8px;"><code>\VAR{entry.text}</code></td>
-                <td style="padding:4px 8px;">The entry's bullet text (inside a loop)</td>
-              </tr>
-              <tr>
-                <td style="padding:4px 8px;"><code>\VAR{entry.subsection}</code></td>
-                <td style="padding:4px 8px;">The entry's heading — e.g. "Software Engineer — Acme Corp"</td>
-              </tr>
-            </tbody>
-          </table>
-
-          <p><strong>Available variables:</strong></p>
-          <ul style="margin:4px 0; padding-left:20px;">
-            <li><code>name</code>, <code>email</code>, <code>phone</code>, <code>location</code> — profile fields</li>
-            <li><code>summary</code> — summary text (string, not a list)</li>
-            <li><code>experience</code> — list of entries, each has <code>.text</code> and <code>.subsection</code></li>
-            <li><code>education</code> — same structure as experience</li>
-            <li><code>skills</code> — list of entries, each has <code>.text</code></li>
-            <li><code>projects</code> — same structure as experience (optional)</li>
-            <li><code>certifications</code> — list of entries, each has <code>.text</code> (optional)</li>
-          </ul>
-
-          <p><strong>Loop helpers:</strong> <code>\BLOCK{if not loop.last}...\BLOCK{endif}</code> — insert separators between items.</p>
-
-          <p><strong>Minimal example:</strong></p>
-          <pre style="background:var(--bg-secondary); padding:8px; border-radius:4px; overflow-x:auto; font-size:0.85em;">\documentclass[11pt]{article}
-\usepackage[margin=0.75in]{geometry}
-\usepackage{enumitem}
-\pagestyle{empty}
-\setlength{\parindent}{0pt}
-
-\begin{document}
-{\LARGE\bfseries \VAR{name}} \\
-\VAR{email} | \VAR{phone} | \VAR{location}
-
-\BLOCK{if experience}
-\section*{Experience}
-\BLOCK{for entry in experience}
-\textbf{\VAR{entry.subsection}} \\
-\begin{itemize}[leftmargin=1.5em,topsep=0pt]
-  \item \VAR{entry.text}
-\end{itemize}
-\BLOCK{endfor}
-\BLOCK{endif}
-
-\BLOCK{if education}
-\section*{Education}
-\BLOCK{for entry in education}
-\textbf{\VAR{entry.subsection}} --- \VAR{entry.text} \\
-\BLOCK{endfor}
-\BLOCK{endif}
-
-\BLOCK{if skills}
-\section*{Skills}
-\BLOCK{for entry in skills}\VAR{entry.text}\BLOCK{if not loop.last}, \BLOCK{endif}\BLOCK{endfor}
-\BLOCK{endif}
-\end{document}</pre>
-          <p style="margin-top:8px;"><strong>Tip:</strong> Start from an Overleaf template and replace hardcoded content with the <code>\VAR{}</code> / <code>\BLOCK{}</code> placeholders above. LaTeX special characters in your data (&amp; % $ # _ { }) are escaped automatically.</p>
-        </div>
-      </details>
-
-      <div class="flex-row gap-sm" style="margin-bottom:12px; flex-wrap:wrap; align-items:flex-end;">
-        <label style="flex:1; min-width:200px;">
-          <span data-i18n="reuse.template_name">Template Name</span>
-          <input type="text" id="tpl-upload-name" class="form-input" placeholder="My Overleaf Template" aria-label="Template name">
-        </label>
-        <label style="flex:1; min-width:200px;">
-          <span data-i18n="reuse.template_desc">Description</span>
-          <input type="text" id="tpl-upload-desc" class="form-input" placeholder="Optional description" aria-label="Template description">
-        </label>
-        <label style="flex:0 0 auto;">
-          <span>.tex file</span>
-          <input type="file" id="tpl-upload-file" class="form-input" accept=".tex" aria-label="LaTeX template file">
-        </label>
-        <label style="flex:0 0 auto; display:flex; align-items:center; gap:6px; padding-top:20px;">
-          <input type="checkbox" id="tpl-upload-default" aria-label="Set as default template">
-          <span data-i18n="reuse.set_default">Set Default</span>
-        </label>
-        <button type="button" class="btn btn-primary btn-sm" onclick="uploadTemplate()" style="margin-top:auto;"
-                data-i18n="reuse.upload_template" aria-label="Upload template">Upload Template</button>
-      </div>
-      <span id="tpl-upload-status" class="text-muted" aria-live="polite"></span>
-
-      <div id="tpl-list" role="region" aria-label="Template list" style="margin-top:12px;"></div>
     </div>
 
     <!-- Bottom row: Resume Builder + Documents side by side -->
@@ -869,12 +711,49 @@
       </div>
     </div>
 
+    <!-- KB Entries Database -->
+    <div class="kb-toolbar">
+      <div class="kb-toolbar-upload">
+        <input type="file" id="kb-upload-input" accept=".pdf,.docx,.txt,.md"
+               aria-label="Choose document to upload" class="form-input">
+        <button type="button" class="btn btn-primary" onclick="uploadKBDocument()"
+                data-i18n="kb.upload_title">Upload</button>
+        <div id="kb-upload-status" class="kb-upload-status" aria-live="polite"></div>
+      </div>
+      <div class="kb-toolbar-filter">
+        <select id="kb-filter-category" class="form-input"
+                onchange="filterKBCategory(this.value)"
+                aria-label="Filter by category">
+          <option value="all" data-i18n="kb.filter_all">All Categories</option>
+          <option value="experience" data-i18n="kb.category_experience">Experience</option>
+          <option value="skill" data-i18n="kb.category_skill">Skills</option>
+          <option value="education" data-i18n="kb.category_education">Education</option>
+          <option value="project" data-i18n="kb.category_project">Projects</option>
+          <option value="certification" data-i18n="kb.category_certification">Certifications</option>
+          <option value="summary" data-i18n="kb.category_summary">Summary</option>
+        </select>
+        <input type="text" id="kb-search-input" class="form-input"
+               placeholder="Search entries..." aria-label="Search KB entries"
+               oninput="searchKB(this.value)">
+      </div>
+    </div>
+
+    <div id="kb-entries-list" role="region" aria-label="Knowledge Base entries" aria-live="polite">
+    </div>
+
+    <div id="kb-pagination" class="resume-pagination" role="navigation" aria-label="KB entries pagination">
+    </div>
+
+    <div id="kb-edit-overlay" class="resume-detail-overlay hidden" role="dialog" aria-label="Edit KB entry">
+      <div class="kb-edit-content resume-detail-body"></div>
+    </div>
+
     <!-- Resume Builder Overlay -->
     <div id="rb-overlay" class="resume-detail-overlay hidden" role="dialog" aria-modal="true" aria-label="Resume Builder">
       <div class="rb-container">
         <div class="rb-header">
           <h2 data-i18n="builder.title">Resume Builder</h2>
-          <button type="button" class="btn" onclick="closeResumeBuilder()" aria-label="Close builder">&times;</button>
+          <button type="button" class="btn btn-secondary" onclick="closeResumeBuilder()" aria-label="Close builder">&times;</button>
         </div>
 
         <div class="rb-layout">
@@ -949,6 +828,7 @@
               <div class="flex-row gap-sm" style="margin-top:8px;">
                 <label>Template
                   <select id="rb-template-select" class="form-input" style="max-width:150px;" aria-label="Resume template">
+                    <option value="jake" selected>Jake (Default)</option>
                     <option value="classic">Classic</option>
                     <option value="modern">Modern</option>
                     <option value="academic">Academic</option>
@@ -959,12 +839,12 @@
               <div class="flex-row gap-sm" style="margin-top:12px; flex-wrap:wrap;">
                 <button type="button" class="btn btn-primary" onclick="previewBuilderResume()"
                         data-i18n="builder.preview_btn">Preview PDF</button>
-                <button type="button" class="btn" onclick="document.getElementById('rb-autofill-section').classList.toggle('hidden')"
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('rb-autofill-section').classList.toggle('hidden')"
                         data-i18n="builder.autofill_btn">Auto-Fill from JD</button>
                 <div style="display:flex; align-items:center; gap:6px;">
                   <input type="text" id="rb-preset-name" class="form-input" style="max-width:200px;"
                          placeholder="Preset name..." aria-label="Preset name">
-                  <button type="button" class="btn" onclick="savePreset()"
+                  <button type="button" class="btn btn-secondary" onclick="savePreset()"
                           data-i18n="builder.save_preset">Save Preset</button>
                 </div>
                 <span id="rb-preview-status" aria-live="polite"></span>

@@ -153,7 +153,7 @@ function renderKBPanel(search) {
         <span class="rb-entry-cat badge">${escHtml(cat)}</span>
         ${e.subsection ? `<strong>${escHtml(e.subsection)}</strong> — ` : ''}
         <span>${escHtml(preview)}${(e.text || '').length > 80 ? '…' : ''}</span>
-        <button type="button" class="btn btn-sm rb-add-btn"
+        <button type="button" class="btn btn-sm btn-secondary rb-add-btn"
                 onclick="addToResume(${e.id})" aria-label="${escAttr(t('builder.add_entry'))}"
                 title="${escAttr(t('builder.add_entry'))}">+</button>
       </div>`;
@@ -187,11 +187,11 @@ function renderResumePanel() {
       html += `<div class="rb-selected-entry" draggable="true" data-entry-id="${e.id}" data-section="${section}" data-index="${i}"
                     role="listitem" tabindex="0">
         <div class="rb-entry-controls">
-          <button type="button" class="btn btn-sm" onclick="moveEntryUp('${section}', ${i})"
+          <button type="button" class="btn btn-sm btn-secondary" onclick="moveEntryUp('${section}', ${i})"
                   aria-label="Move up" ${i === 0 ? 'disabled' : ''}>&#x25B2;</button>
-          <button type="button" class="btn btn-sm" onclick="moveEntryDown('${section}', ${i})"
+          <button type="button" class="btn btn-sm btn-secondary" onclick="moveEntryDown('${section}', ${i})"
                   aria-label="Move down" ${i === entries.length - 1 ? 'disabled' : ''}>&#x25BC;</button>
-          <button type="button" class="btn btn-sm rb-remove-btn" onclick="removeFromResume('${section}', ${i})"
+          <button type="button" class="btn btn-sm btn-danger rb-remove-btn" onclick="removeFromResume('${section}', ${i})"
                   aria-label="${escAttr(t('builder.remove_entry'))}">&times;</button>
         </div>
         ${e.subsection ? `<strong>${escHtml(e.subsection)}</strong> — ` : ''}
@@ -355,7 +355,7 @@ function renderPresetsList() {
       <div class="rb-preset-actions">
         <button type="button" class="btn btn-sm btn-primary" onclick="loadPreset(${p.id})"
                 aria-label="${escAttr(t('builder.load_preset'))}">${escHtml(t('builder.load'))}</button>
-        <button type="button" class="btn btn-sm" onclick="deletePreset(${p.id})"
+        <button type="button" class="btn btn-sm btn-danger" onclick="deletePreset(${p.id})"
                 aria-label="${escAttr(t('builder.delete_preset'))}">&times;</button>
       </div>
     </div>`;

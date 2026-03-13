@@ -15,7 +15,7 @@ let kbSearch = '';
 // ---------------------------------------------------------------------------
 
 export async function loadKnowledgeBase() {
-  await Promise.all([loadKBStats(), loadKBEntries(), loadTemplates()]);
+  await Promise.all([loadKBStats(), loadKBEntries(), loadKBDocuments()]);
 }
 
 async function loadKBStats() {
@@ -86,10 +86,10 @@ export async function loadKBEntries() {
         <td>${escHtml(dates)}</td>
         <td>${escHtml(e.role_location || '')}</td>
         <td class="kb-actions no-row-click">
-          <button type="button" class="btn btn-sm btn-secondary" data-kb-edit="${e.id}"
+          <button type="button" class="btn btn-xs" data-kb-edit="${e.id}"
                   aria-label="${escAttr(t('kb.edit_entry'))}"
                   data-i18n="kb.edit_entry">Edit</button>
-          <button type="button" class="btn btn-sm btn-danger" data-kb-delete="${e.id}"
+          <button type="button" class="btn btn-xs btn-danger" data-kb-delete="${e.id}"
                   aria-label="${escAttr(t('kb.delete_entry'))}"
                   data-i18n="kb.delete_entry">Delete</button>
         </td>

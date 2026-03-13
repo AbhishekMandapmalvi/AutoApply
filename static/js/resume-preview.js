@@ -70,17 +70,25 @@ function showPreviewPDF(url, template) {
 
   const content = overlay.querySelector('.kb-preview-content') || overlay;
   content.innerHTML = `
-    <div class="resume-detail-header">
-      <button type="button" class="btn btn-secondary" onclick="closeKBPreview()"
-              data-i18n="resumes.back_to_library">Back</button>
-      <h3>${escHtml(t('reuse.settings_title'))} — ${escHtml(template)}</h3>
-      <a href="${escAttr(url)}" download="preview_${escAttr(template)}.pdf"
+    <div class="resume-detail-header" style="display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid var(--border-color);">
+      <button type="button" class="btn btn-secondary" onclick="closeKBPreview()">Close</button>
+      <h3 style="flex:1; margin:0;">Generated Resume</h3>
+      <a href="${escAttr(url)}" download="resume.pdf"
          class="btn btn-primary">Download PDF</a>
     </div>
     <iframe src="${escAttr(url)}" class="resume-pdf-preview"
-            title="Resume preview" style="width:100%;height:80vh;border:none;"></iframe>
+            title="Resume preview" style="width:100%;height:calc(100vh - 60px);border:none;"></iframe>
   `;
   _applyDataI18n(content);
+
+  // Ensure overlay covers full viewport
+  overlay.style.position = 'fixed';
+  overlay.style.top = '0';
+  overlay.style.left = '0';
+  overlay.style.right = '0';
+  overlay.style.bottom = '0';
+  overlay.style.zIndex = '1000';
+  overlay.style.backgroundColor = 'var(--bg, #0f1923)';
   overlay.classList.remove('hidden');
 }
 
