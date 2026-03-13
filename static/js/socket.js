@@ -5,6 +5,7 @@ import { state } from './state.js';
 import { updateBotUI, renderStats } from './bot-control.js';
 import { addFeedItem } from './feed.js';
 import { showReviewCard, hideReviewCard } from './review.js';
+import { showLoginGateModal, hideLoginGateModal } from './login-gate.js';
 import { updateAIIndicators } from './ai-status.js';
 
 export function initSocket() {
@@ -36,6 +37,12 @@ function handleBotStatus(data) {
   if (data.awaiting_review === false) {
     hideReviewCard();
   }
+  // Show/hide login gate modal (FR-089)
+  if (data.awaiting_login === true && data.login_context) {
+    showLoginGateModal(data.login_context);
+  } else if (data.awaiting_login === false) {
+    hideLoginGateModal();
+  }
 }
 
 function handleFeedEvent(evt) {
@@ -50,8 +57,13 @@ function handleFeedEvent(evt) {
   if (evt.type === 'REVIEW') {
     showReviewCard(evt);
   }
+  // Show login gate modal when LOGIN_REQUIRED event arrives (FR-089)
+  if (evt.type === 'LOGIN_REQUIRED') {
+    showLoginGateModal({ domain: evt.domain, portal_type: evt.portal_type, url: evt.apply_url });
+  }
   // Hide review card on APPLIED, SKIPPED, or ERROR for the same job
   if (['APPLIED', 'SKIPPED', 'ERROR'].includes(evt.type)) {
     hideReviewCard();
+    hideLoginGateModal();
   }
 }

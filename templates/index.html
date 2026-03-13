@@ -438,6 +438,37 @@
       </div>
     </div>
 
+    <!-- Login Gate Modal (FR-089) -->
+    <div class="modal-overlay hidden" id="modal-login-gate">
+      <div class="modal-box" role="alertdialog" aria-modal="true" aria-labelledby="login-gate-title" aria-describedby="login-gate-desc">
+        <button class="modal-close" onclick="closeModal('modal-login-gate')" aria-label="Close dialog">&times;</button>
+        <h3 id="login-gate-title" data-i18n="login_gate.title">Login Required</h3>
+        <p id="login-gate-desc" class="text-dim" style="margin-bottom:16px;" data-i18n="login_gate.description">
+          The bot detected a login wall. Please log in to this portal, then click "I've Logged In" to continue.
+        </p>
+        <div style="background:var(--bg); padding:12px; border-radius:var(--radius-sm); margin-bottom:16px;">
+          <div style="font-size:.85rem; margin-bottom:4px;"><strong data-i18n="login_gate.domain_label">Portal:</strong> <span id="login-gate-domain"></span></div>
+          <div style="font-size:.85rem;"><strong data-i18n="login_gate.type_label">Type:</strong> <span id="login-gate-type"></span></div>
+          <div style="font-size:.85rem; margin-top:4px;" class="hidden"><a id="login-gate-url" href="#" target="_blank" rel="noopener" data-i18n="login_gate.open_portal">Open portal</a></div>
+        </div>
+        <p class="text-dim" style="font-size:.85rem; margin-bottom:12px;" data-i18n="login_gate.save_hint">
+          Optionally save your credentials below for future auto-login:
+        </p>
+        <div class="form-group" style="margin-bottom:12px;">
+          <label for="login-gate-username" data-i18n="login_gate.username_label">Username / Email</label>
+          <input type="text" class="form-control" id="login-gate-username" autocomplete="username">
+        </div>
+        <div class="form-group" style="margin-bottom:20px;">
+          <label for="login-gate-password" data-i18n="login_gate.password_label">Password</label>
+          <input type="password" class="form-control" id="login-gate-password" autocomplete="current-password">
+        </div>
+        <div class="flex gap-sm">
+          <button class="btn btn-success" onclick="loginGateDone()" data-i18n="login_gate.done_button">I've Logged In</button>
+          <button class="btn btn-ghost" onclick="loginGateSkip()" data-i18n="login_gate.skip_button">Skip This Job</button>
+        </div>
+      </div>
+    </div>
+
     <div class="card">
       <div class="flex justify-between items-center" style="margin-bottom:12px;">
         <h3 class="flex items-center gap-sm" style="margin-bottom:0;" data-i18n="dashboard.activity_feed">

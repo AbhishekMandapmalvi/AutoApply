@@ -682,5 +682,18 @@
     "login_required": "Login required at {domain} — please log in manually.",
     "auto_login_failed": "Auto-login failed at {domain}.",
     "auto_login_success": "Auto-login succeeded at {domain}."
+  },
+  "login_gate": {
+    "title": "Login Required",
+    "description": "The bot detected a login wall. Please log in to this portal, then click \"I've Logged In\" to continue.",
+    "domain_label": "Portal:",
+    "type_label": "Type:",
+    "open_portal": "Open portal",
+    "save_hint": "Optionally save your credentials below for future auto-login:",
+    "username_label": "Username / Email",
+    "password_label": "Password",
+    "done_button": "I've Logged In",
+    "skip_button": "Skip This Job",
+    "unknown": "Unknown portal"
   }
 }

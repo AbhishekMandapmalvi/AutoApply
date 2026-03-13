@@ -18,6 +18,7 @@ import { debounceSearch, loadApplications, goAppPage, updateAppStatus, updateApp
 import { loadProfileFiles, showFileModal, editFile, saveFile, confirmDeleteFile } from './profile.js';
 import { loadSettings, saveSettings, updateScheduleUI, changeApplyMode, initBotToggles, uploadDefaultResume, removeDefaultResume, loadDefaultResume, onLLMProviderChange, validateLLMKey, onLocaleChange } from './settings.js';
 import { reviewApprove, reviewEdit, reviewManualSubmit, reviewSkip } from './review.js';
+import { loginGateDone, loginGateSkip } from './login-gate.js';
 import { openLoginBrowser, closeLoginBrowser } from './login.js';
 import { closeModal } from './modals.js';
 import { updateAIIndicators } from './ai-status.js';
@@ -68,6 +69,8 @@ window.reviewApprove = reviewApprove;
 window.reviewEdit = reviewEdit;
 window.reviewManualSubmit = reviewManualSubmit;
 window.reviewSkip = reviewSkip;
+window.loginGateDone = loginGateDone;
+window.loginGateSkip = loginGateSkip;
 window.closeModal = closeModal;
 window.switchAnalyticsPeriod = switchAnalyticsPeriod;
 window.viewResume = viewResume;

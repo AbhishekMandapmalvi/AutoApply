@@ -662,5 +662,18 @@
     "login_required": "Se requiere inicio de sesión en {domain} — inicie sesión manualmente.",
     "auto_login_failed": "Inicio de sesión automático falló en {domain}.",
     "auto_login_success": "Inicio de sesión automático exitoso en {domain}."
+  },
+  "login_gate": {
+    "title": "Inicio de Sesión Requerido",
+    "description": "El bot detectó un muro de inicio de sesión. Inicie sesión en este portal y haga clic en \"Ya Inicié Sesión\" para continuar.",
+    "domain_label": "Portal:",
+    "type_label": "Tipo:",
+    "open_portal": "Abrir portal",
+    "save_hint": "Opcionalmente guarde sus credenciales para inicio de sesión automático futuro:",
+    "username_label": "Usuario / Correo Electrónico",
+    "password_label": "Contraseña",
+    "done_button": "Ya Inicié Sesión",
+    "skip_button": "Omitir Este Trabajo",
+    "unknown": "Portal desconocido"
   }
 }
